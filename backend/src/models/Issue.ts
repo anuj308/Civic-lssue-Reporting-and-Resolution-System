@@ -1,0 +1,391 @@
+import mongoose, { Document, Schema } from 'mongoose';
+
+export interface IIssue extends Document {
+  _id: string;
+  title: string;
+  description: string;
+  category: string;
+  subcategory?: string;
+  priority: 'low' | 'medium' | 'high' | 'critical';
+  status: 'pending' | 'acknowledged' | 'in_progress' | 'resolved' | 'closed' | 'rejected';
+  reportedBy: string; // User ID
+  assignedTo?: string; // User ID
+  assignedDepartment?: string; // Department ID
+  location: {
+    address: string;
+    city: string;
+    state: string;
+    pincode: string;
+    coordinates: {
+      latitude: number;
+      longitude: number;
+    };
+    landmark?: string;
+  };
+  media: {
+    images: string[]; // Cloudinary URLs
+    videos?: string[]; // Cloudinary URLs
+    audio?: string; // Voice description URL
+  };
+  timeline: {
+    reported: Date;
+    acknowledged?: Date;
+    started?: Date;
+    resolved?: Date;
+    closed?: Date;
+  };
+  estimatedResolution?: Date;
+  actualResolution?: Date;
+  resolution?: {
+    description: string;
+    resolvedBy: string; // User ID
+    images?: string[]; // Before/after images
+    cost?: number;
+    resources?: string[];
+  };
+  feedback?: {
+    rating: number; // 1-5 stars
+    comment?: string;
+    submittedAt: Date;
+  };
+  votes: {
+    upvotes: string[]; // Array of User IDs
+    downvotes: string[]; // Array of User IDs
+  };
+  comments: {
+    user: string; // User ID
+    message: string;
+    timestamp: Date;
+    isOfficial: boolean; // From department/admin
+  }[];
+  tags: string[];
+  isPublic: boolean;
+  urgencyScore: number; // Calculated score based on various factors
+  duplicateOf?: string; // Issue ID if this is a duplicate
+  relatedIssues: string[]; // Array of related Issue IDs
+  metadata: {
+    deviceInfo?: string;
+    appVersion?: string;
+    reportingMethod: 'mobile' | 'web' | 'phone' | 'email';
+    weatherCondition?: string;
+    timeOfDay: 'morning' | 'afternoon' | 'evening' | 'night';
+  };
+  analytics: {
+    views: number;
+    shares: number;
+    reportCount: number; // How many times this issue was reported
+  };
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+const issueSchema = new Schema<IIssue>({
+  title: {
+    type: String,
+    required: [true, 'Issue title is required'],
+    trim: true,
+    maxLength: [200, 'Title cannot exceed 200 characters']
+  },
+  description: {
+    type: String,
+    required: [true, 'Issue description is required'],
+    trim: true,
+    maxLength: [1000, 'Description cannot exceed 1000 characters']
+  },
+  category: {
+    type: String,
+    required: [true, 'Category is required'],
+    enum: [
+      'pothole',
+      'streetlight',
+      'garbage',
+      'water_supply',
+      'sewerage',
+      'traffic',
+      'park_maintenance',
+      'road_maintenance',
+      'electrical',
+      'construction',
+      'noise_pollution',
+      'air_pollution',
+      'water_pollution',
+      'stray_animals',
+      'illegal_parking',
+      'illegal_construction',
+      'public_transport',
+      'healthcare',
+      'education',
+      'other'
+    ]
+  },
+  subcategory: {
+    type: String,
+    maxLength: [100, 'Subcategory cannot exceed 100 characters']
+  },
+  priority: {
+    type: String,
+    enum: ['low', 'medium', 'high', 'critical'],
+    default: 'medium'
+  },
+  status: {
+    type: String,
+    enum: ['pending', 'acknowledged', 'in_progress', 'resolved', 'closed', 'rejected'],
+    default: 'pending'
+  },
+  reportedBy: {
+    type: Schema.Types.ObjectId,
+    ref: 'User',
+    required: [true, 'Reporter is required']
+  },
+  assignedTo: {
+    type: Schema.Types.ObjectId,
+    ref: 'User',
+    default: null
+  },
+  assignedDepartment: {
+    type: Schema.Types.ObjectId,
+    ref: 'Department',
+    default: null
+  },
+  location: {
+    address: {
+      type: String,
+      required: [true, 'Address is required'],
+      trim: true,
+      maxLength: [300, 'Address cannot exceed 300 characters']
+    },
+    city: {
+      type: String,
+      required: [true, 'City is required'],
+      trim: true
+    },
+    state: {
+      type: String,
+      default: 'Jharkhand'
+    },
+    pincode: {
+      type: String,
+      required: [true, 'Pincode is required'],
+      match: [/^\d{6}$/, 'Please enter a valid 6-digit pincode']
+    },
+    coordinates: {
+      latitude: {
+        type: Number,
+        required: [true, 'Latitude is required'],
+        min: [-90, 'Latitude must be between -90 and 90'],
+        max: [90, 'Latitude must be between -90 and 90']
+      },
+      longitude: {
+        type: Number,
+        required: [true, 'Longitude is required'],
+        min: [-180, 'Longitude must be between -180 and 180'],
+        max: [180, 'Longitude must be between -180 and 180']
+      }
+    },
+    landmark: {
+      type: String,
+      maxLength: [100, 'Landmark cannot exceed 100 characters']
+    }
+  },
+  media: {
+    images: [{
+      type: String,
+      required: true
+    }],
+    videos: [{
+      type: String
+    }],
+    audio: {
+      type: String,
+      default: null
+    }
+  },
+  timeline: {
+    reported: {
+      type: Date,
+      default: Date.now,
+      required: true
+    },
+    acknowledged: {
+      type: Date,
+      default: null
+    },
+    started: {
+      type: Date,
+      default: null
+    },
+    resolved: {
+      type: Date,
+      default: null
+    },
+    closed: {
+      type: Date,
+      default: null
+    }
+  },
+  estimatedResolution: {
+    type: Date,
+    default: null
+  },
+  actualResolution: {
+    type: Date,
+    default: null
+  },
+  resolution: {
+    description: String,
+    resolvedBy: {
+      type: Schema.Types.ObjectId,
+      ref: 'User'
+    },
+    images: [String],
+    cost: {
+      type: Number,
+      min: [0, 'Cost cannot be negative']
+    },
+    resources: [String]
+  },
+  feedback: {
+    rating: {
+      type: Number,
+      min: [1, 'Rating must be between 1 and 5'],
+      max: [5, 'Rating must be between 1 and 5']
+    },
+    comment: {
+      type: String,
+      maxLength: [500, 'Feedback comment cannot exceed 500 characters']
+    },
+    submittedAt: Date
+  },
+  votes: {
+    upvotes: [{
+      type: Schema.Types.ObjectId,
+      ref: 'User'
+    }],
+    downvotes: [{
+      type: Schema.Types.ObjectId,
+      ref: 'User'
+    }]
+  },
+  comments: [{
+    user: {
+      type: Schema.Types.ObjectId,
+      ref: 'User',
+      required: true
+    },
+    message: {
+      type: String,
+      required: true,
+      maxLength: [500, 'Comment cannot exceed 500 characters']
+    },
+    timestamp: {
+      type: Date,
+      default: Date.now
+    },
+    isOfficial: {
+      type: Boolean,
+      default: false
+    }
+  }],
+  tags: [{
+    type: String,
+    lowercase: true,
+    trim: true
+  }],
+  isPublic: {
+    type: Boolean,
+    default: true
+  },
+  urgencyScore: {
+    type: Number,
+    default: 0,
+    min: [0, 'Urgency score cannot be negative'],
+    max: [100, 'Urgency score cannot exceed 100']
+  },
+  duplicateOf: {
+    type: Schema.Types.ObjectId,
+    ref: 'Issue',
+    default: null
+  },
+  relatedIssues: [{
+    type: Schema.Types.ObjectId,
+    ref: 'Issue'
+  }],
+  metadata: {
+    deviceInfo: String,
+    appVersion: String,
+    reportingMethod: {
+      type: String,
+      enum: ['mobile', 'web', 'phone', 'email'],
+      default: 'mobile'
+    },
+    weatherCondition: String,
+    timeOfDay: {
+      type: String,
+      enum: ['morning', 'afternoon', 'evening', 'night'],
+      default: function() {
+        const hour = new Date().getHours();
+        if (hour >= 5 && hour < 12) return 'morning';
+        if (hour >= 12 && hour < 17) return 'afternoon';
+        if (hour >= 17 && hour < 21) return 'evening';
+        return 'night';
+      }
+    }
+  },
+  analytics: {
+    views: { type: Number, default: 0 },
+    shares: { type: Number, default: 0 },
+    reportCount: { type: Number, default: 1 }
+  }
+}, {
+  timestamps: true,
+  toJSON: { virtuals: true },
+  toObject: { virtuals: true }
+});
+
+// Indexes for better query performance
+issueSchema.index({ status: 1, createdAt: -1 });
+issueSchema.index({ category: 1, priority: 1 });
+issueSchema.index({ reportedBy: 1 });
+issueSchema.index({ assignedDepartment: 1 });
+issueSchema.index({ assignedTo: 1 });
+issueSchema.index({ 'location.coordinates': '2dsphere' });
+issueSchema.index({ 'location.pincode': 1 });
+issueSchema.index({ tags: 1 });
+issueSchema.index({ urgencyScore: -1 });
+issueSchema.index({ duplicateOf: 1 });
+
+// Compound indexes for common queries
+issueSchema.index({ status: 1, priority: -1, createdAt: -1 });
+issueSchema.index({ assignedDepartment: 1, status: 1 });
+issueSchema.index({ category: 1, 'location.coordinates': '2dsphere' });
+
+// Virtual for vote score
+issueSchema.virtual('voteScore').get(function(this: IIssue) {
+  return this.votes.upvotes.length - this.votes.downvotes.length;
+});
+
+// Virtual for days since reported
+issueSchema.virtual('daysSinceReported').get(function(this: IIssue) {
+  return Math.floor((Date.now() - this.timeline.reported.getTime()) / (1000 * 60 * 60 * 24));
+});
+
+// Virtual for resolution time in hours
+issueSchema.virtual('resolutionTimeHours').get(function(this: IIssue) {
+  if (!this.timeline.resolved) return null;
+  return Math.round((this.timeline.resolved.getTime() - this.timeline.reported.getTime()) / (1000 * 60 * 60));
+});
+
+// Virtual for status display
+issueSchema.virtual('statusDisplay').get(function(this: IIssue) {
+  const statusMap: { [key: string]: string } = {
+    'pending': 'Reported',
+    'acknowledged': 'Acknowledged',
+    'in_progress': 'In Progress',
+    'resolved': 'Resolved',
+    'closed': 'Closed',
+    'rejected': 'Rejected'
+  };
+  return statusMap[this.status] || this.status;
+});
+
+export const Issue = mongoose.model<IIssue>('Issue', issueSchema);
