@@ -5,17 +5,18 @@ import helmet from 'helmet';
 import compression from 'compression';
 import morgan from 'morgan';
 import rateLimit from 'express-rate-limit';
+import cookieParser from 'cookie-parser';
 import { createServer } from 'http';
 import { Server } from 'socket.io';
 import dotenv from 'dotenv';
 
 // Import routes
 import authRoutes from './routes/auth';
-import userRoutes from './routes/users';
-import issueRoutes from './routes/issues';
-import departmentRoutes from './routes/departments';
-import analyticsRoutes from './routes/analytics';
-import notificationRoutes from './routes/notifications';
+// import userRoutes from './routes/users';
+// import issueRoutes from './routes/issues';
+// import departmentRoutes from './routes/departments';
+// import analyticsRoutes from './routes/analytics';
+// import notificationRoutes from './routes/notifications';
 
 // Import middleware
 import { errorHandler } from './middleware/errorHandler';
@@ -25,7 +26,6 @@ import { authenticateToken } from './middleware/auth';
 // Import services
 import { connectDatabase } from './config/database';
 import { connectRedis } from './config/redis';
-import { setupSocketIO } from './services/socketService';
 
 // Load environment variables
 dotenv.config();
@@ -60,6 +60,7 @@ app.use(cors({
 app.use(morgan('combined'));
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
+app.use(cookieParser()); // Add cookie parser middleware
 app.use(limiter);
 
 // Health check route
@@ -74,14 +75,14 @@ app.get('/health', (req, res) => {
 
 // API routes
 app.use('/api/auth', authRoutes);
-app.use('/api/users', authenticateToken, userRoutes);
-app.use('/api/issues', issueRoutes);
-app.use('/api/departments', authenticateToken, departmentRoutes);
-app.use('/api/analytics', authenticateToken, analyticsRoutes);
-app.use('/api/notifications', authenticateToken, notificationRoutes);
+// app.use('/api/users', authenticateToken, userRoutes);
+// app.use('/api/issues', issueRoutes);
+// app.use('/api/departments', authenticateToken, departmentRoutes);
+// app.use('/api/analytics', authenticateToken, analyticsRoutes);
+// app.use('/api/notifications', authenticateToken, notificationRoutes);
 
 // Socket.IO setup
-setupSocketIO(io);
+// setupSocketIO(io);
 
 // Error handling middleware
 app.use(notFound);
