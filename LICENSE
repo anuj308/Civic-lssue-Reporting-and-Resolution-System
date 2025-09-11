@@ -1,0 +1,88 @@
+MIT License
+
+Copyright (c) 2023 Government of Jharkhand - Department of Higher and Technical Education
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+
+## Additional Terms for Government Use
+
+This software is developed as part of a government initiative to improve civic 
+engagement and public service delivery. While the software is released under 
+the MIT License, users are encouraged to:
+
+1. **Acknowledge the source** when using this software in other government 
+   projects or civic applications.
+
+2. **Contribute improvements** back to the original project to benefit the 
+   broader community of civic technology users.
+
+3. **Respect data privacy** and comply with applicable data protection laws 
+   when implementing this system.
+
+4. **Ensure accessibility** standards are maintained when modifying the user 
+   interface components.
+
+5. **Follow security best practices** especially when deploying in production 
+   environments handling citizen data.
+
+## Third-Party Licenses
+
+This project includes software licensed under various open source licenses:
+
+### Frontend Dependencies
+- React: MIT License
+- Material-UI: MIT License
+- Redux Toolkit: MIT License
+- React Router: MIT License
+
+### Backend Dependencies
+- Express.js: MIT License
+- Mongoose: MIT License
+- bcryptjs: MIT License
+- jsonwebtoken: MIT License
+
+### Mobile Dependencies
+- React Native: MIT License
+- Expo: MIT License
+- React Navigation: MIT License
+
+### Development Dependencies
+- TypeScript: Apache License 2.0
+- ESLint: MIT License
+- Jest: MIT License
+
+For complete license information of all dependencies, please refer to the 
+package.json files in each respective directory.
+
+## Data and Privacy
+
+Users of this software are responsible for:
+
+- Complying with local data protection and privacy laws
+- Implementing appropriate security measures for user data
+- Obtaining necessary consents for data collection and processing
+- Ensuring secure transmission and storage of sensitive information
+- Regular security audits and updates
+
+## Disclaimer
+
+The Government of Jharkhand provides this software "as is" without warranty 
+of any kind. Users are responsible for ensuring the software meets their 
+specific requirements and for implementing appropriate security measures in 
+production environments.
