@@ -12,11 +12,12 @@ import dotenv from 'dotenv';
 
 // Import routes
 import authRoutes from './routes/auth';
-// import userRoutes from './routes/users';
-// import issueRoutes from './routes/issues';
-// import departmentRoutes from './routes/departments';
-// import analyticsRoutes from './routes/analytics';
-// import notificationRoutes from './routes/notifications';
+import userRoutes from './routes/users';
+import issueRoutes from './routes/issues';
+import departmentRoutes from './routes/departments';
+import analyticsRoutes from './routes/analytics';
+import notificationRoutes from './routes/notifications';
+import adminRoutes from './routes/admin';
 
 // Import middleware
 import { errorHandler } from './middleware/errorHandler';
@@ -75,11 +76,12 @@ app.get('/health', (req, res) => {
 
 // API routes
 app.use('/api/auth', authRoutes);
-// app.use('/api/users', authenticateToken, userRoutes);
-// app.use('/api/issues', issueRoutes);
-// app.use('/api/departments', authenticateToken, departmentRoutes);
-// app.use('/api/analytics', authenticateToken, analyticsRoutes);
-// app.use('/api/notifications', authenticateToken, notificationRoutes);
+app.use('/api/users', userRoutes);
+app.use('/api/issues', issueRoutes);
+app.use('/api/departments', departmentRoutes);
+app.use('/api/analytics', analyticsRoutes);
+app.use('/api/notifications', notificationRoutes);
+app.use('/api/admin', adminRoutes);
 
 // Socket.IO setup
 // setupSocketIO(io);
