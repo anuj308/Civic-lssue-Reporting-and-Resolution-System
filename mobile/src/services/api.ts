@@ -145,6 +145,9 @@ export const authApi = {
   verifyOTP: (data: { userId: string; otp: string }) =>
     apiService.post('/auth/verify-otp', data),
   
+  resendOTP: (data: { email: string; phone: string }) =>
+    apiService.post('/auth/resend-otp', data),
+  
   refreshToken: (refreshToken: string) =>
     apiService.post('/auth/refresh', { refreshToken }),
   

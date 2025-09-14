@@ -134,7 +134,9 @@ const HomeScreen: React.FC = () => {
             icon="bell"
             onPress={() => navigation.navigate('Notifications' as never)}
             style={styles.notificationButton}
-          />
+          >
+            Notifications
+          </Button>
         </View>
 
         {/* Quick Stats */}

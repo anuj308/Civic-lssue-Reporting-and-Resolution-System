@@ -10,7 +10,7 @@ export type AuthStackParamList = {
   Welcome: undefined;
   Login: undefined;
   Register: undefined;
-  OTPVerification: { phoneNumber: string; userId: string };
+  OTPVerification: { email: string; phoneNumber: string };
 };
 
 const Stack = createStackNavigator<AuthStackParamList>();

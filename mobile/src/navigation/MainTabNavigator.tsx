@@ -4,18 +4,15 @@ import { createStackNavigator } from '@react-navigation/stack';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useTheme } from 'react-native-paper';
 
-import HomeScreen from '../screens/main/HomeScreen';
-import IssuesScreen from '../screens/main/IssuesScreen';
+// Import the actual screens we've created
 import MapScreen from '../screens/main/MapScreen';
 import ProfileScreen from '../screens/main/ProfileScreen';
-import ReportIssueScreen from '../screens/main/ReportIssueScreen';
 import IssueDetailScreen from '../screens/main/IssueDetailScreen';
-import CameraScreen from '../screens/main/CameraScreen';
-import NotificationsScreen from '../screens/main/NotificationsScreen';
-import SettingsScreen from '../screens/main/SettingsScreen';
+
+// Import from main index with proper component adapters
+import { IssuesScreen, ReportIssueScreen } from '../screens/main';
 
 export type MainTabParamList = {
-  Home: undefined;
   Issues: undefined;
   Report: undefined;
   Map: undefined;
@@ -24,14 +21,16 @@ export type MainTabParamList = {
 
 export type MainStackParamList = {
   MainTabs: undefined;
+  ReportIssue: undefined;
   IssueDetail: { issueId: string };
-  Camera: { onCapture: (uri: string) => void };
-  Notifications: undefined;
-  Settings: undefined;
 };
 
 const Tab = createBottomTabNavigator<MainTabParamList>();
 const Stack = createStackNavigator<MainStackParamList>();
+
+// Create wrapper components that handle navigation props properly
+const IssuesScreenWrapper = () => <IssuesScreen />;
+const ReportIssueScreenWrapper = () => <ReportIssueScreen />;
 
 const MainTabs = () => {
   const theme = useTheme();
@@ -40,38 +39,30 @@ const MainTabs = () => {
     <Tab.Navigator
       screenOptions={({ route }) => ({
         tabBarIcon: ({ focused, color, size }) => {
-          let iconName: keyof typeof MaterialCommunityIcons.glyphMap;
+          let iconName: string;
 
-          switch (route.name) {
-            case 'Home':
-              iconName = focused ? 'home' : 'home-outline';
-              break;
-            case 'Issues':
-              iconName = focused ? 'format-list-bulleted' : 'format-list-bulleted';
-              break;
-            case 'Report':
-              iconName = focused ? 'plus-circle' : 'plus-circle-outline';
-              break;
-            case 'Map':
-              iconName = focused ? 'map' : 'map-outline';
-              break;
-            case 'Profile':
-              iconName = focused ? 'account' : 'account-outline';
-              break;
-            default:
-              iconName = 'help';
+          if (route.name === 'Issues') {
+            iconName = focused ? 'format-list-bulleted' : 'format-list-bulleted';
+          } else if (route.name === 'Report') {
+            iconName = focused ? 'plus-circle' : 'plus-circle-outline';
+          } else if (route.name === 'Map') {
+            iconName = focused ? 'map' : 'map-outline';
+          } else if (route.name === 'Profile') {
+            iconName = focused ? 'account' : 'account-outline';
+          } else {
+            iconName = 'circle';
           }
 
-          return <MaterialCommunityIcons name={iconName} size={size} color={color} />;
+          return <MaterialCommunityIcons name={iconName as any} size={size} color={color} />;
         },
         tabBarActiveTintColor: theme.colors.primary,
         tabBarInactiveTintColor: theme.colors.onSurfaceVariant,
         tabBarStyle: {
           backgroundColor: theme.colors.surface,
           borderTopColor: theme.colors.outline,
-          height: 65,
-          paddingBottom: 8,
           paddingTop: 8,
+          paddingBottom: 8,
+          height: 60,
         },
         tabBarLabelStyle: {
           fontSize: 12,
@@ -81,27 +72,27 @@ const MainTabs = () => {
       })}
     >
       <Tab.Screen 
-        name="Home" 
-        component={HomeScreen}
-        options={{ tabBarLabel: 'Home' }}
-      />
-      <Tab.Screen 
         name="Issues" 
-        component={IssuesScreen}
+        component={IssuesScreenWrapper}
         options={{ tabBarLabel: 'My Issues' }}
-      />
-      <Tab.Screen 
-        name="Report" 
-        component={ReportIssueScreen}
-        options={{ 
-          tabBarLabel: 'Report',
-          tabBarIconStyle: { transform: [{ scale: 1.2 }] }
-        }}
       />
       <Tab.Screen 
         name="Map" 
         component={MapScreen}
         options={{ tabBarLabel: 'Map' }}
+      />
+      <Tab.Screen 
+        name="Report" 
+        component={ReportIssueScreenWrapper}
+        options={{ 
+          tabBarLabel: 'Report',
+        }}
+        listeners={({ navigation }) => ({
+          tabPress: (e) => {
+            e.preventDefault();
+            navigation.navigate('ReportIssue');
+          },
+        })}
       />
       <Tab.Screen 
         name="Profile" 
@@ -121,35 +112,19 @@ const MainTabNavigator = () => {
     >
       <Stack.Screen name="MainTabs" component={MainTabs} />
       <Stack.Screen 
+        name="ReportIssue" 
+        component={ReportIssueScreenWrapper}
+        options={{
+          headerShown: true,
+          title: 'Report Issue',
+        }}
+      />
+      <Stack.Screen 
         name="IssueDetail" 
         component={IssueDetailScreen}
         options={{
           headerShown: true,
           title: 'Issue Details',
-        }}
-      />
-      <Stack.Screen 
-        name="Camera" 
-        component={CameraScreen}
-        options={{
-          headerShown: true,
-          title: 'Take Photo',
-        }}
-      />
-      <Stack.Screen 
-        name="Notifications" 
-        component={NotificationsScreen}
-        options={{
-          headerShown: true,
-          title: 'Notifications',
-        }}
-      />
-      <Stack.Screen 
-        name="Settings" 
-        component={SettingsScreen}
-        options={{
-          headerShown: true,
-          title: 'Settings',
         }}
       />
     </Stack.Navigator>

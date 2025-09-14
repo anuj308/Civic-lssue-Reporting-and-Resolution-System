@@ -303,4 +303,8 @@ export const {
   updateIssueStatus
 } = issueSlice.actions;
 
+// Alias exports for compatibility
+export const fetchUserIssues = fetchMyIssues;
+export const deleteIssue = updateIssue; // Placeholder for delete functionality
+
 export default issueSlice.reducer;

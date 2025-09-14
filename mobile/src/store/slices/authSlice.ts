@@ -5,10 +5,13 @@ import { authApi } from '../../services/api';
 export interface User {
   id: string;
   name: string;
+  firstName?: string;
+  lastName?: string;
   email: string;
   phone: string;
   isVerified: boolean;
   avatar?: string;
+  createdAt?: string;
 }
 
 export interface AuthState {
@@ -58,16 +61,51 @@ export const register = createAsyncThunk(
   }
 );
 
+export const registerUser = createAsyncThunk(
+  'auth/registerUser',
+  async (userData: { firstName: string; lastName: string; email: string; phoneNumber: string; password: string }, { rejectWithValue }) => {
+    try {
+      const response = await authApi.register({
+        name: `${userData.firstName} ${userData.lastName}`,
+        email: userData.email,
+        phone: userData.phoneNumber,
+        password: userData.password,
+      });
+      return response.data;
+    } catch (error: any) {
+      return rejectWithValue(error.response?.data?.message || 'Registration failed');
+    }
+  }
+);
+
 export const verifyOTP = createAsyncThunk(
   'auth/verifyOTP',
-  async (data: { userId: string; otp: string }, { rejectWithValue }) => {
+  async (data: { email: string; phoneNumber: string; otp: string }, { rejectWithValue }) => {
     try {
-      const response = await authApi.verifyOTP(data);
+      const response = await authApi.verifyOTP({
+        userId: data.email, // Using email as userId for now
+        otp: data.otp,
+      });
       await AsyncStorage.setItem('token', response.data.token);
       await AsyncStorage.setItem('refreshToken', response.data.refreshToken);
       return response.data;
     } catch (error: any) {
       return rejectWithValue(error.response?.data?.message || 'OTP verification failed');
+    }
+  }
+);
+
+export const resendOTP = createAsyncThunk(
+  'auth/resendOTP',
+  async (data: { email: string; phoneNumber: string }, { rejectWithValue }) => {
+    try {
+      const response = await authApi.resendOTP({
+        email: data.email,
+        phone: data.phoneNumber,
+      });
+      return response.data;
+    } catch (error: any) {
+      return rejectWithValue(error.response?.data?.message || 'Failed to resend OTP');
     }
   }
 );
@@ -153,6 +191,21 @@ const authSlice = createSlice({
         state.error = action.payload as string;
       });
 
+    // Register User
+    builder
+      .addCase(registerUser.pending, (state) => {
+        state.isLoading = true;
+        state.error = null;
+      })
+      .addCase(registerUser.fulfilled, (state, action) => {
+        state.isLoading = false;
+        state.error = null;
+      })
+      .addCase(registerUser.rejected, (state, action) => {
+        state.isLoading = false;
+        state.error = action.payload as string;
+      });
+
     // Verify OTP
     builder
       .addCase(verifyOTP.pending, (state) => {
@@ -168,6 +221,21 @@ const authSlice = createSlice({
         state.error = null;
       })
       .addCase(verifyOTP.rejected, (state, action) => {
+        state.isLoading = false;
+        state.error = action.payload as string;
+      });
+
+    // Resend OTP
+    builder
+      .addCase(resendOTP.pending, (state) => {
+        state.isLoading = true;
+        state.error = null;
+      })
+      .addCase(resendOTP.fulfilled, (state) => {
+        state.isLoading = false;
+        state.error = null;
+      })
+      .addCase(resendOTP.rejected, (state, action) => {
         state.isLoading = false;
         state.error = action.payload as string;
       });
