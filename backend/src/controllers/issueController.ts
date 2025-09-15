@@ -200,7 +200,7 @@ export const getIssueById = async (req: Request, res: Response) => {
 /**
  * Update issue status (Department/Admin only)
  */
-export const updateIssueStatus = async (req: AuthRequest, res: Response) => {
+export const updateIssueStatus = async (req: Request, res: Response) => {
   try {
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
@@ -287,7 +287,7 @@ export const updateIssueStatus = async (req: AuthRequest, res: Response) => {
 /**
  * Assign issue to department/officer
  */
-export const assignIssue = async (req: AuthRequest, res: Response) => {
+export const assignIssue = async (req: Request, res: Response) => {
   try {
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
@@ -352,7 +352,7 @@ export const assignIssue = async (req: AuthRequest, res: Response) => {
 /**
  * Add comment to issue
  */
-export const addComment = async (req: AuthRequest, res: Response) => {
+export const addComment = async (req: Request, res: Response) => {
   try {
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
@@ -415,7 +415,7 @@ export const addComment = async (req: AuthRequest, res: Response) => {
 /**
  * Upvote/Downvote issue
  */
-export const toggleUpvote = async (req: AuthRequest, res: Response) => {
+export const toggleUpvote = async (req: Request, res: Response) => {
   try {
     const { issueId } = req.params;
     const userId = req.user?.id;
@@ -435,17 +435,17 @@ export const toggleUpvote = async (req: AuthRequest, res: Response) => {
       });
     }
 
-    issue.upvotes = issue.upvotes || [];
-    const userIndex = issue.upvotes.findIndex(id => id.toString() === userId);
+    issue.votes = issue.votes || { upvotes: [], downvotes: [] };
+    const userIndex = issue.votes.upvotes.findIndex((id: any) => id.toString() === userId);
 
     let message: string;
     if (userIndex > -1) {
       // Remove upvote
-      issue.upvotes.splice(userIndex, 1);
+      issue.votes.upvotes.splice(userIndex, 1);
       message = 'Upvote removed';
     } else {
       // Add upvote
-      issue.upvotes.push(userId as any);
+      issue.votes.upvotes.push(userId as any);
       message = 'Issue upvoted';
     }
 
@@ -455,7 +455,7 @@ export const toggleUpvote = async (req: AuthRequest, res: Response) => {
       success: true,
       message,
       data: { 
-        upvoteCount: issue.upvotes.length,
+        upvoteCount: issue.votes.upvotes.length,
         isUpvoted: userIndex === -1
       }
     });
@@ -471,7 +471,7 @@ export const toggleUpvote = async (req: AuthRequest, res: Response) => {
 /**
  * Get user's reported issues
  */
-export const getUserIssues = async (req: AuthRequest, res: Response) => {
+export const getUserIssues = async (req: Request, res: Response) => {
   try {
     const page = parseInt(req.query.page as string) || 1;
     const limit = parseInt(req.query.limit as string) || 10;
@@ -520,7 +520,7 @@ export const getUserIssues = async (req: AuthRequest, res: Response) => {
 /**
  * Submit feedback for resolved issue
  */
-export const submitFeedback = async (req: AuthRequest, res: Response) => {
+export const submitFeedback = async (req: Request, res: Response) => {
   try {
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
@@ -633,7 +633,7 @@ export const getIssuesByLocation = async (req: Request, res: Response) => {
 /**
  * Delete issue (Admin/Reporter only)
  */
-export const deleteIssue = async (req: AuthRequest, res: Response) => {
+export const deleteIssue = async (req: Request, res: Response) => {
   try {
     const { issueId } = req.params;
     const userId = req.user?.id;

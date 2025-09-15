@@ -156,7 +156,7 @@ router.post('/system-announcement',
       .withMessage('targetRoles must be an array'),
     body('targetRoles.*')
       .optional()
-      .isIn(['admin', 'department_head', 'department_staff', 'citizen'])
+      .isIn(['admin', 'department_head', 'field_worker', 'citizen'])
       .withMessage('Invalid target role'),
     body('targetDepartments')
       .optional()

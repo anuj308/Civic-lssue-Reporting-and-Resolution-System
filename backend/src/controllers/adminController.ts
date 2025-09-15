@@ -4,7 +4,7 @@ import mongoose from 'mongoose';
 import { User } from '../models/User';
 import { Issue } from '../models/Issue';
 import { Department } from '../models/Department';
-import { Notification } from '../models/Notification';
+import Notification from '../models/Notification';
 
 /**
  * Get system overview statistics (Admin only)
@@ -395,7 +395,13 @@ export const bulkUserOperations = async (req: Request, res: Response) => {
     res.status(200).json({
       success: true,
       message,
-      data: { affectedCount: result.modifiedCount || result.deletedCount }
+      data: { 
+        affectedCount: 'modifiedCount' in result 
+          ? result.modifiedCount 
+          : 'deletedCount' in result 
+            ? result.deletedCount 
+            : 0 
+      }
     });
   } catch (error) {
     console.error('Error performing bulk user operations:', error);

@@ -7,14 +7,14 @@ import { Department } from '../models/Department';
 /**
  * Get dashboard overview statistics
  */
-export const getDashboardOverview = async (req: AuthRequest, res: Response) => {
+export const getDashboardOverview = async (req: Request, res: Response) => {
   try {
     const userRole = req.user?.role;
     const userId = req.user?.id;
 
     // Base filters based on user role
     let issueFilter: any = {};
-    if (userRole === 'department_head' || userRole === 'department_staff') {
+    if (userRole === 'department_head' || userRole === 'field_worker') {
       const user = await User.findById(userId).populate('department');
       if (user?.department) {
         issueFilter.assignedDepartment = user.department;

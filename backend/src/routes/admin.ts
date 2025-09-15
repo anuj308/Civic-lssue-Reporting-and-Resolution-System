@@ -19,7 +19,7 @@ const router = express.Router();
  */
 router.get('/overview',
   auth,
-  authorize(['admin']),
+  authorize('admin'),
   getSystemOverview
 );
 
@@ -30,7 +30,7 @@ router.get('/overview',
  */
 router.get('/logs',
   auth,
-  authorize(['admin']),
+  authorize('admin'),
   [
     query('page')
       .optional()
@@ -63,7 +63,7 @@ router.get('/logs',
  */
 router.post('/users/bulk',
   auth,
-  authorize(['admin']),
+  authorize('admin'),
   [
     body('operation')
       .isIn(['activate', 'deactivate', 'delete', 'update_role'])
@@ -76,7 +76,7 @@ router.post('/users/bulk',
       .withMessage('Each user ID must be a valid MongoDB ObjectId'),
     body('data.role')
       .if(body('operation').equals('update_role'))
-      .isIn(['user', 'department_head', 'department_staff', 'admin'])
+      .isIn(['citizen', 'department_head', 'field_worker', 'admin'])
       .withMessage('Invalid role'),
     body('data.department')
       .if(body('operation').equals('update_role'))
@@ -96,7 +96,7 @@ router.post('/users/bulk',
  */
 router.put('/config',
   auth,
-  authorize(['admin']),
+  authorize('admin'),
   [
     body('maintenanceMode')
       .optional()
@@ -157,7 +157,7 @@ router.put('/config',
  */
 router.get('/reports',
   auth,
-  authorize(['admin']),
+  authorize('admin'),
   [
     query('reportType')
       .isIn(['user_activity', 'issue_summary', 'department_performance'])
@@ -177,7 +177,7 @@ router.get('/reports',
     query('startDate')
       .if(query('endDate').exists())
       .custom((startDate, { req }) => {
-        const endDate = req.query.endDate as string;
+        const endDate = req.query?.endDate as string;
         if (startDate && endDate && new Date(startDate) >= new Date(endDate)) {
           throw new Error('Start date must be before end date');
         }
@@ -194,7 +194,7 @@ router.get('/reports',
  */
 router.post('/maintenance',
   auth,
-  authorize(['admin']),
+  authorize('admin'),
   [
     body('operation')
       .isIn(['cleanup_old_notifications', 'update_issue_statistics', 'reindex_search'])

@@ -110,7 +110,7 @@ router.put('/:userId/role',
   authorizeRoles('admin'),
   [
     body('role')
-      .isIn(['admin', 'department_head', 'department_staff', 'citizen'])
+      .isIn(['admin', 'department_head', 'field_worker', 'citizen'])
       .withMessage('Invalid role specified'),
     body('department')
       .optional()

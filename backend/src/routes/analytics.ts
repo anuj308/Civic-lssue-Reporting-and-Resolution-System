@@ -17,14 +17,14 @@ const router = express.Router();
 // Dashboard overview (role-based access)
 router.get('/dashboard',
   authenticateToken,
-  authorizeRoles('admin', 'department_head', 'department_staff'),
+  authorizeRoles('admin', 'department_head', 'field_worker'),
   getDashboardOverview
 );
 
 // Issue statistics with filtering
 router.get('/issues',
   authenticateToken,
-  authorizeRoles('admin', 'department_head', 'department_staff'),
+  authorizeRoles('admin', 'department_head', 'field_worker'),
   [
     query('startDate')
       .optional()

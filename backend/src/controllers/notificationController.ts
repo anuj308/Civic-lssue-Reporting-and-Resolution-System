@@ -1,20 +1,20 @@
 import { Request, Response } from 'express';
 import { validationResult } from 'express-validator';
 import mongoose from 'mongoose';
-import { Notification } from '../models/Notification';
+import Notification from '../models/Notification';
 import { User } from '../models/User';
 import { Issue } from '../models/Issue';
 
 /**
  * Get user notifications with pagination
  */
-export const getUserNotifications = async (req: AuthRequest, res: Response) => {
+export const getUserNotifications = async (req: Request, res: Response) => {
   try {
     const page = parseInt(req.query.page as string) || 1;
     const limit = parseInt(req.query.limit as string) || 20;
     const isRead = req.query.isRead as string;
     const type = req.query.type as string;
-    const userId = req.user?.id;
+    const userId = req.user?._id.toString();
 
     const skip = (page - 1) * limit;
 
@@ -71,7 +71,7 @@ export const getUserNotifications = async (req: AuthRequest, res: Response) => {
 /**
  * Mark notifications as read
  */
-export const markNotificationsAsRead = async (req: AuthRequest, res: Response) => {
+export const markNotificationsAsRead = async (req: Request, res: Response) => {
   try {
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
@@ -83,7 +83,7 @@ export const markNotificationsAsRead = async (req: AuthRequest, res: Response) =
     }
 
     const { notificationIds } = req.body;
-    const userId = req.user?.id;
+    const userId = req.user?._id.toString();
 
     // Validate notification IDs
     const validIds = notificationIds.filter((id: string) => 
@@ -126,9 +126,9 @@ export const markNotificationsAsRead = async (req: AuthRequest, res: Response) =
 /**
  * Mark all notifications as read
  */
-export const markAllAsRead = async (req: AuthRequest, res: Response) => {
+export const markAllAsRead = async (req: Request, res: Response) => {
   try {
-    const userId = req.user?.id;
+    const userId = req.user?._id.toString();
 
     const result = await Notification.updateMany(
       { 
@@ -158,10 +158,10 @@ export const markAllAsRead = async (req: AuthRequest, res: Response) => {
 /**
  * Delete notification
  */
-export const deleteNotification = async (req: AuthRequest, res: Response) => {
+export const deleteNotification = async (req: Request, res: Response) => {
   try {
     const { notificationId } = req.params;
-    const userId = req.user?.id;
+    const userId = req.user?._id.toString();
 
     if (!mongoose.Types.ObjectId.isValid(notificationId)) {
       return res.status(400).json({
@@ -198,9 +198,9 @@ export const deleteNotification = async (req: AuthRequest, res: Response) => {
 /**
  * Get notification statistics
  */
-export const getNotificationStats = async (req: AuthRequest, res: Response) => {
+export const getNotificationStats = async (req: Request, res: Response) => {
   try {
-    const userId = req.user?.id;
+    const userId = req.user?._id.toString();
 
     const stats = await Notification.aggregate([
       { $match: { recipient: new mongoose.Types.ObjectId(userId) } },
@@ -294,7 +294,7 @@ export const getNotificationStats = async (req: AuthRequest, res: Response) => {
 /**
  * Create system announcement (Admin only)
  */
-export const createSystemAnnouncement = async (req: AuthRequest, res: Response) => {
+export const createSystemAnnouncement = async (req: Request, res: Response) => {
   try {
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
@@ -316,7 +316,7 @@ export const createSystemAnnouncement = async (req: AuthRequest, res: Response) 
       expiresAt
     } = req.body;
 
-    const createdBy = req.user?.id;
+    const createdBy = req.user?._id.toString();
 
     // Build recipient filter
     const recipientFilter: any = {};
@@ -375,7 +375,7 @@ export const createSystemAnnouncement = async (req: AuthRequest, res: Response) 
 /**
  * Create custom notification (Admin/Department Head only)
  */
-export const createCustomNotification = async (req: AuthRequest, res: Response) => {
+export const createCustomNotification = async (req: Request, res: Response) => {
   try {
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
@@ -400,7 +400,7 @@ export const createCustomNotification = async (req: AuthRequest, res: Response) 
       expiresAt
     } = req.body;
 
-    const createdBy = req.user?.id;
+    const createdBy = req.user?._id.toString();
 
     // Validate recipients
     const validRecipients = recipients.filter((id: string) => 

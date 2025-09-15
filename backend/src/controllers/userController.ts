@@ -348,7 +348,7 @@ export const updateUserRole = async (req: Request, res: Response) => {
       updatedAt: new Date()
     };
 
-    if (role === 'department_head' || role === 'department_staff') {
+    if (role === 'department_head' || role === 'field_worker') {
       if (!department) {
         return res.status(400).json({
           success: false,

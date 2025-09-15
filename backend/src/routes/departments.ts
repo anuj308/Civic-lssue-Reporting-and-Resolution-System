@@ -147,7 +147,7 @@ router.delete('/:departmentId/staff/:userId',
 // Department issues
 router.get('/:departmentId/issues',
   authenticateToken,
-  authorizeRoles('admin', 'department_head', 'department_staff'),
+  authorizeRoles('admin', 'department_head', 'field_worker'),
   [
     query('page')
       .optional()

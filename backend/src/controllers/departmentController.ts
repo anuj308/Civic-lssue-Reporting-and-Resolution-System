@@ -8,7 +8,7 @@ import { Issue } from '../models/Issue';
 /**
  * Create a new department (Admin only)
  */
-export const createDepartment = async (req: AuthRequest, res: Response) => {
+export const createDepartment = async (req: Request, res: Response) => {
   try {
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
@@ -216,7 +216,7 @@ export const getDepartmentById = async (req: Request, res: Response) => {
 /**
  * Update department (Admin/Department Head only)
  */
-export const updateDepartment = async (req: AuthRequest, res: Response) => {
+export const updateDepartment = async (req: Request, res: Response) => {
   try {
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
@@ -331,7 +331,7 @@ export const updateDepartment = async (req: AuthRequest, res: Response) => {
 /**
  * Add staff to department (Admin/Department Head only)
  */
-export const addStaff = async (req: AuthRequest, res: Response) => {
+export const addStaff = async (req: Request, res: Response) => {
   try {
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
@@ -369,7 +369,7 @@ export const addStaff = async (req: AuthRequest, res: Response) => {
     }
 
     // Check if user is eligible
-    if (user.role !== 'department_staff' && user.role !== 'department_head') {
+    if (user.role !== 'field_worker' && user.role !== 'department_head') {
       return res.status(400).json({
         success: false,
         message: 'User is not eligible to be department staff'
@@ -412,7 +412,7 @@ export const addStaff = async (req: AuthRequest, res: Response) => {
 /**
  * Remove staff from department (Admin/Department Head only)
  */
-export const removeStaff = async (req: AuthRequest, res: Response) => {
+export const removeStaff = async (req: Request, res: Response) => {
   try {
     const { departmentId, userId } = req.params;
 
@@ -566,7 +566,7 @@ export const getDepartmentStatistics = async (req: Request, res: Response) => {
 /**
  * Get department issues
  */
-export const getDepartmentIssues = async (req: AuthRequest, res: Response) => {
+export const getDepartmentIssues = async (req: Request, res: Response) => {
   try {
     const { departmentId } = req.params;
     const page = parseInt(req.query.page as string) || 1;

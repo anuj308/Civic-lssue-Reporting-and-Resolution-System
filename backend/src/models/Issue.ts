@@ -1,4 +1,4 @@
-import mongoose, { Document, Schema } from 'mongoose';
+import mongoose, { Document, Schema, Types } from 'mongoose';
 
 export interface IIssue extends Document {
   _id: string;
@@ -8,9 +8,9 @@ export interface IIssue extends Document {
   subcategory?: string;
   priority: 'low' | 'medium' | 'high' | 'critical';
   status: 'pending' | 'acknowledged' | 'in_progress' | 'resolved' | 'closed' | 'rejected';
-  reportedBy: string; // User ID
-  assignedTo?: string; // User ID
-  assignedDepartment?: string; // Department ID
+  reportedBy: Types.ObjectId; // User ID
+  assignedTo?: Types.ObjectId; // User ID
+  assignedDepartment?: Types.ObjectId; // Department ID
   location: {
     address: string;
     city: string;
@@ -133,7 +133,7 @@ const issueSchema = new Schema<IIssue>({
     default: 'pending'
   },
   reportedBy: {
-    type: mongoose.Schema.Types.ObjectId,
+    type: Schema.Types.ObjectId,
     ref: 'User',
     required: [true, 'Reporter is required']
   },

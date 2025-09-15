@@ -108,7 +108,7 @@ router.get('/:issueId',
 // Issue management routes (Department/Admin only)
 router.put('/:issueId/status',
   authenticateToken,
-  authorizeRoles('admin', 'department_head', 'department_staff'),
+  authorizeRoles('admin', 'department_head', 'field_worker'),
   [
     body('status')
       .isIn(['pending', 'acknowledged', 'in_progress', 'resolved', 'closed', 'rejected'])

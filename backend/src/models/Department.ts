@@ -1,11 +1,12 @@
-import mongoose, { Document, Schema } from 'mongoose';
+import mongoose, { Document, Schema, Types } from 'mongoose';
 
 export interface IDepartment extends Document {
   _id: string;
   name: string;
   code: string;
   description?: string;
-  head?: string; // User ID of department head
+  head?: Types.ObjectId; // User ID of department head
+  staff: Types.ObjectId[]; // Array of User IDs for department staff
   contactEmail: string;
   contactPhone?: string;
   isActive: boolean;
@@ -63,6 +64,10 @@ const departmentSchema = new Schema<IDepartment>({
     ref: 'User',
     default: null
   },
+  staff: [{
+    type: Schema.Types.ObjectId,
+    ref: 'User'
+  }],
   contactEmail: {
     type: String,
     required: [true, 'Contact email is required'],
