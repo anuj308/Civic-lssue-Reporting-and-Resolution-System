@@ -1,15 +1,14 @@
 import { Request, Response } from 'express';
 import { validationResult } from 'express-validator';
 import bcrypt from 'bcryptjs';
-import User, { IUser } from '../models/User';
-import { AuthRequest } from '../middleware/auth';
+import { User, IUser } from '../models/User';
 
 /**
  * Get user profile
  */
-export const getProfile = async (req: AuthRequest, res: Response) => {
+export const getProfile = async (req: Request, res: Response) => {
   try {
-    const user = await User.findById(req.user?.id)
+    const user = await User.findById(req.user?._id)
       .select('-password -refreshToken')
       .populate('department', 'name type');
 
@@ -36,7 +35,7 @@ export const getProfile = async (req: AuthRequest, res: Response) => {
 /**
  * Update user profile
  */
-export const updateProfile = async (req: AuthRequest, res: Response) => {
+export const updateProfile = async (req: Request, res: Response) => {
   try {
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
@@ -102,7 +101,7 @@ export const updateProfile = async (req: AuthRequest, res: Response) => {
 /**
  * Change password
  */
-export const changePassword = async (req: AuthRequest, res: Response) => {
+export const changePassword = async (req: Request, res: Response) => {
   try {
     const errors = validationResult(req);
     if (!errors.isEmpty()) {

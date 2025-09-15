@@ -1,11 +1,10 @@
 import { Request, Response } from 'express';
 import { validationResult } from 'express-validator';
 import mongoose from 'mongoose';
-import User from '../models/User';
-import Issue from '../models/Issue';
-import Department from '../models/Department';
-import Notification from '../models/Notification';
-import { AuthRequest } from '../middleware/auth';
+import { User } from '../models/User';
+import { Issue } from '../models/Issue';
+import { Department } from '../models/Department';
+import { Notification } from '../models/Notification';
 
 /**
  * Get system overview statistics (Admin only)
@@ -288,7 +287,7 @@ export const getSystemLogs = async (req: Request, res: Response) => {
 /**
  * Bulk operations on users (Admin only)
  */
-export const bulkUserOperations = async (req: AuthRequest, res: Response) => {
+export const bulkUserOperations = async (req: Request, res: Response) => {
   try {
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
@@ -410,7 +409,7 @@ export const bulkUserOperations = async (req: AuthRequest, res: Response) => {
 /**
  * System configuration management (Admin only)
  */
-export const updateSystemConfig = async (req: AuthRequest, res: Response) => {
+export const updateSystemConfig = async (req: Request, res: Response) => {
   try {
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
@@ -693,7 +692,7 @@ export const generateSystemReport = async (req: Request, res: Response) => {
 /**
  * System maintenance operations (Admin only)
  */
-export const performMaintenance = async (req: AuthRequest, res: Response) => {
+export const performMaintenance = async (req: Request, res: Response) => {
   try {
     const { operation } = req.body;
 

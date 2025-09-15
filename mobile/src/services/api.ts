@@ -1,7 +1,5 @@
 import axios, { AxiosInstance, AxiosResponse } from 'axios';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { store } from '../store/store';
-import { refreshToken, logout } from '../store/slices/authSlice';
 
 // Base URL - Update this to match your backend URL
 const BASE_URL = __DEV__ 

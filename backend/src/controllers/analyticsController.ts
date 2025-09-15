@@ -1,9 +1,8 @@
 import { Request, Response } from 'express';
 import mongoose from 'mongoose';
-import Issue from '../models/Issue';
-import User from '../models/User';
-import Department from '../models/Department';
-import { AuthRequest } from '../middleware/auth';
+import { Issue } from '../models/Issue';
+import { User } from '../models/User';
+import { Department } from '../models/Department';
 
 /**
  * Get dashboard overview statistics

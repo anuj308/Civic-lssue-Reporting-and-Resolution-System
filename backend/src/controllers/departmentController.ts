@@ -1,10 +1,9 @@
 import { Request, Response } from 'express';
 import { validationResult } from 'express-validator';
 import mongoose from 'mongoose';
-import Department from '../models/Department';
-import User from '../models/User';
-import Issue from '../models/Issue';
-import { AuthRequest } from '../middleware/auth';
+import { Department } from '../models/Department';
+import { User } from '../models/User';
+import { Issue } from '../models/Issue';
 
 /**
  * Create a new department (Admin only)

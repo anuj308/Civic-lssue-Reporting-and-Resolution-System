@@ -133,7 +133,7 @@ const issueSchema = new Schema<IIssue>({
     default: 'pending'
   },
   reportedBy: {
-    type: Schema.Types.ObjectId,
+    type: mongoose.Schema.Types.ObjectId,
     ref: 'User',
     required: [true, 'Reporter is required']
   },

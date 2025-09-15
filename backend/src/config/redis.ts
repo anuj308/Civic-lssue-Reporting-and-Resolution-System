@@ -14,7 +14,6 @@ export const connectRedis = async (): Promise<void> => {
       password: process.env.REDIS_PASSWORD,
       socket: {
         connectTimeout: 5000,
-        lazyConnect: true,
       },
     });
 
@@ -187,7 +186,7 @@ export class RedisUtils {
     try {
       const client = getRedisClient();
       const result = await client.expire(key, seconds);
-      return result === 1;
+      return Boolean(result);
     } catch (error) {
       console.error(`Redis EXPIRE error for key ${key}:`, error);
       throw error;

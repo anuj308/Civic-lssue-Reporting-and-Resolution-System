@@ -1,4 +1,4 @@
-import jwt from 'jsonwebtoken';
+import jwt, { SignOptions } from 'jsonwebtoken';
 import { Response } from 'express';
 
 export interface JWTPayload {
@@ -10,16 +10,16 @@ export interface JWTPayload {
 }
 
 export class JWTUtils {
-  private static readonly ACCESS_TOKEN_SECRET = process.env.JWT_SECRET || 'your_access_token_secret';
+  private static readonly ACCESS_TOKEN_SECRET = process.env.JWT_ACCESS_SECRET || 'your_access_token_secret';
   private static readonly REFRESH_TOKEN_SECRET = process.env.JWT_REFRESH_SECRET || 'your_refresh_token_secret';
-  private static readonly ACCESS_TOKEN_EXPIRES_IN = process.env.JWT_EXPIRES_IN || '15m';
-  private static readonly REFRESH_TOKEN_EXPIRES_IN = process.env.JWT_REFRESH_EXPIRES_IN || '7d';
+  private static readonly ACCESS_TOKEN_EXPIRES_IN = '15m';
+  private static readonly REFRESH_TOKEN_EXPIRES_IN = '7d';
 
   /**
    * Generate access token
    */
   static generateAccessToken(payload: Omit<JWTPayload, 'iat' | 'exp'>): string {
-    return jwt.sign(payload, this.ACCESS_TOKEN_SECRET, {
+    return jwt.sign(payload as any, this.ACCESS_TOKEN_SECRET, {
       expiresIn: this.ACCESS_TOKEN_EXPIRES_IN,
     });
   }
@@ -28,7 +28,7 @@ export class JWTUtils {
    * Generate refresh token
    */
   static generateRefreshToken(payload: Omit<JWTPayload, 'iat' | 'exp'>): string {
-    return jwt.sign(payload, this.REFRESH_TOKEN_SECRET, {
+    return jwt.sign(payload as any, this.REFRESH_TOKEN_SECRET, {
       expiresIn: this.REFRESH_TOKEN_EXPIRES_IN,
     });
   }

@@ -1,4 +1,4 @@
-import { Request, Response, NextFunction } from 'express';
+import { Request, Response, NextFunction, RequestHandler } from 'express';
 import { JWTUtils, JWTPayload } from '../utils/jwt';
 import { User, IUser } from '../models/User';
 
@@ -15,6 +15,35 @@ declare global {
 export interface AuthenticatedRequest extends Request {
   user: IUser;
   userId: string;
+}
+
+// Export alias for backwards compatibility
+export type AuthRequest = AuthenticatedRequest;
+
+// Type guard to check if request is authenticated
+export function isAuthenticatedRequest(req: Request): req is AuthenticatedRequest {
+  return req.user !== undefined && req.userId !== undefined;
+}
+
+// Helper to create properly typed authenticated handlers
+export function withAuth<T = any>(
+  handler: (req: AuthenticatedRequest, res: Response) => Promise<T>
+): RequestHandler {
+  return async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+    if (!isAuthenticatedRequest(req)) {
+      res.status(401).json({
+        success: false,
+        message: 'Authentication required',
+        error: { code: 'NOT_AUTHENTICATED' }
+      });
+      return;
+    }
+    try {
+      await handler(req, res);
+    } catch (error) {
+      next(error);
+    }
+  };
 }
 
 /**
@@ -278,3 +307,7 @@ export const optionalAuth = async (
     next();
   }
 };
+
+// Export aliases for backwards compatibility
+export const auth = authenticateToken;
+export const authorize = authorizeRoles;

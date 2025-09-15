@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, StyleSheet, Image, Dimensions } from 'react-native';
+import { View, StyleSheet, Dimensions } from 'react-native';
 import { Button, Text, Card } from 'react-native-paper';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { StackNavigationProp } from '@react-navigation/stack';
@@ -20,11 +20,6 @@ const WelcomeScreen: React.FC<Props> = ({ navigation }) => {
       <View style={styles.content}>
         {/* Logo and App Name */}
         <View style={styles.header}>
-          <Image
-            source={require('../../../assets/icon.png')}
-            style={styles.logo}
-            resizeMode="contain"
-          />
           <Text variant="headlineLarge" style={styles.title}>
             Civic Issue Reporter
           </Text>
@@ -108,11 +103,6 @@ const styles = StyleSheet.create({
   header: {
     alignItems: 'center',
     marginTop: spacing.xxl,
-  },
-  logo: {
-    width: 120,
-    height: 120,
-    marginBottom: spacing.lg,
   },
   title: {
     color: theme.colors.primary,

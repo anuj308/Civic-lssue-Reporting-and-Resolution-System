@@ -1,15 +1,14 @@
 import { Request, Response } from 'express';
 import { validationResult } from 'express-validator';
 import mongoose from 'mongoose';
-import Issue from '../models/Issue';
-import User from '../models/User';
-import Department from '../models/Department';
-import { AuthRequest } from '../middleware/auth';
+import { Issue } from '../models/Issue';
+import { User } from '../models/User';
+import { Department } from '../models/Department';
 
 /**
  * Create a new issue
  */
-export const createIssue = async (req: AuthRequest, res: Response) => {
+export const createIssue = async (req: Request, res: Response) => {
   try {
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
