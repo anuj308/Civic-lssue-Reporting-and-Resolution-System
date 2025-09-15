@@ -75,6 +75,27 @@ const loginValidation = [
     .withMessage('Password is required')
 ];
 
+// Validation middleware for OTP verification
+const otpVerificationValidation = [
+  body('email')
+    .isEmail()
+    .normalizeEmail()
+    .withMessage('Please provide a valid email address'),
+  
+  body('otpCode')
+    .isLength({ min: 6, max: 6 })
+    .isNumeric()
+    .withMessage('OTP must be a 6-digit number')
+];
+
+// Validation middleware for OTP resend
+const otpResendValidation = [
+  body('email')
+    .isEmail()
+    .normalizeEmail()
+    .withMessage('Please provide a valid email address')
+];
+
 /**
  * @route   POST /api/auth/register
  * @desc    Register a new user
@@ -95,6 +116,20 @@ router.post('/login', loginValidation, AuthController.login);
  * @access  Public
  */
 router.post('/logout', AuthController.logout);
+
+/**
+ * @route   POST /api/auth/verify-otp
+ * @desc    Verify OTP and activate user account
+ * @access  Public
+ */
+router.post('/verify-otp', otpVerificationValidation, AuthController.verifyOTP);
+
+/**
+ * @route   POST /api/auth/resend-otp
+ * @desc    Resend OTP for user verification
+ * @access  Public
+ */
+router.post('/resend-otp', otpResendValidation, AuthController.resendOTP);
 
 /**
  * @route   POST /api/auth/refresh

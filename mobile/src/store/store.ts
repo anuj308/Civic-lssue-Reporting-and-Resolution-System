@@ -14,11 +14,18 @@ const persistConfig = {
   key: 'root',
   version: 1,
   storage: AsyncStorage,
-  whitelist: ['auth', 'user'], // Only persist auth and user data
+  whitelist: ['user'], // Only persist user data at root level (auth has its own config)
+};
+
+// Special config for auth slice to exclude isLoading and error
+const authPersistConfig = {
+  key: 'auth',
+  storage: AsyncStorage,
+  blacklist: ['isLoading', 'error'], // Don't persist loading and error states
 };
 
 const rootReducer = combineReducers({
-  auth: authSlice,
+  auth: persistReducer(authPersistConfig, authSlice),
   issues: issueSlice,
   user: userSlice,
   location: locationSlice,

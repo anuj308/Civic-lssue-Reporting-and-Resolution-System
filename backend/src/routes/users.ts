@@ -8,7 +8,8 @@ import {
   getUserById,
   updateUserStatus,
   deleteUser,
-  updateUserRole
+  updateUserRole,
+  deleteOwnProfile
 } from '../controllers/userController';
 import { 
   authenticateToken, 
@@ -79,6 +80,12 @@ router.put('/change-password',
       .withMessage('New password must contain at least one uppercase letter, one lowercase letter, one number, and one special character')
   ],
   changePassword
+);
+
+// Delete own profile
+router.delete('/profile',
+  authenticateToken,
+  deleteOwnProfile
 );
 
 // Admin-only routes for user management

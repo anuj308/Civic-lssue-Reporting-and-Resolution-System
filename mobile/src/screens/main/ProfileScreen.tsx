@@ -31,7 +31,7 @@ import * as DocumentPicker from 'expo-document-picker';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 import { theme } from '../../theme';
 import { useAppDispatch, useAppSelector } from '../../store/store';
-import { logout } from '../../store/slices/authSlice';
+import { logout, deleteAccount } from '../../store/slices/authSlice';
 
 const { width } = Dimensions.get('window');
 
@@ -218,17 +218,32 @@ export default function ProfileScreen() {
   const handleDeleteAccount = async () => {
     try {
       setLoading(true);
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 2000));
+      
+      // Call the delete account API
+      await dispatch(deleteAccount()).unwrap();
+      
       setShowDeleteDialog(false);
-      Alert.alert('Account Deleted', 'Your account has been permanently deleted');
-      navigation.reset({
-        index: 0,
-        routes: [{ name: 'Welcome' }],
-      });
-    } catch (error) {
+      
+      // Show success message
+      Alert.alert(
+        'Account Deleted',
+        'Your account has been permanently deleted. You will now be signed out.',
+        [
+          {
+            text: 'OK',
+            onPress: () => {
+              // Navigate to welcome screen (user is already logged out by deleteAccount thunk)
+              navigation.reset({
+                index: 0,
+                routes: [{ name: 'Welcome' }],
+              });
+            }
+          }
+        ]
+      );
+    } catch (error: any) {
       console.error('Error deleting account:', error);
-      Alert.alert('Error', 'Failed to delete account');
+      Alert.alert('Error', error || 'Failed to delete account. Please try again.');
     } finally {
       setLoading(false);
     }

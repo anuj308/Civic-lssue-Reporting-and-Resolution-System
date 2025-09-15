@@ -23,6 +23,7 @@ import { registerUser } from '../../store/slices/authSlice';
 import { theme } from '../../utils/theme';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import type { AuthStackParamList } from '../../navigation/AuthNavigator';
+import apiService from '../../services/api';
 
 type Props = NativeStackScreenProps<AuthStackParamList, 'Register'>;
 
@@ -59,6 +60,19 @@ const RegisterScreen: React.FC<Props> = ({ navigation }) => {
   });
 
   const password = watch('password');
+
+  // Test connection function
+  const testConnection = async () => {
+    console.log('🔍 Testing backend connection...');
+    try {
+      const result = await apiService.testConnection();
+      console.log('Connection test result:', result);
+      alert(result ? 'Connection successful!' : 'Connection failed!');
+    } catch (error) {
+      console.error('Connection test error:', error);
+      alert('Connection test failed!');
+    }
+  };
 
   const onSubmit = async (data: RegisterForm) => {
     try {
@@ -312,6 +326,16 @@ const RegisterScreen: React.FC<Props> = ({ navigation }) => {
                   {errors.confirmPassword.message}
                 </HelperText>
               )}
+
+              {/* Test Connection Button (Temporary for debugging) */}
+              <Button
+                mode="outlined"
+                onPress={testConnection}
+                style={[styles.registerButton, { marginBottom: 10 }]}
+                contentStyle={styles.buttonContent}
+              >
+                Test Backend Connection
+              </Button>
 
               <Button
                 mode="contained"

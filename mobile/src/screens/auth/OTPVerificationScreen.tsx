@@ -80,7 +80,14 @@ const OTPVerificationScreen: React.FC<Props> = ({ navigation, route }) => {
       return;
     }
 
+    // Prevent double submission
+    if (isLoading) {
+      console.log('⚠️ OTP verification already in progress, ignoring duplicate call');
+      return;
+    }
+
     try {
+      console.log('🔥 Starting OTP verification for:', email);
       const result = await dispatch(
         verifyOTP({
           email,
@@ -89,10 +96,10 @@ const OTPVerificationScreen: React.FC<Props> = ({ navigation, route }) => {
         })
       ).unwrap();
 
-      if (result.success) {
-        // Navigation will be handled by the auth state change
-      }
+      console.log('✅ OTP verification successful:', result);
+      // Navigation will be handled by the auth state change
     } catch (error: any) {
+      console.error('❌ OTP verification failed:', error);
       setError(error.message || 'Invalid OTP. Please try again.');
       // Clear OTP fields on error
       setOtp(['', '', '', '', '', '']);

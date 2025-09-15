@@ -5,7 +5,7 @@ import { User } from '../models/User';
 import { Issue } from '../models/Issue';
 import { Department } from '../models/Department';
 import Notification from '../models/Notification';
-
+ 
 /**
  * Get system overview statistics (Admin only)
  */

@@ -12,6 +12,9 @@ export interface IUser extends Document {
   profileImage?: string;
   isActive: boolean;
   isVerified: boolean;
+  otpCode?: string;
+  otpExpiry?: Date;
+  otpAttempts?: number;
   fcmToken?: string;
   address?: {
     street?: string;
@@ -88,6 +91,19 @@ const userSchema = new Schema<IUser>({
   isVerified: {
     type: Boolean,
     default: false
+  },
+  otpCode: {
+    type: String,
+    default: null,
+    select: false
+  },
+  otpExpiry: {
+    type: Date,
+    default: null
+  },
+  otpAttempts: {
+    type: Number,
+    default: 0
   },
   fcmToken: {
     type: String,

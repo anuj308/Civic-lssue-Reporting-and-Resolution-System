@@ -2,9 +2,11 @@ import axios, { AxiosInstance, AxiosResponse } from 'axios';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 // Base URL - Update this to match your backend URL
-const BASE_URL = __DEV__ 
-  ? 'http://10.0.2.2:5000/api' // Android emulator
-  : 'https://your-production-api.com/api';
+const BASE_URL = process.env.EXPO_PUBLIC_API_BASE_URL || (__DEV__ 
+  ? 'http://192.168.18.101:5000/api' // Your computer's WiFi IP for Expo Go
+  : 'https://your-production-api.com/api');
+
+console.log('🌐 API Service initialized with BASE_URL:', BASE_URL);
 
 class ApiService {
   private api: AxiosInstance;
@@ -18,6 +20,11 @@ class ApiService {
       },
     });
 
+    console.log('🔧 Axios instance created with config:', {
+      baseURL: BASE_URL,
+      timeout: 30000,
+    });
+
     this.setupInterceptors();
   }
 
@@ -29,31 +36,55 @@ class ApiService {
         if (token) {
           config.headers.Authorization = `Bearer ${token}`;
         }
+        
+        // Log outgoing requests
+        console.log('📤 API Request:', {
+          method: config.method?.toUpperCase(),
+          url: config.url,
+          baseURL: config.baseURL,
+          data: config.data,
+          headers: config.headers,
+        });
+        
         return config;
       },
       (error) => {
+        console.error('📤 Request Error:', error);
         return Promise.reject(error);
       }
     );
 
     // Response interceptor
     this.api.interceptors.response.use(
-      (response) => response,
+      (response) => {
+        // Log successful responses
+        console.log('📥 API Response:', {
+          status: response.status,
+          statusText: response.statusText,
+          url: response.config.url,
+          data: response.data,
+        });
+        return response;
+      },
       async (error) => {
+        // Log error responses
+        console.error('📥 API Error Response:', {
+          status: error.response?.status,
+          statusText: error.response?.statusText,
+          url: error.config?.url,
+          data: error.response?.data,
+          message: error.message,
+        });
+
         const originalRequest = error.config;
 
         if (error.response?.status === 401 && !originalRequest._retry) {
           originalRequest._retry = true;
-
-          try {
-            await store.dispatch(refreshToken()).unwrap();
-            const newToken = await AsyncStorage.getItem('token');
-            originalRequest.headers.Authorization = `Bearer ${newToken}`;
-            return this.api(originalRequest);
-          } catch (refreshError) {
-            store.dispatch(logout());
-            return Promise.reject(refreshError);
-          }
+          
+          // Clear stored tokens on 401 error
+          await AsyncStorage.multiRemove(['token', 'refreshToken']);
+          
+          return Promise.reject(error);
         }
 
         return Promise.reject(error);
@@ -94,6 +125,24 @@ class ApiService {
     });
     
     return formData;
+  }
+
+  // Network test method
+  async testConnection(): Promise<boolean> {
+    try {
+      console.log('🔍 Testing connection to:', BASE_URL);
+      const response = await this.api.get('/test', { timeout: 5000 });
+      console.log('✅ Connection test successful:', response.status);
+      return true;
+    } catch (error: any) {
+      console.error('❌ Connection test failed:', {
+        message: error.message,
+        code: error.code,
+        status: error.response?.status,
+        baseURL: BASE_URL,
+      });
+      return false;
+    }
   }
 
   // Generic API methods
@@ -140,10 +189,10 @@ export const authApi = {
   register: (userData: { name: string; email: string; phone: string; password: string }) =>
     apiService.post('/auth/register', userData),
   
-  verifyOTP: (data: { userId: string; otp: string }) =>
+  verifyOTP: (data: { email: string; otpCode: string }) =>
     apiService.post('/auth/verify-otp', data),
   
-  resendOTP: (data: { email: string; phone: string }) =>
+  resendOTP: (data: { email: string }) =>
     apiService.post('/auth/resend-otp', data),
   
   refreshToken: (refreshToken: string) =>

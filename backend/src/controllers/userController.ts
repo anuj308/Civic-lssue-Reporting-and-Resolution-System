@@ -386,3 +386,46 @@ export const updateUserRole = async (req: Request, res: Response) => {
     });
   }
 };
+
+/**
+ * Delete own profile
+ */
+export const deleteOwnProfile = async (req: Request, res: Response) => {
+  try {
+    if (!req.user) {
+      return res.status(401).json({
+        success: false,
+        message: 'Authentication required'
+      });
+    }
+
+    const userId = req.user._id;
+
+    // Delete the user account
+    const user = await User.findByIdAndDelete(userId);
+    
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: 'User not found'
+      });
+    }
+
+    // Clear authentication cookies
+    res.clearCookie('accessToken');
+    res.clearCookie('refreshToken');
+
+    console.log(`✅ User account deleted: ${user.email}`);
+
+    res.status(200).json({
+      success: true,
+      message: 'Account deleted successfully'
+    });
+  } catch (error) {
+    console.error('Error deleting own profile:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Internal server error'
+    });
+  }
+};

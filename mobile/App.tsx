@@ -14,28 +14,51 @@ import AppNavigator from './src/navigation/AppNavigator';
 import { theme } from './src/utils/theme';
 import LoadingScreen from './src/components/LoadingScreen';
 
-// Configure notifications
-Notifications.setNotificationHandler({
-  handleNotification: async () => ({
-    shouldShowAlert: true,
-    shouldPlaySound: true,
-    shouldSetBadge: false,
-  }),
-});
+// Check if notifications are enabled
+const NOTIFICATIONS_ENABLED = process.env.EXPO_PUBLIC_ENABLE_PUSH_NOTIFICATIONS === 'true';
 
-export default function App() {
+// Configure notifications only if enabled
+if (NOTIFICATIONS_ENABLED) {
+  Notifications.setNotificationHandler({
+    handleNotification: async () => ({
+      shouldShowAlert: true,
+      shouldPlaySound: true,
+      shouldSetBadge: false,
+    }),
+  });
+}
+
+// App content component that has access to store after provider
+const AppContent = () => {
   useEffect(() => {
-    // Request notification permissions
-    const requestPermissions = async () => {
-      const { status } = await Notifications.requestPermissionsAsync();
-      if (status !== 'granted') {
-        console.warn('Notification permissions not granted');
-      }
-    };
+    // Request notification permissions only if notifications are enabled
+    if (NOTIFICATIONS_ENABLED) {
+      const requestPermissions = async () => {
+        try {
+          const { status } = await Notifications.requestPermissionsAsync();
+          if (status !== 'granted') {
+            console.warn('Notification permissions not granted');
+          }
+        } catch (error) {
+          console.warn('Notification setup failed (Expo Go limitation):', error);
+        }
+      };
 
-    requestPermissions();
+      requestPermissions();
+    } else {
+      console.log('Push notifications disabled in development mode');
+    }
   }, []);
 
+  return (
+    <>
+      <AppNavigator />
+      <Toast />
+    </>
+  );
+};
+
+export default function App() {
   return (
     <Provider store={store}>
       <PersistGate loading={<LoadingScreen />} persistor={persistor}>
@@ -43,8 +66,7 @@ export default function App() {
           <SafeAreaProvider>
             <GestureHandlerRootView style={styles.container}>
               <StatusBar style="auto" />
-              <AppNavigator />
-              <Toast />
+              <AppContent />
             </GestureHandlerRootView>
           </SafeAreaProvider>
         </PaperProvider>

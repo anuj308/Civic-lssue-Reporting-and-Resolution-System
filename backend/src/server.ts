@@ -1,3 +1,29 @@
+// Load environment variables FIRST - before any other imports
+import dotenv from 'dotenv';
+import path from 'path';
+dotenv.config({ path: path.resolve(__dirname, '../.env') });
+
+// Debug environment loading
+console.log('🔧 Environment Debug:');
+console.log('📁 Current working directory:', process.cwd());
+console.log('📁 __dirname:', __dirname);
+console.log('📁 .env path attempted:', path.resolve(__dirname, '../.env'));
+console.log('📁 Alternative .env path:', path.resolve(process.cwd(), '.env'));
+console.log('🔑 Total env variables loaded:', Object.keys(process.env).length);
+console.log('🔍 SMTP variables:', {
+  SMTP_USER: process.env.SMTP_USER ? 'Set' : 'Not Set',
+  SMTP_PASS: process.env.SMTP_PASS ? 'Set' : 'Not Set',
+  NODE_ENV: process.env.NODE_ENV,
+  PORT: process.env.PORT
+});
+
+// Try loading from current working directory if first attempt failed
+if (!process.env.SMTP_USER) {
+  console.log('🔄 Retrying with current working directory...');
+  dotenv.config({ path: path.resolve(process.cwd(), '.env') });
+  console.log('🔍 After retry - SMTP_USER:', process.env.SMTP_USER ? 'Set' : 'Not Set');
+}
+
 import express from 'express';
 import mongoose from 'mongoose';
 import cors from 'cors';
@@ -8,7 +34,6 @@ import rateLimit from 'express-rate-limit';
 import cookieParser from 'cookie-parser';
 import { createServer } from 'http';
 import { Server } from 'socket.io';
-import dotenv from 'dotenv';
 
 // Import routes
 import authRoutes from './routes/auth';
@@ -29,7 +54,28 @@ import { connectDatabase } from './config/database';
 import { connectRedis } from './config/redis';
 
 // Load environment variables
-dotenv.config();
+dotenv.config({ path: path.resolve(__dirname, '../.env') });
+
+// Debug environment loading
+console.log('🔧 Environment Debug:');
+console.log('📁 Current working directory:', process.cwd());
+console.log('📁 __dirname:', __dirname);
+console.log('📁 .env path attempted:', path.resolve(__dirname, '../.env'));
+console.log('� Alternative .env path:', path.resolve(process.cwd(), '.env'));
+console.log('�🔑 Total env variables loaded:', Object.keys(process.env).length);
+console.log('🔍 SMTP variables:', {
+  SMTP_USER: process.env.SMTP_USER ? 'Set' : 'Not Set',
+  SMTP_PASS: process.env.SMTP_PASS ? 'Set' : 'Not Set',
+  NODE_ENV: process.env.NODE_ENV,
+  PORT: process.env.PORT
+});
+
+// Try loading from current working directory if first attempt failed
+if (!process.env.SMTP_USER) {
+  console.log('🔄 Retrying with current working directory...');
+  dotenv.config({ path: path.resolve(process.cwd(), '.env') });
+  console.log('🔍 After retry - SMTP_USER:', process.env.SMTP_USER ? 'Set' : 'Not Set');
+}
 
 const app = express();
 const server = createServer(app);
@@ -55,7 +101,13 @@ const limiter = rateLimit({
 app.use(helmet());
 app.use(compression());
 app.use(cors({
-  origin: process.env.CLIENT_URL || "http://localhost:3000",
+  origin: [
+    process.env.CLIENT_URL || "http://localhost:3000",
+    "http://192.168.18.101:3000", // Your computer's IP
+    "http://192.168.18.101:5000", // Backend IP (for testing)
+    "http://localhost:8081", // Expo dev server
+    "http://192.168.18.101:8081", // Expo dev server on your IP
+  ],
   credentials: true
 }));
 app.use(morgan('combined'));
@@ -71,6 +123,17 @@ app.get('/health', (req, res) => {
     timestamp: new Date().toISOString(),
     uptime: process.uptime(),
     environment: process.env.NODE_ENV
+  });
+});
+
+// Test endpoint for mobile connectivity
+app.get('/api/test', (req, res) => {
+  console.log('🔍 Test endpoint hit from:', req.ip);
+  res.json({
+    success: true,
+    message: 'Backend server is reachable',
+    timestamp: new Date().toISOString(),
+    port: PORT
   });
 });
 
