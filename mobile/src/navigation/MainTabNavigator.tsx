@@ -8,9 +8,8 @@ import { useTheme } from 'react-native-paper';
 import MapScreen from '../screens/main/MapScreen';
 import ProfileScreen from '../screens/main/ProfileScreen';
 import IssueDetailScreen from '../screens/main/IssueDetailScreen';
-
-// Import from main index with proper component adapters
-import { IssuesScreen, ReportIssueScreen } from '../screens/main';
+import ReportIssueScreen from '../screens/main/ReportIssueScreen';
+import IssuesScreen from '../screens/main/IssuesScreen';
 
 export type MainTabParamList = {
   Issues: undefined;
@@ -27,10 +26,6 @@ export type MainStackParamList = {
 
 const Tab = createBottomTabNavigator<MainTabParamList>();
 const Stack = createStackNavigator<MainStackParamList>();
-
-// Create wrapper components that handle navigation props properly
-const IssuesScreenWrapper = () => <IssuesScreen />;
-const ReportIssueScreenWrapper = () => <ReportIssueScreen />;
 
 const MainTabs = () => {
   const theme = useTheme();
@@ -73,7 +68,7 @@ const MainTabs = () => {
     >
       <Tab.Screen 
         name="Issues" 
-        component={IssuesScreenWrapper}
+        component={IssuesScreen}
         options={{ tabBarLabel: 'My Issues' }}
       />
       <Tab.Screen 
@@ -83,7 +78,7 @@ const MainTabs = () => {
       />
       <Tab.Screen 
         name="Report" 
-        component={ReportIssueScreenWrapper}
+        component={ReportIssueScreen}
         options={{ 
           tabBarLabel: 'Report',
         }}
@@ -113,7 +108,7 @@ const MainTabNavigator = () => {
       <Stack.Screen name="MainTabs" component={MainTabs} />
       <Stack.Screen 
         name="ReportIssue" 
-        component={ReportIssueScreenWrapper}
+        component={ReportIssueScreen}
         options={{
           headerShown: true,
           title: 'Report Issue',

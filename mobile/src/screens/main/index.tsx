@@ -2,6 +2,8 @@
 export { default as MapScreen } from './MapScreen';
 export { default as ProfileScreen } from './ProfileScreen';
 export { default as IssueDetailScreen } from './IssueDetailScreen';
+export { default as ReportIssueScreen } from './ReportIssueScreen';
+export { default as IssuesScreen } from './IssuesScreen';
 
 // Simple placeholder screens for missing components
 import React from 'react';
@@ -23,8 +25,6 @@ const PlaceholderScreen: React.FC<{ title: string }> = ({ title }) => (
   </SafeAreaView>
 );
 
-export const ReportIssueScreen = () => <PlaceholderScreen title="Report Issue" />;
-export const IssuesScreen = () => <PlaceholderScreen title="My Issues" />;
 export const CameraScreen = () => <PlaceholderScreen title="Camera" />;
 export const NotificationsScreen = () => <PlaceholderScreen title="Notifications" />;
 export const SettingsScreen = () => <PlaceholderScreen title="Settings" />;

@@ -1,0 +1,632 @@
+const { validationResult } = require('express-validator');
+const { Issue } = require('../models/Issue');
+
+class IssueController {
+  /**
+   * Create a new issue
+   * @param {Object} req - Express request object
+   * @param {Object} res - Express response object
+   */
+  static async createIssue(req, res) {
+    try {
+      const errors = validationResult(req);
+      if (!errors.isEmpty()) {
+        return res.status(400).json({
+          success: false,
+          message: 'Validation failed',
+          errors: errors.array()
+        });
+      }
+
+      const {
+        title,
+        description,
+        category,
+        subcategory,
+        priority,
+        location,
+        media,
+        tags,
+        isPublic
+      } = req.body;
+
+      // Create new issue
+      const issue = new Issue({
+        title,
+        description,
+        category,
+        subcategory,
+        priority: priority || 'medium',
+        reportedBy: req.user.userId,
+        location,
+        media: media || { images: [], videos: [], audio: null },
+        tags: tags || [],
+        isPublic: isPublic !== false, // Default to true
+        metadata: {
+          deviceInfo: req.headers['user-agent'],
+          reportingMethod: 'mobile'
+        }
+      });
+
+      // Calculate urgency score
+      issue.urgencyScore = calculateUrgencyScore(issue);
+
+      await issue.save();
+
+      console.log('✅ Issue created successfully:', issue._id);
+
+      // Populate reporter info for response
+      await issue.populate('reportedBy', 'name email');
+
+      res.status(201).json({
+        success: true,
+        message: 'Issue reported successfully!',
+        data: {
+          issue: {
+            id: issue._id,
+            title: issue.title,
+            description: issue.description,
+            category: issue.category,
+            subcategory: issue.subcategory,
+            priority: issue.priority,
+            status: issue.status,
+            statusDisplay: issue.statusDisplay,
+            location: issue.location,
+            media: issue.media,
+            timeline: issue.timeline,
+            reportedBy: issue.reportedBy,
+            urgencyScore: issue.urgencyScore,
+            voteScore: issue.voteScore,
+            daysSinceReported: issue.daysSinceReported,
+            tags: issue.tags,
+            isPublic: issue.isPublic,
+            createdAt: issue.createdAt,
+            updatedAt: issue.updatedAt
+          }
+        }
+      });
+
+    } catch (error) {
+      console.error('❌ Error creating issue:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Internal server error while creating issue'
+      });
+    }
+  }
+
+  /**
+   * Get user's issues
+   * @param {Object} req - Express request object
+   * @param {Object} res - Express response object
+   */
+  static async getMyIssues(req, res) {
+    try {
+      const { page = 1, limit = 10, status, category, sortBy = 'createdAt', order = 'desc' } = req.query;
+      
+      const filters = { reportedBy: req.user.userId };
+      
+      // Add optional filters
+      if (status) filters.status = status;
+      if (category) filters.category = category;
+
+      const sortOrder = order === 'desc' ? -1 : 1;
+      const sortOptions = {};
+      sortOptions[sortBy] = sortOrder;
+
+      const skip = (parseInt(page) - 1) * parseInt(limit);
+
+      console.log('🔍 Fetching issues for user:', req.user.userId, 'with filters:', filters);
+
+      const issues = await Issue.find(filters)
+        .populate('reportedBy', 'name email')
+        .populate('assignedTo', 'name email')
+        .populate('assignedDepartment', 'name')
+        .sort(sortOptions)
+        .skip(skip)
+        .limit(parseInt(limit))
+        .lean();
+
+      const totalIssues = await Issue.countDocuments(filters);
+      const totalPages = Math.ceil(totalIssues / parseInt(limit));
+
+      console.log(`✅ Found ${issues.length} issues for user ${req.user.userId}`);
+
+      res.status(200).json({
+        success: true,
+        message: 'Issues retrieved successfully',
+        data: {
+          issues: issues.map(issue => ({
+            id: issue._id,
+            title: issue.title,
+            description: issue.description,
+            category: issue.category,
+            subcategory: issue.subcategory,
+            priority: issue.priority,
+            status: issue.status,
+            statusDisplay: getStatusDisplay(issue.status),
+            location: issue.location,
+            media: issue.media,
+            timeline: issue.timeline,
+            reportedBy: issue.reportedBy,
+            assignedTo: issue.assignedTo,
+            assignedDepartment: issue.assignedDepartment,
+            voteScore: (issue.votes?.upvotes?.length || 0) - (issue.votes?.downvotes?.length || 0),
+            daysSinceReported: Math.floor((Date.now() - new Date(issue.timeline?.reported || issue.createdAt).getTime()) / (1000 * 60 * 60 * 24)),
+            tags: issue.tags,
+            isPublic: issue.isPublic,
+            createdAt: issue.createdAt,
+            updatedAt: issue.updatedAt
+          })),
+          pagination: {
+            currentPage: parseInt(page),
+            totalPages,
+            totalIssues,
+            hasNextPage: parseInt(page) < totalPages,
+            hasPrevPage: parseInt(page) > 1
+          }
+        }
+      });
+
+    } catch (error) {
+      console.error('❌ Error fetching user issues:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Internal server error while fetching issues'
+      });
+    }
+  }
+
+  /**
+   * Get all public issues (for public view)
+   * @param {Object} req - Express request object
+   * @param {Object} res - Express response object
+   */
+  static async getPublicIssues(req, res) {
+    try {
+      const { page = 1, limit = 10, status, category, priority, sortBy = 'createdAt', order = 'desc' } = req.query;
+      
+      const filters = { isPublic: true };
+      
+      // Add optional filters
+      if (status) filters.status = status;
+      if (category) filters.category = category;
+      if (priority) filters.priority = priority;
+
+      const sortOrder = order === 'desc' ? -1 : 1;
+      const sortOptions = {};
+      sortOptions[sortBy] = sortOrder;
+
+      const skip = (parseInt(page) - 1) * parseInt(limit);
+
+      const issues = await Issue.find(filters)
+        .populate('reportedBy', 'name')
+        .populate('assignedDepartment', 'name')
+        .sort(sortOptions)
+        .skip(skip)
+        .limit(parseInt(limit))
+        .lean();
+
+      const totalIssues = await Issue.countDocuments(filters);
+      const totalPages = Math.ceil(totalIssues / parseInt(limit));
+
+      res.status(200).json({
+        success: true,
+        message: 'Public issues retrieved successfully',
+        data: {
+          issues: issues.map(issue => ({
+            id: issue._id,
+            title: issue.title,
+            description: issue.description,
+            category: issue.category,
+            subcategory: issue.subcategory,
+            priority: issue.priority,
+            status: issue.status,
+            statusDisplay: getStatusDisplay(issue.status),
+            location: {
+              address: issue.location.address,
+              city: issue.location.city,
+              state: issue.location.state,
+              pincode: issue.location.pincode,
+              landmark: issue.location.landmark
+              // Don't expose exact coordinates for privacy
+            },
+            media: issue.media,
+            timeline: issue.timeline,
+            reportedBy: issue.reportedBy ? { name: issue.reportedBy.name } : null,
+            assignedDepartment: issue.assignedDepartment,
+            voteScore: (issue.votes?.upvotes?.length || 0) - (issue.votes?.downvotes?.length || 0),
+            daysSinceReported: Math.floor((Date.now() - new Date(issue.timeline?.reported || issue.createdAt).getTime()) / (1000 * 60 * 60 * 24)),
+            tags: issue.tags,
+            createdAt: issue.createdAt,
+            updatedAt: issue.updatedAt
+          })),
+          pagination: {
+            currentPage: parseInt(page),
+            totalPages,
+            totalIssues,
+            hasNextPage: parseInt(page) < totalPages,
+            hasPrevPage: parseInt(page) > 1
+          }
+        }
+      });
+
+    } catch (error) {
+      console.error('❌ Error fetching public issues:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Internal server error while fetching public issues'
+      });
+    }
+  }
+
+  /**
+   * Get nearby issues
+   * @param {Object} req - Express request object
+   * @param {Object} res - Express response object
+   */
+  static async getNearbyIssues(req, res) {
+    try {
+      const { latitude, longitude, radius = 5000, page = 1, limit = 10 } = req.query;
+
+      if (!latitude || !longitude) {
+        return res.status(400).json({
+          success: false,
+          message: 'Latitude and longitude are required'
+        });
+      }
+
+      const skip = (parseInt(page) - 1) * parseInt(limit);
+
+      const issues = await Issue.find({
+        isPublic: true,
+        'location.coordinates': {
+          $near: {
+            $geometry: {
+              type: 'Point',
+              coordinates: [parseFloat(longitude), parseFloat(latitude)]
+            },
+            $maxDistance: parseInt(radius)
+          }
+        }
+      })
+      .populate('reportedBy', 'name')
+      .populate('assignedDepartment', 'name')
+      .sort({ createdAt: -1 })
+      .skip(skip)
+      .limit(parseInt(limit))
+      .lean();
+
+      res.status(200).json({
+        success: true,
+        message: 'Nearby issues retrieved successfully',
+        data: {
+          issues: issues.map(issue => ({
+            id: issue._id,
+            title: issue.title,
+            description: issue.description,
+            category: issue.category,
+            priority: issue.priority,
+            status: issue.status,
+            statusDisplay: getStatusDisplay(issue.status),
+            location: issue.location,
+            media: issue.media,
+            timeline: issue.timeline,
+            reportedBy: issue.reportedBy ? { name: issue.reportedBy.name } : null,
+            assignedDepartment: issue.assignedDepartment,
+            voteScore: (issue.votes?.upvotes?.length || 0) - (issue.votes?.downvotes?.length || 0),
+            daysSinceReported: Math.floor((Date.now() - new Date(issue.timeline?.reported || issue.createdAt).getTime()) / (1000 * 60 * 60 * 24)),
+            tags: issue.tags,
+            createdAt: issue.createdAt,
+            updatedAt: issue.updatedAt
+          })),
+          searchParams: {
+            latitude: parseFloat(latitude),
+            longitude: parseFloat(longitude),
+            radius: parseInt(radius)
+          },
+          totalFound: issues.length
+        }
+      });
+
+    } catch (error) {
+      console.error('❌ Error fetching nearby issues:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Internal server error while fetching nearby issues'
+      });
+    }
+  }
+
+  /**
+   * Get issue by ID
+   * @param {Object} req - Express request object
+   * @param {Object} res - Express response object
+   */
+  static async getIssueById(req, res) {
+    try {
+      const { issueId } = req.params;
+
+      const issue = await Issue.findById(issueId)
+        .populate('reportedBy', 'name email')
+        .populate('assignedTo', 'name email')
+        .populate('assignedDepartment', 'name')
+        .populate('comments.user', 'name')
+        .lean();
+
+      if (!issue) {
+        return res.status(404).json({
+          success: false,
+          message: 'Issue not found'
+        });
+      }
+
+      // Check if user has permission to view this issue
+      if (!issue.isPublic && (!req.user || req.user.userId !== issue.reportedBy._id.toString())) {
+        return res.status(403).json({
+          success: false,
+          message: 'Access denied. You do not have permission to view this issue.'
+        });
+      }
+
+      // Increment view count
+      await Issue.findByIdAndUpdate(issueId, { $inc: { 'analytics.views': 1 } });
+
+      res.status(200).json({
+        success: true,
+        message: 'Issue retrieved successfully',
+        data: {
+          issue: {
+            id: issue._id,
+            title: issue.title,
+            description: issue.description,
+            category: issue.category,
+            subcategory: issue.subcategory,
+            priority: issue.priority,
+            status: issue.status,
+            statusDisplay: getStatusDisplay(issue.status),
+            location: issue.location,
+            media: issue.media,
+            timeline: issue.timeline,
+            estimatedResolution: issue.estimatedResolution,
+            actualResolution: issue.actualResolution,
+            resolution: issue.resolution,
+            feedback: issue.feedback,
+            reportedBy: issue.reportedBy,
+            assignedTo: issue.assignedTo,
+            assignedDepartment: issue.assignedDepartment,
+            votes: issue.votes,
+            voteScore: (issue.votes?.upvotes?.length || 0) - (issue.votes?.downvotes?.length || 0),
+            comments: issue.comments,
+            daysSinceReported: Math.floor((Date.now() - new Date(issue.timeline?.reported || issue.createdAt).getTime()) / (1000 * 60 * 60 * 24)),
+            resolutionTimeHours: issue.timeline?.resolved ? Math.round((new Date(issue.timeline.resolved).getTime() - new Date(issue.timeline.reported).getTime()) / (1000 * 60 * 60)) : null,
+            tags: issue.tags,
+            isPublic: issue.isPublic,
+            urgencyScore: issue.urgencyScore,
+            analytics: issue.analytics,
+            createdAt: issue.createdAt,
+            updatedAt: issue.updatedAt
+          }
+        }
+      });
+
+    } catch (error) {
+      console.error('❌ Error fetching issue by ID:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Internal server error while fetching issue'
+      });
+    }
+  }
+
+  /**
+   * Update issue status (for authorized users)
+   * @param {Object} req - Express request object
+   * @param {Object} res - Express response object
+   */
+  static async updateIssueStatus(req, res) {
+    try {
+      const errors = validationResult(req);
+      if (!errors.isEmpty()) {
+        return res.status(400).json({
+          success: false,
+          message: 'Validation failed',
+          errors: errors.array()
+        });
+      }
+
+      const { issueId } = req.params;
+      const { status, comment } = req.body;
+
+      const issue = await Issue.findById(issueId);
+      if (!issue) {
+        return res.status(404).json({
+          success: false,
+          message: 'Issue not found'
+        });
+      }
+
+      // Check if user has permission to update status
+      if (req.user.role === 'citizen' && req.user.userId !== issue.reportedBy.toString()) {
+        return res.status(403).json({
+          success: false,
+          message: 'Access denied. You can only update your own issues.'
+        });
+      }
+
+      // Update status and timeline
+      const oldStatus = issue.status;
+      issue.status = status;
+
+      // Update timeline based on status
+      switch (status) {
+        case 'acknowledged':
+          if (!issue.timeline.acknowledged) {
+            issue.timeline.acknowledged = new Date();
+          }
+          break;
+        case 'in_progress':
+          if (!issue.timeline.started) {
+            issue.timeline.started = new Date();
+          }
+          break;
+        case 'resolved':
+          if (!issue.timeline.resolved) {
+            issue.timeline.resolved = new Date();
+            issue.actualResolution = new Date();
+          }
+          break;
+        case 'closed':
+          if (!issue.timeline.closed) {
+            issue.timeline.closed = new Date();
+          }
+          break;
+      }
+
+      await issue.save();
+
+      // Add status update comment
+      if (comment) {
+        issue.comments.push({
+          user: req.user.userId,
+          message: comment,
+          isOfficial: req.user.role !== 'citizen'
+        });
+        await issue.save();
+      }
+
+      console.log(`✅ Issue ${issueId} status updated from ${oldStatus} to ${status}`);
+
+      res.status(200).json({
+        success: true,
+        message: 'Issue status updated successfully',
+        data: {
+          issueId: issue._id,
+          oldStatus,
+          newStatus: status,
+          timeline: issue.timeline
+        }
+      });
+
+    } catch (error) {
+      console.error('❌ Error updating issue status:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Internal server error while updating issue status'
+      });
+    }
+  }
+
+  /**
+   * Delete issue (only for reporters)
+   * @param {Object} req - Express request object
+   * @param {Object} res - Express response object
+   */
+  static async deleteIssue(req, res) {
+    try {
+      const { issueId } = req.params;
+
+      const issue = await Issue.findById(issueId);
+      if (!issue) {
+        return res.status(404).json({
+          success: false,
+          message: 'Issue not found'
+        });
+      }
+
+      // Only reporter can delete their own issue, and only if it's pending
+      if (req.user.userId !== issue.reportedBy.toString()) {
+        return res.status(403).json({
+          success: false,
+          message: 'Access denied. You can only delete your own issues.'
+        });
+      }
+
+      if (issue.status !== 'pending') {
+        return res.status(400).json({
+          success: false,
+          message: 'Cannot delete issue that has been acknowledged or is in progress.'
+        });
+      }
+
+      await Issue.findByIdAndDelete(issueId);
+
+      console.log(`✅ Issue ${issueId} deleted by user ${req.user.userId}`);
+
+      res.status(200).json({
+        success: true,
+        message: 'Issue deleted successfully'
+      });
+
+    } catch (error) {
+      console.error('❌ Error deleting issue:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Internal server error while deleting issue'
+      });
+    }
+  }
+}
+
+/**
+ * Calculate urgency score based on issue properties
+ * @param {Object} issue - Issue object
+ * @returns {number} Urgency score (0-100)
+ */
+function calculateUrgencyScore(issue) {
+  let score = 0;
+
+  // Priority weight (40% of score)
+  const priorityWeights = {
+    'low': 10,
+    'medium': 25,
+    'high': 35,
+    'critical': 40
+  };
+  score += priorityWeights[issue.priority] || 25;
+
+  // Category weight (30% of score)
+  const categoryWeights = {
+    'water_supply': 30,
+    'sewerage': 25,
+    'electrical': 20,
+    'traffic': 20,
+    'pothole': 15,
+    'streetlight': 10,
+    'garbage': 10,
+    'other': 5
+  };
+  score += categoryWeights[issue.category] || 10;
+
+  // Public visibility (20% of score)
+  if (issue.isPublic) {
+    score += 20;
+  }
+
+  // Time factor (10% of score) - issues get more urgent over time
+  const hoursOld = (Date.now() - issue.timeline.reported.getTime()) / (1000 * 60 * 60);
+  if (hoursOld > 72) score += 10; // More than 3 days
+  else if (hoursOld > 24) score += 7; // More than 1 day
+  else if (hoursOld > 12) score += 4; // More than 12 hours
+
+  return Math.min(score, 100);
+}
+
+/**
+ * Get display text for status
+ * @param {string} status - Status value
+ * @returns {string} Display text
+ */
+function getStatusDisplay(status) {
+  const statusMap = {
+    'pending': 'Reported',
+    'acknowledged': 'Acknowledged',
+    'in_progress': 'In Progress',
+    'resolved': 'Resolved',
+    'closed': 'Closed',
+    'rejected': 'Rejected'
+  };
+  return statusMap[status] || status;
+}
+
+module.exports = { IssueController };
