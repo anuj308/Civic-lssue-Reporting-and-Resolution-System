@@ -1,57 +1,36 @@
 // Load environment variables FIRST - before any other imports
-import dotenv from 'dotenv';
-import path from 'path';
+const dotenv = require('dotenv');
+const path = require('path');
 dotenv.config({ path: path.resolve(__dirname, '../.env') });
 
-// Debug environment loading
-console.log('🔧 Environment Debug:');
-console.log('📁 Current working directory:', process.cwd());
-console.log('📁 __dirname:', __dirname);
-console.log('📁 .env path attempted:', path.resolve(__dirname, '../.env'));
-console.log('📁 Alternative .env path:', path.resolve(process.cwd(), '.env'));
-console.log('🔑 Total env variables loaded:', Object.keys(process.env).length);
-console.log('🔍 SMTP variables:', {
-  SMTP_USER: process.env.SMTP_USER ? 'Set' : 'Not Set',
-  SMTP_PASS: process.env.SMTP_PASS ? 'Set' : 'Not Set',
-  NODE_ENV: process.env.NODE_ENV,
-  PORT: process.env.PORT
-});
-
-// Try loading from current working directory if first attempt failed
-if (!process.env.SMTP_USER) {
-  console.log('🔄 Retrying with current working directory...');
-  dotenv.config({ path: path.resolve(process.cwd(), '.env') });
-  console.log('🔍 After retry - SMTP_USER:', process.env.SMTP_USER ? 'Set' : 'Not Set');
-}
-
-import express from 'express';
-import mongoose from 'mongoose';
-import cors from 'cors';
-import helmet from 'helmet';
-import compression from 'compression';
-import morgan from 'morgan';
-import rateLimit from 'express-rate-limit';
-import cookieParser from 'cookie-parser';
-import { createServer } from 'http';
-import { Server } from 'socket.io';
+const express = require('express');
+const mongoose = require('mongoose');
+const cors = require('cors');
+const helmet = require('helmet');
+const compression = require('compression');
+const morgan = require('morgan');
+const rateLimit = require('express-rate-limit');
+const cookieParser = require('cookie-parser');
+const { createServer } = require('http');
+const { Server } = require('socket.io');
 
 // Import routes
-import authRoutes from './routes/auth';
-import userRoutes from './routes/users';
-import issueRoutes from './routes/issues';
-import departmentRoutes from './routes/departments';
-import analyticsRoutes from './routes/analytics';
-import notificationRoutes from './routes/notifications';
-import adminRoutes from './routes/admin';
+const authRoutes = require('./routes/auth');
+// const userRoutes = require('./routes/users');
+// const issueRoutes = require('./routes/issues');
+// const departmentRoutes = require('./routes/departments');
+// const analyticsRoutes = require('./routes/analytics');
+// const notificationRoutes = require('./routes/notifications');
+// const adminRoutes = require('./routes/admin');
 
 // Import middleware
-import { errorHandler } from './middleware/errorHandler';
-import { notFound } from './middleware/notFound';
-import { authenticateToken } from './middleware/auth';
+const { errorHandler } = require('./middleware/errorHandler');
+const { notFound } = require('./middleware/notFound');
+const { authenticateToken } = require('./middleware/auth');
 
 // Import services
-import { connectDatabase } from './config/database';
-import { connectRedis } from './config/redis';
+const { connectDatabase } = require('./config/database');
+const { connectRedis } = require('./config/redis');
 
 // Load environment variables
 dotenv.config({ path: path.resolve(__dirname, '../.env') });
@@ -61,8 +40,8 @@ console.log('🔧 Environment Debug:');
 console.log('📁 Current working directory:', process.cwd());
 console.log('📁 __dirname:', __dirname);
 console.log('📁 .env path attempted:', path.resolve(__dirname, '../.env'));
-console.log('� Alternative .env path:', path.resolve(process.cwd(), '.env'));
-console.log('�🔑 Total env variables loaded:', Object.keys(process.env).length);
+console.log('📁 Alternative .env path:', path.resolve(process.cwd(), '.env'));
+console.log('🔑 Total env variables loaded:', Object.keys(process.env).length);
 console.log('🔍 SMTP variables:', {
   SMTP_USER: process.env.SMTP_USER ? 'Set' : 'Not Set',
   SMTP_PASS: process.env.SMTP_PASS ? 'Set' : 'Not Set',
@@ -139,12 +118,12 @@ app.get('/api/test', (req, res) => {
 
 // API routes
 app.use('/api/auth', authRoutes);
-app.use('/api/users', userRoutes);
-app.use('/api/issues', issueRoutes);
-app.use('/api/departments', departmentRoutes);
-app.use('/api/analytics', analyticsRoutes);
-app.use('/api/notifications', notificationRoutes);
-app.use('/api/admin', adminRoutes);
+// app.use('/api/users', userRoutes);
+// app.use('/api/issues', issueRoutes);
+// app.use('/api/departments', departmentRoutes);
+// app.use('/api/analytics', analyticsRoutes);
+// app.use('/api/notifications', notificationRoutes);
+// app.use('/api/admin', adminRoutes);
 
 // Socket.IO setup
 // setupSocketIO(io);
@@ -178,13 +157,13 @@ async function startServer() {
 }
 
 // Handle unhandled promise rejections
-process.on('unhandledRejection', (err: Error) => {
+process.on('unhandledRejection', (err) => {
   console.error('Unhandled Promise Rejection:', err);
   process.exit(1);
 });
 
 // Handle uncaught exceptions
-process.on('uncaughtException', (err: Error) => {
+process.on('uncaughtException', (err) => {
   console.error('Uncaught Exception:', err);
   process.exit(1);
 });
@@ -198,4 +177,4 @@ process.on('SIGTERM', async () => {
 
 startServer();
 
-export { io };
+module.exports = { io };

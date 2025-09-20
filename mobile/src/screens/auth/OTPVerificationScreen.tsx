@@ -5,6 +5,7 @@ import {
   KeyboardAvoidingView,
   Platform,
   TextInput as RNTextInput,
+  Alert,
 } from 'react-native';
 import {
   Text,
@@ -13,11 +14,12 @@ import {
   Surface,
   IconButton,
   HelperText,
+  Snackbar,
 } from 'react-native-paper';
 import { useSelector } from 'react-redux';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { RootState, useAppDispatch } from '../../store/store';
-import { verifyOTP, resendOTP } from '../../store/slices/authSlice';
+import { verifyOTP, resendOTP, verifyAndLogin, resendLoginOTP } from '../../store/slices/authSlice';
 import { theme } from '../../utils/theme';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import type { AuthStackParamList } from '../../navigation/AuthNavigator';
@@ -25,16 +27,34 @@ import type { AuthStackParamList } from '../../navigation/AuthNavigator';
 type Props = NativeStackScreenProps<AuthStackParamList, 'OTPVerification'>;
 
 const OTPVerificationScreen: React.FC<Props> = ({ navigation, route }) => {
-  const { email, phoneNumber } = route.params;
+  const { email, phoneNumber, isLoginVerification = false, password } = route.params;
   const [otp, setOtp] = useState(['', '', '', '', '', '']);
   const [timer, setTimer] = useState(60);
   const [canResend, setCanResend] = useState(false);
   const [error, setError] = useState('');
+  const [successMessage, setSuccessMessage] = useState('');
+  const [isVerifying, setIsVerifying] = useState(false);
   
   const dispatch = useAppDispatch();
-  const { isLoading } = useSelector((state: RootState) => state.auth);
+  const { isLoading, isAuthenticated } = useSelector((state: RootState) => state.auth);
   
   const otpRefs = useRef<(RNTextInput | null)[]>([]);
+
+  // Handle authentication success - navigate to main app
+  useEffect(() => {
+    if (isAuthenticated && !isLoading) {
+      console.log('✅ User authenticated successfully, navigating to main app');
+      setSuccessMessage(isLoginVerification ? 'Login successful!' : 'Account verified successfully!');
+      
+      // Show success message briefly before navigating
+      setTimeout(() => {
+        navigation.reset({
+          index: 0,
+          routes: [{ name: 'Welcome' }], // This will trigger navigation to main app
+        });
+      }, 1500);
+    }
+  }, [isAuthenticated, isLoading, navigation, isLoginVerification]);
 
   useEffect(() => {
     if (timer > 0) {
@@ -81,50 +101,96 @@ const OTPVerificationScreen: React.FC<Props> = ({ navigation, route }) => {
     }
 
     // Prevent double submission
-    if (isLoading) {
+    if (isVerifying || isLoading) {
       console.log('⚠️ OTP verification already in progress, ignoring duplicate call');
       return;
     }
 
-    try {
-      console.log('🔥 Starting OTP verification for:', email);
-      const result = await dispatch(
-        verifyOTP({
-          email,
-          phoneNumber,
-          otp: code,
-        })
-      ).unwrap();
+    setIsVerifying(true);
+    setError('');
+    setSuccessMessage('');
 
-      console.log('✅ OTP verification successful:', result);
-      // Navigation will be handled by the auth state change
+    try {
+      console.log('🔥 Starting OTP verification for:', email, 'isLoginVerification:', isLoginVerification);
+      
+      let result;
+      if (isLoginVerification) {
+        // Use verify and login for login verification flow
+        result = await dispatch(
+          verifyAndLogin({
+            email,
+            otpCode: code,
+            password: password, // Include password for login verification
+          })
+        ).unwrap();
+        console.log('✅ Login verification successful:', result);
+        setSuccessMessage('Email verified! Logging you in...');
+      } else {
+        // Use regular verify OTP for registration flow
+        result = await dispatch(
+          verifyOTP({
+            email,
+            phoneNumber: phoneNumber || '',
+            otp: code,
+          })
+        ).unwrap();
+        console.log('✅ Registration verification successful:', result);
+        setSuccessMessage('Account verified successfully! Welcome aboard!');
+      }
+
+      // Clear OTP on success
+      setOtp(['', '', '', '', '', '']);
+      
     } catch (error: any) {
       console.error('❌ OTP verification failed:', error);
-      setError(error.message || 'Invalid OTP. Please try again.');
+      setError(error.message || 'Invalid verification code. Please try again.');
       // Clear OTP fields on error
       setOtp(['', '', '', '', '', '']);
       otpRefs.current[0]?.focus();
+    } finally {
+      setIsVerifying(false);
     }
   };
 
   const handleResendOTP = async () => {
-    if (!canResend) return;
+    if (!canResend || isLoading) return;
+    
+    setError('');
+    setSuccessMessage('');
     
     try {
-      await dispatch(
-        resendOTP({
-          email,
-          phoneNumber,
-        })
-      ).unwrap();
+      if (isLoginVerification) {
+        // Use specific resend login OTP for login verification flow
+        await dispatch(
+          resendLoginOTP({
+            email,
+          })
+        ).unwrap();
+        console.log('✅ Login OTP resent successfully');
+        setSuccessMessage('Verification code sent to your email!');
+      } else {
+        // Use regular resend OTP for registration flow
+        await dispatch(
+          resendOTP({
+            email,
+            phoneNumber: phoneNumber || '',
+          })
+        ).unwrap();
+        console.log('✅ Registration OTP resent successfully');
+        setSuccessMessage('Verification code sent to your email and phone!');
+      }
       
       setTimer(60);
       setCanResend(false);
-      setError('');
       setOtp(['', '', '', '', '', '']);
       otpRefs.current[0]?.focus();
+      
+      // Clear success message after 3 seconds
+      setTimeout(() => setSuccessMessage(''), 3000);
+      
     } catch (error: any) {
-      setError(error.message || 'Failed to resend OTP');
+      console.error('❌ Failed to resend OTP:', error);
+      setError(error.message || 'Failed to resend verification code. Please try again.');
     }
   };
 
@@ -152,16 +218,27 @@ const OTPVerificationScreen: React.FC<Props> = ({ navigation, route }) => {
             style={styles.backButton}
           />
           <Text variant="headlineMedium" style={styles.title}>
-            Verify Account
+            {isLoginVerification ? 'Verify Email to Login' : 'Verify Account'}
           </Text>
           <Text variant="bodyMedium" style={styles.subtitle}>
-            We've sent a 6-digit code to{'\n'}
+            {isLoginVerification 
+              ? `Please verify your email to continue logging in.\nWe've sent a 6-digit code to\n`
+              : `We've sent a 6-digit code to\n`
+            }
             <Text style={styles.contact}>{maskedContact}</Text>
           </Text>
         </Surface>
 
         <Card style={styles.card} elevation={2}>
           <Card.Content style={styles.cardContent}>
+            {/* Success Message */}
+            {successMessage ? (
+              <Surface style={styles.successContainer} elevation={1}>
+                <Text style={styles.successText}>{successMessage}</Text>
+              </Surface>
+            ) : null}
+
+            {/* Error Message */}
             {error ? (
               <Surface style={styles.errorContainer} elevation={1}>
                 <Text style={styles.errorText}>{error}</Text>
@@ -199,12 +276,20 @@ const OTPVerificationScreen: React.FC<Props> = ({ navigation, route }) => {
             <Button
               mode="contained"
               onPress={() => handleVerifyOTP()}
-              disabled={otp.some(digit => !digit) || isLoading}
-              loading={isLoading}
-              style={styles.verifyButton}
+              disabled={otp.some(digit => !digit) || isLoading || isVerifying || !!successMessage}
+              loading={isLoading || isVerifying}
+              style={[
+                styles.verifyButton,
+                successMessage ? styles.verifyButtonSuccess : null
+              ]}
               contentStyle={styles.buttonContent}
             >
-              Verify Account
+              {isVerifying 
+                ? (isLoginVerification ? 'Verifying & Logging In...' : 'Verifying Account...')
+                : successMessage 
+                  ? '✓ Success'
+                  : (isLoginVerification ? 'Verify & Login' : 'Verify Account')
+              }
             </Button>
 
             <View style={styles.resendContainer}>
@@ -242,6 +327,16 @@ const OTPVerificationScreen: React.FC<Props> = ({ navigation, route }) => {
             </View>
           </Card.Content>
         </Card>
+
+        {/* Success Snackbar */}
+        <Snackbar
+          visible={!!successMessage}
+          onDismiss={() => setSuccessMessage('')}
+          duration={3000}
+          style={styles.successSnackbar}
+        >
+          {successMessage}
+        </Snackbar>
       </KeyboardAvoidingView>
     </SafeAreaView>
   );
@@ -298,6 +393,17 @@ const styles = StyleSheet.create({
     color: theme.colors.onErrorContainer,
     textAlign: 'center',
   },
+  successContainer: {
+    backgroundColor: theme.colors.primaryContainer,
+    padding: 12,
+    borderRadius: 8,
+    marginBottom: 16,
+  },
+  successText: {
+    color: theme.colors.onPrimaryContainer,
+    textAlign: 'center',
+    fontWeight: '600',
+  },
   otpLabel: {
     color: theme.colors.onSurface,
     marginBottom: 16,
@@ -329,6 +435,9 @@ const styles = StyleSheet.create({
   },
   verifyButton: {
     marginBottom: 24,
+  },
+  verifyButtonSuccess: {
+    backgroundColor: theme.colors.primaryContainer,
   },
   buttonContent: {
     paddingVertical: 8,
@@ -368,6 +477,9 @@ const styles = StyleSheet.create({
     color: theme.colors.primary,
     fontSize: 12,
     fontWeight: '600',
+  },
+  successSnackbar: {
+    backgroundColor: theme.colors.primaryContainer,
   },
 });
 

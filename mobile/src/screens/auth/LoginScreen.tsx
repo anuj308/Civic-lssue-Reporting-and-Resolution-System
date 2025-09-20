@@ -54,8 +54,22 @@ const LoginScreen: React.FC<Props> = ({ navigation }) => {
   const onSubmit = async (data: LoginFormData) => {
     try {
       await dispatch(login(data)).unwrap();
-    } catch (error) {
-      // Error is handled by Redux state
+    } catch (error: any) {
+      console.log('❌ Login error caught:', error);
+      
+      // Check if error is due to unverified email
+      // The backend returns HTTP 403 with needsVerification flag for unverified emails
+      if (error.includes('verify your email') || 
+          error.includes('EMAIL_NOT_VERIFIED') || 
+          error.includes('verification code has been sent')) {
+        // Navigate to OTP verification screen for login
+        navigation.navigate('OTPVerification', {
+          email: data.email,
+          isLoginVerification: true,
+          password: data.password,
+        });
+      }
+      // Other errors are handled by Redux state and will show in Snackbar
     }
   };
 

@@ -191,9 +191,15 @@ export const authApi = {
   
   verifyOTP: (data: { email: string; otpCode: string }) =>
     apiService.post('/auth/verify-otp', data),
+
+  verifyAndLogin: (data: { email: string; otpCode: string; password?: string }) =>
+    apiService.post('/auth/verify-and-login', data),
   
   resendOTP: (data: { email: string }) =>
     apiService.post('/auth/resend-otp', data),
+
+  resendLoginOTP: (data: { email: string }) =>
+    apiService.post('/auth/resend-login-otp', data),
   
   refreshToken: (refreshToken: string) =>
     apiService.post('/auth/refresh', { refreshToken }),
@@ -206,6 +212,9 @@ export const authApi = {
   
   resetPassword: (data: { token: string; password: string }) =>
     apiService.post('/auth/reset-password', data),
+  
+  deleteAccount: () =>
+    apiService.delete('/auth/account'),
 };
 
 // Issue API
@@ -245,9 +254,6 @@ export const userApi = {
   
   uploadAvatar: (imageData: any) =>
     apiService.upload('/users/avatar', { avatar: imageData }),
-  
-  deleteAccount: () =>
-    apiService.delete('/users/profile'),
 };
 
 // Notification API

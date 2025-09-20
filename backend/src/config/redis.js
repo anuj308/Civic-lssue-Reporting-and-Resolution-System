@@ -1,11 +1,12 @@
-import { createClient, RedisClientType } from 'redis';
+const { createClient } = require('redis');
 
-let redisClient: RedisClientType;
+let redisClient;
 
 /**
  * Redis connection configuration
+ * @returns {Promise<void>}
  */
-export const connectRedis = async (): Promise<void> => {
+const connectRedis = async () => {
   try {
     const redisURL = process.env.REDIS_URL || 'redis://localhost:6379';
     
@@ -58,8 +59,9 @@ export const connectRedis = async (): Promise<void> => {
 
 /**
  * Get Redis client instance
+ * @returns {Object} Redis client
  */
-export const getRedisClient = (): RedisClientType => {
+const getRedisClient = () => {
   if (!redisClient) {
     throw new Error('Redis client not initialized. Call connectRedis() first.');
   }
@@ -68,8 +70,9 @@ export const getRedisClient = (): RedisClientType => {
 
 /**
  * Close Redis connection
+ * @returns {Promise<void>}
  */
-export const closeRedisConnection = async (): Promise<void> => {
+const closeRedisConnection = async () => {
   try {
     if (redisClient) {
       await redisClient.quit();
@@ -83,8 +86,9 @@ export const closeRedisConnection = async (): Promise<void> => {
 
 /**
  * Check Redis connection status
+ * @returns {Promise<Object>} Redis status information
  */
-export const getRedisStatus = async () => {
+const getRedisStatus = async () => {
   try {
     if (!redisClient) {
       return { status: 'disconnected', message: 'Redis client not initialized' };
@@ -121,11 +125,14 @@ export const getRedisStatus = async () => {
 /**
  * Redis utility functions
  */
-export class RedisUtils {
+class RedisUtils {
   /**
    * Set a key-value pair with optional expiration
+   * @param {string} key 
+   * @param {string} value 
+   * @param {number} [expirationInSeconds] 
    */
-  static async set(key: string, value: string, expirationInSeconds?: number): Promise<void> {
+  static async set(key, value, expirationInSeconds) {
     try {
       const client = getRedisClient();
       if (expirationInSeconds) {
@@ -141,8 +148,10 @@ export class RedisUtils {
 
   /**
    * Get value by key
+   * @param {string} key 
+   * @returns {Promise<string|null>}
    */
-  static async get(key: string): Promise<string | null> {
+  static async get(key) {
     try {
       const client = getRedisClient();
       return await client.get(key);
@@ -154,8 +163,10 @@ export class RedisUtils {
 
   /**
    * Delete a key
+   * @param {string} key 
+   * @returns {Promise<number>}
    */
-  static async del(key: string): Promise<number> {
+  static async del(key) {
     try {
       const client = getRedisClient();
       return await client.del(key);
@@ -167,8 +178,10 @@ export class RedisUtils {
 
   /**
    * Check if a key exists
+   * @param {string} key 
+   * @returns {Promise<boolean>}
    */
-  static async exists(key: string): Promise<boolean> {
+  static async exists(key) {
     try {
       const client = getRedisClient();
       const result = await client.exists(key);
@@ -181,8 +194,11 @@ export class RedisUtils {
 
   /**
    * Set expiration for a key
+   * @param {string} key 
+   * @param {number} seconds 
+   * @returns {Promise<boolean>}
    */
-  static async expire(key: string, seconds: number): Promise<boolean> {
+  static async expire(key, seconds) {
     try {
       const client = getRedisClient();
       const result = await client.expire(key, seconds);
@@ -195,8 +211,10 @@ export class RedisUtils {
 
   /**
    * Increment a numeric value
+   * @param {string} key 
+   * @returns {Promise<number>}
    */
-  static async incr(key: string): Promise<number> {
+  static async incr(key) {
     try {
       const client = getRedisClient();
       return await client.incr(key);
@@ -208,8 +226,11 @@ export class RedisUtils {
 
   /**
    * Set JSON object
+   * @param {string} key 
+   * @param {Object} value 
+   * @param {number} [expirationInSeconds] 
    */
-  static async setJSON(key: string, value: object, expirationInSeconds?: number): Promise<void> {
+  static async setJSON(key, value, expirationInSeconds) {
     try {
       const jsonString = JSON.stringify(value);
       await this.set(key, jsonString, expirationInSeconds);
@@ -221,12 +242,14 @@ export class RedisUtils {
 
   /**
    * Get JSON object
+   * @param {string} key 
+   * @returns {Promise<Object|null>}
    */
-  static async getJSON<T>(key: string): Promise<T | null> {
+  static async getJSON(key) {
     try {
       const jsonString = await this.get(key);
       if (!jsonString) return null;
-      return JSON.parse(jsonString) as T;
+      return JSON.parse(jsonString);
     } catch (error) {
       console.error(`Redis GET JSON error for key ${key}:`, error);
       throw error;
@@ -234,5 +257,10 @@ export class RedisUtils {
   }
 }
 
-// Export Redis client type for use in other files
-export { RedisClientType };
+module.exports = {
+  connectRedis,
+  getRedisClient,
+  closeRedisConnection,
+  getRedisStatus,
+  RedisUtils
+};

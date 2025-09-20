@@ -1,85 +1,37 @@
-import mongoose, { Document, Schema, Types } from 'mongoose';
+const mongoose = require('mongoose');
 
-export interface IIssue extends Document {
-  _id: string;
-  title: string;
-  description: string;
-  category: string;
-  subcategory?: string;
-  priority: 'low' | 'medium' | 'high' | 'critical';
-  status: 'pending' | 'acknowledged' | 'in_progress' | 'resolved' | 'closed' | 'rejected';
-  reportedBy: Types.ObjectId; // User ID
-  assignedTo?: Types.ObjectId; // User ID
-  assignedDepartment?: Types.ObjectId; // Department ID
-  location: {
-    address: string;
-    city: string;
-    state: string;
-    pincode: string;
-    coordinates: {
-      latitude: number;
-      longitude: number;
-    };
-    landmark?: string;
-  };
-  media: {
-    images: string[]; // Cloudinary URLs
-    videos?: string[]; // Cloudinary URLs
-    audio?: string; // Voice description URL
-  };
-  timeline: {
-    reported: Date;
-    acknowledged?: Date;
-    started?: Date;
-    resolved?: Date;
-    closed?: Date;
-  };
-  estimatedResolution?: Date;
-  actualResolution?: Date;
-  resolution?: {
-    description: string;
-    resolvedBy: string; // User ID
-    images?: string[]; // Before/after images
-    cost?: number;
-    resources?: string[];
-  };
-  feedback?: {
-    rating: number; // 1-5 stars
-    comment?: string;
-    submittedAt: Date;
-  };
-  votes: {
-    upvotes: string[]; // Array of User IDs
-    downvotes: string[]; // Array of User IDs
-  };
-  comments: {
-    user: string; // User ID
-    message: string;
-    timestamp: Date;
-    isOfficial: boolean; // From department/admin
-  }[];
-  tags: string[];
-  isPublic: boolean;
-  urgencyScore: number; // Calculated score based on various factors
-  duplicateOf?: string; // Issue ID if this is a duplicate
-  relatedIssues: string[]; // Array of related Issue IDs
-  metadata: {
-    deviceInfo?: string;
-    appVersion?: string;
-    reportingMethod: 'mobile' | 'web' | 'phone' | 'email';
-    weatherCondition?: string;
-    timeOfDay: 'morning' | 'afternoon' | 'evening' | 'night';
-  };
-  analytics: {
-    views: number;
-    shares: number;
-    reportCount: number; // How many times this issue was reported
-  };
-  createdAt: Date;
-  updatedAt: Date;
-}
+/**
+ * Issue Schema for the Civic Issue Reporting System
+ * @typedef {Object} Issue
+ * @property {string} _id - Unique identifier
+ * @property {string} title - Issue title
+ * @property {string} description - Detailed description
+ * @property {string} category - Issue category
+ * @property {string} [subcategory] - Optional subcategory
+ * @property {string} priority - Priority level: 'low', 'medium', 'high', 'critical'
+ * @property {string} status - Current status
+ * @property {ObjectId} reportedBy - User who reported the issue
+ * @property {ObjectId} [assignedTo] - User assigned to handle the issue
+ * @property {ObjectId} [assignedDepartment] - Department assigned
+ * @property {Object} location - Location information
+ * @property {Object} media - Media files (images, videos, audio)
+ * @property {Object} timeline - Timeline of status changes
+ * @property {Date} [estimatedResolution] - Estimated resolution date
+ * @property {Date} [actualResolution] - Actual resolution date
+ * @property {Object} [resolution] - Resolution details
+ * @property {Object} [feedback] - User feedback
+ * @property {Object} votes - Upvotes and downvotes
+ * @property {Array} comments - Comments on the issue
+ * @property {Array} tags - Issue tags
+ * @property {boolean} isPublic - Whether issue is public
+ * @property {number} urgencyScore - Calculated urgency score
+ * @property {string} [duplicateOf] - Reference to original issue if duplicate
+ * @property {Array} relatedIssues - Related issues
+ * @property {Object} metadata - Additional metadata
+ * @property {Object} analytics - Analytics data
+ */
 
-const issueSchema = new Schema<IIssue>({
+const issueSchema = new mongoose.Schema({
   title: {
     type: String,
     required: [true, 'Issue title is required'],
@@ -133,17 +85,17 @@ const issueSchema = new Schema<IIssue>({
     default: 'pending'
   },
   reportedBy: {
-    type: Schema.Types.ObjectId,
+    type: mongoose.Schema.Types.ObjectId,
     ref: 'User',
     required: [true, 'Reporter is required']
   },
   assignedTo: {
-    type: Schema.Types.ObjectId,
+    type: mongoose.Schema.Types.ObjectId,
     ref: 'User',
     default: null
   },
   assignedDepartment: {
-    type: Schema.Types.ObjectId,
+    type: mongoose.Schema.Types.ObjectId,
     ref: 'Department',
     default: null
   },
@@ -234,7 +186,7 @@ const issueSchema = new Schema<IIssue>({
   resolution: {
     description: String,
     resolvedBy: {
-      type: Schema.Types.ObjectId,
+      type: mongoose.Schema.Types.ObjectId,
       ref: 'User'
     },
     images: [String],
@@ -258,17 +210,17 @@ const issueSchema = new Schema<IIssue>({
   },
   votes: {
     upvotes: [{
-      type: Schema.Types.ObjectId,
+      type: mongoose.Schema.Types.ObjectId,
       ref: 'User'
     }],
     downvotes: [{
-      type: Schema.Types.ObjectId,
+      type: mongoose.Schema.Types.ObjectId,
       ref: 'User'
     }]
   },
   comments: [{
     user: {
-      type: Schema.Types.ObjectId,
+      type: mongoose.Schema.Types.ObjectId,
       ref: 'User',
       required: true
     },
@@ -302,12 +254,12 @@ const issueSchema = new Schema<IIssue>({
     max: [100, 'Urgency score cannot exceed 100']
   },
   duplicateOf: {
-    type: Schema.Types.ObjectId,
+    type: mongoose.Schema.Types.ObjectId,
     ref: 'Issue',
     default: null
   },
   relatedIssues: [{
-    type: Schema.Types.ObjectId,
+    type: mongoose.Schema.Types.ObjectId,
     ref: 'Issue'
   }],
   metadata: {
@@ -360,24 +312,24 @@ issueSchema.index({ assignedDepartment: 1, status: 1 });
 issueSchema.index({ category: 1, 'location.coordinates': '2dsphere' });
 
 // Virtual for vote score
-issueSchema.virtual('voteScore').get(function(this: IIssue) {
+issueSchema.virtual('voteScore').get(function() {
   return this.votes.upvotes.length - this.votes.downvotes.length;
 });
 
 // Virtual for days since reported
-issueSchema.virtual('daysSinceReported').get(function(this: IIssue) {
+issueSchema.virtual('daysSinceReported').get(function() {
   return Math.floor((Date.now() - this.timeline.reported.getTime()) / (1000 * 60 * 60 * 24));
 });
 
 // Virtual for resolution time in hours
-issueSchema.virtual('resolutionTimeHours').get(function(this: IIssue) {
+issueSchema.virtual('resolutionTimeHours').get(function() {
   if (!this.timeline.resolved) return null;
   return Math.round((this.timeline.resolved.getTime() - this.timeline.reported.getTime()) / (1000 * 60 * 60));
 });
 
 // Virtual for status display
-issueSchema.virtual('statusDisplay').get(function(this: IIssue) {
-  const statusMap: { [key: string]: string } = {
+issueSchema.virtual('statusDisplay').get(function() {
+  const statusMap = {
     'pending': 'Reported',
     'acknowledged': 'Acknowledged',
     'in_progress': 'In Progress',
@@ -388,4 +340,6 @@ issueSchema.virtual('statusDisplay').get(function(this: IIssue) {
   return statusMap[this.status] || this.status;
 });
 
-export const Issue = mongoose.model<IIssue>('Issue', issueSchema);
+const Issue = mongoose.model('Issue', issueSchema);
+
+module.exports = { Issue };

@@ -1,45 +1,26 @@
-import mongoose, { Document, Schema, Types } from 'mongoose';
+const mongoose = require('mongoose');
 
-export interface IDepartment extends Document {
-  _id: string;
-  name: string;
-  code: string;
-  description?: string;
-  head?: Types.ObjectId; // User ID of department head
-  staff: Types.ObjectId[]; // Array of User IDs for department staff
-  contactEmail: string;
-  contactPhone?: string;
-  isActive: boolean;
-  categories: string[]; // Issue categories this department handles
-  priority: number; // Default priority level (1-5)
-  responseTime: {
-    acknowledge: number; // Hours to acknowledge
-    resolve: number; // Hours to resolve
-  };
-  workingHours: {
-    start: string; // 24-hour format (e.g., "09:00")
-    end: string; // 24-hour format (e.g., "18:00")
-    workingDays: number[]; // 0=Sunday, 1=Monday, ..., 6=Saturday
-  };
-  location?: {
-    address: string;
-    coordinates: {
-      latitude: number;
-      longitude: number;
-    };
-  };
-  stats: {
-    totalAssigned: number;
-    totalResolved: number;
-    averageResponseTime: number; // in hours
-    averageResolutionTime: number; // in hours
-    currentBacklog: number;
-  };
-  createdAt: Date;
-  updatedAt: Date;
-}
+/**
+ * Department Schema for the Civic Issue Reporting System
+ * @typedef {Object} Department
+ * @property {string} _id - Unique identifier
+ * @property {string} name - Department name
+ * @property {string} code - Department code
+ * @property {string} [description] - Department description
+ * @property {ObjectId} [head] - Department head user ID
+ * @property {Array} staff - Array of staff user IDs
+ * @property {string} contactEmail - Contact email
+ * @property {string} [contactPhone] - Contact phone number
+ * @property {boolean} isActive - Whether department is active
+ * @property {Array} categories - Issue categories handled
+ * @property {number} priority - Default priority level
+ * @property {Object} responseTime - Response time expectations
+ * @property {Object} workingHours - Working hours and days
+ * @property {Object} [location] - Department location
+ * @property {Object} stats - Department statistics
+ */
 
-const departmentSchema = new Schema<IDepartment>({
+const departmentSchema = new mongoose.Schema({
   name: {
     type: String,
     required: [true, 'Department name is required'],
@@ -60,12 +41,12 @@ const departmentSchema = new Schema<IDepartment>({
     maxLength: [500, 'Description cannot exceed 500 characters']
   },
   head: {
-    type: Schema.Types.ObjectId,
+    type: mongoose.Schema.Types.ObjectId,
     ref: 'User',
     default: null
   },
   staff: [{
-    type: Schema.Types.ObjectId,
+    type: mongoose.Schema.Types.ObjectId,
     ref: 'User'
   }],
   contactEmail: {
@@ -184,17 +165,19 @@ departmentSchema.index({ categories: 1 });
 departmentSchema.index({ head: 1 });
 
 // Virtual for efficiency rate
-departmentSchema.virtual('efficiencyRate').get(function(this: IDepartment) {
+departmentSchema.virtual('efficiencyRate').get(function() {
   if (this.stats.totalAssigned === 0) return 0;
   return Math.round((this.stats.totalResolved / this.stats.totalAssigned) * 100);
 });
 
 // Virtual for current workload status
-departmentSchema.virtual('workloadStatus').get(function(this: IDepartment) {
+departmentSchema.virtual('workloadStatus').get(function() {
   const backlogRatio = this.stats.currentBacklog / (this.stats.totalAssigned || 1);
   if (backlogRatio > 0.5) return 'high';
   if (backlogRatio > 0.2) return 'medium';
   return 'low';
 });
 
-export const Department = mongoose.model<IDepartment>('Department', departmentSchema);
+const Department = mongoose.model('Department', departmentSchema);
+
+module.exports = { Department };

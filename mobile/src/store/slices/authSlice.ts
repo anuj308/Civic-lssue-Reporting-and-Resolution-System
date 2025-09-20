@@ -58,17 +58,53 @@ export const login = createAsyncThunk(
   'auth/login',
   async (credentials: { email: string; password: string }, { rejectWithValue }) => {
     try {
+      console.log('🔥 Redux login: Starting login with credentials for:', credentials.email);
       const response = await authApi.login(credentials);
+      console.log('📥 Redux login: Raw response:', response.data);
+      
       const { accessToken, refreshToken, user } = response.data.data;
+      console.log('🔍 Redux login: Extracted data:', {
+        hasAccessToken: !!accessToken,
+        hasRefreshToken: !!refreshToken,
+        hasUser: !!user,
+        userName: user?.name,
+        userEmail: user?.email
+      });
+      
+      if (!accessToken) {
+        console.error('❌ Redux login: Missing accessToken in response');
+        throw new Error('Missing access token in server response');
+      }
+      
+      if (!refreshToken) {
+        console.error('❌ Redux login: Missing refreshToken in response');
+        throw new Error('Missing refresh token in server response');
+      }
+      
       await AsyncStorage.setItem('token', accessToken);
       await AsyncStorage.setItem('refreshToken', refreshToken);
+      console.log('✅ Redux login: Tokens saved to AsyncStorage successfully');
+      
       return {
         user,
         token: accessToken,
         refreshToken: refreshToken
       };
     } catch (error: any) {
-      return rejectWithValue(error.response?.data?.message || 'Login failed');
+      console.error('❌ Redux login error:', error);
+      console.error('Error details:', {
+        message: error.message,
+        response: error.response?.data,
+        status: error.response?.status,
+      });
+      
+      // Check if it's an email verification error (HTTP 403)
+      if (error.response?.status === 403 && error.response?.data?.error?.needsVerification) {
+        console.log('📧 Login failed: Email verification required');
+        return rejectWithValue(error.response.data.message + ' (EMAIL_NOT_VERIFIED)');
+      }
+      
+      return rejectWithValue(error.response?.data?.message || error.message || 'Login failed');
     }
   }
 );
@@ -170,6 +206,63 @@ export const resendOTP = createAsyncThunk(
   }
 );
 
+export const resendLoginOTP = createAsyncThunk(
+  'auth/resendLoginOTP',
+  async (data: { email: string }, { rejectWithValue }) => {
+    try {
+      console.log('🔄 Redux resendLoginOTP: Input data:', data);
+      
+      const response = await authApi.resendLoginOTP({
+        email: data.email,
+      });
+      
+      console.log('✅ Redux resendLoginOTP: Response:', response.data);
+      return response.data;
+    } catch (error: any) {
+      console.error('❌ Redux resendLoginOTP error:', error);
+      return rejectWithValue(error.response?.data?.message || 'Failed to resend login OTP');
+    }
+  }
+);
+
+export const verifyAndLogin = createAsyncThunk(
+  'auth/verifyAndLogin',
+  async (data: { email: string; otpCode: string; password?: string }, { rejectWithValue }) => {
+    try {
+      console.log('🔥 Redux verifyAndLogin: Input data:', data);
+      
+      const response = await authApi.verifyAndLogin({
+        email: data.email,
+        otpCode: data.otpCode,
+        password: data.password,
+      });
+      
+      console.log('✅ Redux verifyAndLogin: Full response:', response.data);
+      
+      const { accessToken, refreshToken, user } = response.data.data;
+      
+      if (!accessToken || !refreshToken) {
+        console.error('❌ Missing tokens in response:', { accessToken: !!accessToken, refreshToken: !!refreshToken });
+        throw new Error('Missing authentication tokens in response');
+      }
+      
+      await AsyncStorage.setItem('token', accessToken);
+      await AsyncStorage.setItem('refreshToken', refreshToken);
+      
+      console.log('✅ Tokens saved to AsyncStorage successfully');
+      
+      return {
+        user,
+        token: accessToken,
+        refreshToken: refreshToken
+      };
+    } catch (error: any) {
+      console.error('❌ Redux verifyAndLogin error:', error);
+      return rejectWithValue(error.response?.data?.message || 'Email verification and login failed');
+    }
+  }
+);
+
 export const refreshToken = createAsyncThunk(
   'auth/refreshToken',
   async (_, { getState, rejectWithValue }) => {
@@ -204,10 +297,16 @@ export const deleteAccount = createAsyncThunk(
   'auth/deleteAccount',
   async (_, { rejectWithValue }) => {
     try {
-      await userApi.deleteAccount();
+      console.log('🗑️ Redux deleteAccount: Starting account deletion');
+      await authApi.deleteAccount();
+      console.log('✅ Redux deleteAccount: Account deleted successfully on server');
+      
       await AsyncStorage.multiRemove(['token', 'refreshToken']);
+      console.log('✅ Redux deleteAccount: Local tokens cleared');
+      
       return true;
     } catch (error: any) {
+      console.error('❌ Redux deleteAccount error:', error);
       return rejectWithValue(error.response?.data?.message || 'Failed to delete account');
     }
   }
@@ -331,6 +430,40 @@ const authSlice = createSlice({
         state.error = null;
       })
       .addCase(resendOTP.rejected, (state, action) => {
+        state.isLoading = false;
+        state.error = action.payload as string;
+      });
+
+    // Resend Login OTP
+    builder
+      .addCase(resendLoginOTP.pending, (state) => {
+        state.isLoading = true;
+        state.error = null;
+      })
+      .addCase(resendLoginOTP.fulfilled, (state) => {
+        state.isLoading = false;
+        state.error = null;
+      })
+      .addCase(resendLoginOTP.rejected, (state, action) => {
+        state.isLoading = false;
+        state.error = action.payload as string;
+      });
+
+    // Verify and Login (for login email verification flow)
+    builder
+      .addCase(verifyAndLogin.pending, (state) => {
+        state.isLoading = true;
+        state.error = null;
+      })
+      .addCase(verifyAndLogin.fulfilled, (state, action) => {
+        state.isLoading = false;
+        state.error = null;
+        state.user = action.payload.user;
+        state.token = action.payload.token;
+        state.refreshToken = action.payload.refreshToken;
+        state.isAuthenticated = true;
+      })
+      .addCase(verifyAndLogin.rejected, (state, action) => {
         state.isLoading = false;
         state.error = action.payload as string;
       });

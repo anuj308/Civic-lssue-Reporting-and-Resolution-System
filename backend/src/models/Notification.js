@@ -1,29 +1,29 @@
-import mongoose, { Document, Schema } from 'mongoose';
+const mongoose = require('mongoose');
 
-export interface INotification extends Document {
-  _id: string;
-  recipient: mongoose.Types.ObjectId;
-  type: 'issue_created' | 'issue_assigned' | 'issue_updated' | 'issue_resolved' | 'comment_added' | 'system_announcement' | 'reminder';
-  title: string;
-  message: string;
-  relatedIssue?: mongoose.Types.ObjectId;
-  relatedDepartment?: mongoose.Types.ObjectId;
-  data?: any;
-  isRead: boolean;
-  readAt?: Date;
-  priority: 'low' | 'medium' | 'high' | 'urgent';
-  channels: ('app' | 'email' | 'sms' | 'push')[];
-  scheduledFor?: Date;
-  expiresAt?: Date;
-  isSystemWide: boolean;
-  createdBy: mongoose.Types.ObjectId;
-  createdAt: Date;
-  updatedAt: Date;
-}
+/**
+ * Notification Schema for the Civic Issue Reporting System
+ * @typedef {Object} Notification
+ * @property {string} _id - Unique identifier
+ * @property {ObjectId} recipient - User who will receive the notification
+ * @property {string} type - Type of notification
+ * @property {string} title - Notification title
+ * @property {string} message - Notification message
+ * @property {ObjectId} [relatedIssue] - Related issue reference
+ * @property {ObjectId} [relatedDepartment] - Related department reference
+ * @property {any} [data] - Additional data
+ * @property {boolean} isRead - Whether notification is read
+ * @property {Date} [readAt] - When notification was read
+ * @property {string} priority - Priority level
+ * @property {Array} channels - Delivery channels
+ * @property {Date} [scheduledFor] - Scheduled delivery time
+ * @property {Date} [expiresAt] - Expiration time
+ * @property {boolean} isSystemWide - Whether it's a system-wide notification
+ * @property {ObjectId} createdBy - User who created the notification
+ */
 
-const NotificationSchema = new Schema<INotification>({
+const NotificationSchema = new mongoose.Schema({
   recipient: {
-    type: Schema.Types.ObjectId,
+    type: mongoose.Schema.Types.ObjectId,
     ref: 'User',
     required: [true, 'Recipient is required']
   },
@@ -48,15 +48,15 @@ const NotificationSchema = new Schema<INotification>({
     maxlength: [1000, 'Message cannot exceed 1000 characters']
   },
   relatedIssue: {
-    type: Schema.Types.ObjectId,
+    type: mongoose.Schema.Types.ObjectId,
     ref: 'Issue'
   },
   relatedDepartment: {
-    type: Schema.Types.ObjectId,
+    type: mongoose.Schema.Types.ObjectId,
     ref: 'Department'
   },
   data: {
-    type: Schema.Types.Mixed
+    type: mongoose.Schema.Types.Mixed
   },
   isRead: {
     type: Boolean,
@@ -88,7 +88,7 @@ const NotificationSchema = new Schema<INotification>({
     default: false
   },
   createdBy: {
-    type: Schema.Types.ObjectId,
+    type: mongoose.Schema.Types.ObjectId,
     ref: 'User',
     required: [true, 'Creator is required']
   }
@@ -122,12 +122,12 @@ NotificationSchema.virtual('timeAgo').get(function() {
 
 // Static method to create notification for issue events
 NotificationSchema.statics.createIssueNotification = async function(
-  type: string,
-  issue: any,
-  recipient: string,
-  additionalData?: any
+  type,
+  issue,
+  recipient,
+  additionalData
 ) {
-  const notificationData: any = {
+  const notificationData = {
     recipient,
     type,
     relatedIssue: issue._id,
@@ -168,7 +168,7 @@ NotificationSchema.statics.createIssueNotification = async function(
 };
 
 // Static method to mark notifications as read
-NotificationSchema.statics.markAsRead = async function(notificationIds: string[], userId: string) {
+NotificationSchema.statics.markAsRead = async function(notificationIds, userId) {
   return this.updateMany(
     { _id: { $in: notificationIds }, recipient: userId },
     { 
@@ -179,8 +179,10 @@ NotificationSchema.statics.markAsRead = async function(notificationIds: string[]
 };
 
 // Static method to get unread count
-NotificationSchema.statics.getUnreadCount = async function(userId: string) {
+NotificationSchema.statics.getUnreadCount = async function(userId) {
   return this.countDocuments({ recipient: userId, isRead: false });
 };
 
-export default mongoose.model<INotification>('Notification', NotificationSchema);
+const Notification = mongoose.model('Notification', NotificationSchema);
+
+module.exports = Notification;

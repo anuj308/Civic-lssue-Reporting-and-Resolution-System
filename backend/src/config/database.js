@@ -1,9 +1,10 @@
-import mongoose from 'mongoose';
+const mongoose = require('mongoose');
 
 /**
  * Database connection configuration
+ * @returns {Promise<void>}
  */
-export const connectDatabase = async (): Promise<void> => {
+const connectDatabase = async () => {
   try {
     const mongoURI = process.env.MONGODB_URI || 'mongodb://localhost:27017/civic_issue_db';
     
@@ -59,8 +60,9 @@ export const connectDatabase = async (): Promise<void> => {
 
 /**
  * Close database connection
+ * @returns {Promise<void>}
  */
-export const closeDatabaseConnection = async (): Promise<void> => {
+const closeDatabaseConnection = async () => {
   try {
     await mongoose.connection.close();
     console.log('📴 MongoDB connection closed');
@@ -72,8 +74,9 @@ export const closeDatabaseConnection = async (): Promise<void> => {
 
 /**
  * Check database connection status
+ * @returns {Object} Database status information
  */
-export const getDatabaseStatus = () => {
+const getDatabaseStatus = () => {
   const state = mongoose.connection.readyState;
   const states = {
     0: 'disconnected',
@@ -83,12 +86,16 @@ export const getDatabaseStatus = () => {
   };
   
   return {
-    state: states[state as keyof typeof states] || 'unknown',
+    state: states[state] || 'unknown',
     host: mongoose.connection.host,
     name: mongoose.connection.name,
     port: mongoose.connection.port,
   };
 };
 
-// Export mongoose for use in other files
-export { mongoose };
+module.exports = {
+  connectDatabase,
+  closeDatabaseConnection,
+  getDatabaseStatus,
+  mongoose
+};

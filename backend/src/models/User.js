@@ -1,48 +1,34 @@
-import mongoose, { Document, Schema } from 'mongoose';
-import bcrypt from 'bcryptjs';
+const mongoose = require('mongoose');
+const bcrypt = require('bcryptjs');
 
-export interface IUser extends Document {
-  _id: string;
-  name: string;
-  email: string;
-  password: string;
-  phone?: string;
-  role: 'citizen' | 'admin' | 'department_head' | 'field_worker';
-  department?: string;
-  profileImage?: string;
-  isActive: boolean;
-  isVerified: boolean;
-  otpCode?: string;
-  otpExpiry?: Date;
-  otpAttempts?: number;
-  fcmToken?: string;
-  address?: {
-    street?: string;
-    city?: string;
-    state?: string;
-    pincode?: string;
-    coordinates?: {
-      latitude: number;
-      longitude: number;
-    };
-  };
-  preferences?: {
-    emailNotifications: boolean;
-    pushNotifications: boolean;
-    smsNotifications: boolean;
-  };
-  stats?: {
-    totalReports: number;
-    resolvedReports: number;
-    averageRating: number;
-  };
-  createdAt: Date;
-  updatedAt: Date;
-  lastLoginAt?: Date;
-  comparePassword(candidatePassword: string): Promise<boolean>;
-}
+/**
+ * User Schema for the Civic Issue Reporting System
+ * @typedef {Object} User
+ * @property {string} _id - Unique identifier
+ * @property {string} name - User's full name
+ * @property {string} email - User's email address
+ * @property {string} password - Hashed password
+ * @property {string} [phone] - Optional phone number
+ * @property {string} role - User role: 'citizen', 'admin', 'department_head', 'field_worker'
+ * @property {string} [department] - Department reference (required for non-citizen roles)
+ * @property {string} [profileImage] - Profile image URL
+ * @property {boolean} isActive - Whether user account is active
+ * @property {boolean} isVerified - Whether user is verified
+ * @property {string} [otpCode] - OTP code for verification
+ * @property {Date} [otpExpiry] - OTP expiration time
+ * @property {number} [otpAttempts] - Number of OTP attempts
+ * @property {string} [resetPasswordToken] - Password reset token
+ * @property {Date} [resetPasswordExpiry] - Password reset token expiration
+ * @property {string} [fcmToken] - Firebase Cloud Messaging token
+ * @property {Object} [address] - User's address information
+ * @property {Object} [preferences] - User notification preferences
+ * @property {Object} [stats] - User statistics
+ * @property {Date} createdAt - Account creation timestamp
+ * @property {Date} updatedAt - Last update timestamp
+ * @property {Date} [lastLoginAt] - Last login timestamp
+ */
 
-const userSchema = new Schema<IUser>({
+const userSchema = new mongoose.Schema({
   name: {
     type: String,
     required: [true, 'Name is required'],
@@ -76,7 +62,7 @@ const userSchema = new Schema<IUser>({
   department: {
     type: String,
     ref: 'Department',
-    required: function(this: IUser) {
+    required: function() {
       return this.role !== 'citizen' && this.role !== 'admin';
     }
   },
@@ -104,6 +90,15 @@ const userSchema = new Schema<IUser>({
   otpAttempts: {
     type: Number,
     default: 0
+  },
+  resetPasswordToken: {
+    type: String,
+    default: null,
+    select: false
+  },
+  resetPasswordExpiry: {
+    type: Date,
+    default: null
   },
   fcmToken: {
     type: String,
@@ -157,7 +152,7 @@ userSchema.index({ department: 1 });
 userSchema.index({ 'address.coordinates': '2dsphere' });
 
 // Virtual for user's full name display
-userSchema.virtual('displayName').get(function(this: IUser) {
+userSchema.virtual('displayName').get(function() {
   return this.name;
 });
 
@@ -170,12 +165,12 @@ userSchema.pre('save', async function(next) {
     this.password = await bcrypt.hash(this.password, saltRounds);
     next();
   } catch (error) {
-    next(error as Error);
+    next(error);
   }
 });
 
 // Method to compare password
-userSchema.methods.comparePassword = async function(candidatePassword: string): Promise<boolean> {
+userSchema.methods.comparePassword = async function(candidatePassword) {
   return bcrypt.compare(candidatePassword, this.password);
 };
 
@@ -187,4 +182,6 @@ userSchema.methods.toJSON = function() {
   return userObject;
 };
 
-export const User = mongoose.model<IUser>('User', userSchema);
+const User = mongoose.model('User', userSchema);
+
+module.exports = { User };
