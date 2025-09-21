@@ -82,6 +82,23 @@ class IssueController {
       if (media?.videos) processedMedia.videos = media.videos;
       if (media?.audio) processedMedia.audio = media.audio;
 
+      // Process location coordinates - convert from object to array format for MongoDB 2dsphere
+      const processedLocation = { ...location };
+      if (location.coordinates && typeof location.coordinates === 'object' && !Array.isArray(location.coordinates)) {
+        // Convert {latitude, longitude} to [longitude, latitude]
+        const { latitude, longitude } = location.coordinates;
+        if (typeof latitude === 'number' && typeof longitude === 'number') {
+          processedLocation.coordinates = [longitude, latitude];
+          console.log('📍 Converted coordinates from object to array:', location.coordinates, '->', processedLocation.coordinates);
+        } else {
+          console.error('❌ Invalid coordinate format received:', location.coordinates);
+          return res.status(400).json({
+            success: false,
+            message: 'Invalid coordinate format. Expected {latitude, longitude} with numeric values.'
+          });
+        }
+      }
+
       // Create new issue
       const issue = new Issue({
         title,
@@ -90,7 +107,7 @@ class IssueController {
         subcategory,
         priority: priority || 'medium',
         reportedBy: req.user._id, // Use req.user._id instead of req.user.userId
-        location,
+        location: processedLocation,
         media: processedMedia,
         tags: tags || [],
         isPublic: isPublic !== false, // Default to true
@@ -626,6 +643,100 @@ class IssueController {
       res.status(500).json({
         success: false,
         message: 'Internal server error while deleting issue'
+      });
+    }
+  }
+
+  /**
+   * Get all public issues with coordinates for map display
+   * @param {Object} req - Express request object
+   * @param {Object} res - Express response object
+   */
+  static async getMapIssues(req, res) {
+    try {
+      const { status, category, priority } = req.query;
+      
+      const filters = { isPublic: true };
+      
+      // Add optional filters
+      if (status) filters.status = status;
+      if (category) filters.category = category;
+      if (priority) filters.priority = priority;
+
+      const issues = await Issue.find(filters)
+        .populate('reportedBy', 'name')
+        .select('title category priority status location.coordinates location.address createdAt votes timeline')
+        .lean();
+
+      // Normalize coordinates: support both array [lng, lat] and object { latitude, longitude }
+      const normalized = issues.map(issue => {
+        const loc = issue.location || {};
+        let latitude = null;
+        let longitude = null;
+
+        // If stored as array [lng, lat] (new format)
+        if (Array.isArray(loc.coordinates) && loc.coordinates.length === 2) {
+          const [lng, lat] = loc.coordinates;
+          if (typeof lat === 'number' && typeof lng === 'number' && !isNaN(lat) && !isNaN(lng)) {
+            latitude = lat;
+            longitude = lng;
+          }
+        }
+        // If stored as object { latitude, longitude } (legacy format)
+        else if (loc.coordinates && typeof loc.coordinates === 'object' && !Array.isArray(loc.coordinates)) {
+          const lat = loc.coordinates.latitude ?? loc.coordinates.lat ?? null;
+          const lng = loc.coordinates.longitude ?? loc.coordinates.lng ?? null;
+          if (typeof lat === 'number' && typeof lng === 'number' && !isNaN(lat) && !isNaN(lng)) {
+            latitude = lat;
+            longitude = lng;
+          }
+        }
+
+        return {
+          ...issue,
+          _normalizedLocation: {
+            latitude,
+            longitude,
+            address: loc.address || null
+          }
+        };
+      });
+
+      // Filter only those with valid numeric lat/lng
+      const validIssues = normalized.filter(i => i._normalizedLocation &&
+        typeof i._normalizedLocation.latitude === 'number' && typeof i._normalizedLocation.longitude === 'number');
+
+      // Debug log
+      console.log(`🔍 getMapIssues: Found ${issues.length} issues, ${validIssues.length} with valid coordinates`);
+
+      res.status(200).json({
+        success: true,
+        message: 'Map issues retrieved successfully',
+        data: {
+          issues: validIssues.map(issue => ({
+            id: issue._id,
+            title: issue.title,
+            category: issue.category,
+            priority: issue.priority,
+            status: issue.status,
+            location: {
+              latitude: issue._normalizedLocation.latitude,
+              longitude: issue._normalizedLocation.longitude,
+              address: issue._normalizedLocation.address
+            },
+            createdAt: issue.createdAt,
+            reportedBy: issue.reportedBy ? { name: issue.reportedBy.name } : null,
+            voteScore: (issue.votes?.upvotes?.length || 0) - (issue.votes?.downvotes?.length || 0),
+            daysSinceReported: Math.floor((Date.now() - new Date(issue.timeline?.reported || issue.createdAt).getTime()) / (1000 * 60 * 60 * 24))
+          }))
+        }
+      });
+
+    } catch (error) {
+      console.error('❌ Error fetching map issues:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Internal server error while fetching map issues'
       });
     }
   }

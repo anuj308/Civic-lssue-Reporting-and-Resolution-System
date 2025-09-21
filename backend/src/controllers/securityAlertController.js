@@ -459,6 +459,83 @@ class SecurityAlertController {
       });
     }
   }
+
+  /**
+   * Clear all security alerts for user
+   * @route DELETE /api/sessions/security/alerts
+   */
+  static async clearSecurityAlerts(req, res) {
+    try {
+      const userId = req.user._id;
+
+      const result = await SecurityAlert.deleteMany({
+        userId: userId
+      });
+
+      res.json({
+        success: true,
+        message: 'All security alerts cleared successfully',
+        data: {
+          deletedCount: result.deletedCount
+        }
+      });
+
+    } catch (error) {
+      console.error('❌ Clear security alerts error:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Failed to clear security alerts'
+      });
+    }
+  }
+
+  /**
+   * Export user security data
+   * @route GET /api/sessions/security-export
+   */
+  static async exportSecurityData(req, res) {
+    try {
+      const userId = req.user._id;
+
+      // Get user's sessions
+      const sessions = await Session.find({
+        userId: userId
+      })
+      .select('-refreshTokenFamily')
+      .sort({ createdAt: -1 });
+
+      // Get user's security alerts
+      const alerts = await SecurityAlert.find({
+        userId: userId
+      })
+      .sort({ createdAt: -1 });
+
+      const exportData = {
+        exportedAt: new Date(),
+        userId: userId,
+        sessions: sessions,
+        securityAlerts: alerts,
+        summary: {
+          totalSessions: sessions.length,
+          activeSessions: sessions.filter(s => s.isActive).length,
+          totalAlerts: alerts.length,
+          criticalAlerts: alerts.filter(a => a.severity === 'critical').length
+        }
+      };
+
+      res.json({
+        success: true,
+        data: exportData
+      });
+
+    } catch (error) {
+      console.error('❌ Export security data error:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Failed to export security data'
+      });
+    }
+  }
 }
 
 module.exports = { SecurityAlertController };

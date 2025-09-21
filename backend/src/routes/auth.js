@@ -244,6 +244,13 @@ router.post('/resend-login-otp', resendOTPValidation, AuthController.resendLogin
 router.get('/me', authenticateToken, AuthController.getMe);
 
 /**
+ * @route   GET /api/auth/stats
+ * @desc    Get user statistics
+ * @access  Private
+ */
+router.get('/stats', authenticateToken, AuthController.getUserStats);
+
+/**
  * @route   PUT /api/auth/profile
  * @desc    Update user profile
  * @access  Private

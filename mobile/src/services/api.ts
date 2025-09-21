@@ -279,6 +279,9 @@ export const issueApi = {
   getNearbyIssues: (params: { latitude: number; longitude: number; radius?: number }) =>
     apiService.get('/issues/nearby', { params }),
   
+  getMapIssues: (params: { status?: string; category?: string; priority?: string } = {}) =>
+    apiService.get('/issues/map', { params }),
+  
   getById: (issueId: string) =>
     apiService.get(`/issues/${issueId}`),
   
@@ -302,6 +305,9 @@ export const userApi = {
   
   updateProfile: (data: any) =>
     apiService.patch('/users/profile', data),
+  
+  getStats: () =>
+    apiService.get('/users/stats'),
   
   uploadAvatar: (imageData: any) =>
     apiService.upload('/users/avatar', { avatar: imageData }),
@@ -340,13 +346,30 @@ export const sessionApi = {
   revokeAllSessions: () =>
     apiService.post('/sessions/revoke-all'),
   
+  getSecuritySettings: () =>
+    apiService.get('/sessions/security-settings'),
+  
   updateSecuritySettings: (settings: {
-    enableLocationAlerts?: boolean;
-    enableNewDeviceAlerts?: boolean;
-    sessionTimeout?: number;
+    emailAlerts?: boolean;
+    pushNotifications?: boolean;
+    newDeviceAlerts?: boolean;
+    locationAlerts?: boolean;
+    failedLoginAlerts?: boolean;
+    twoFactorEnabled?: boolean;
+    loginNotifications?: boolean;
+    suspiciousActivityAlerts?: boolean;
+    weeklySecurityReport?: boolean;
+    enableLocationAlerts?: boolean; // backwards compatibility
+    enableNewDeviceAlerts?: boolean; // backwards compatibility
     requireStrongAuth?: boolean;
   }) =>
     apiService.patch('/sessions/security-settings', settings),
+  
+  clearSecurityAlerts: () =>
+    apiService.delete('/sessions/security/alerts'),
+  
+  exportSecurityData: () =>
+    apiService.get('/sessions/security-export'),
   
   reportSuspiciousActivity: (data: {
     sessionId: string;

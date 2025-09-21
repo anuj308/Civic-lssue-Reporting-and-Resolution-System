@@ -147,9 +147,9 @@ const authenticateToken = async (req, res, next) => {
           path: '/',
         });
 
-        // Update session activity
-        session.lastActiveAt = new Date();
-        await session.save();
+  // Update session activity only
+  session.lastActiveAt = new Date();
+  await session.save();
 
         req.user = user;
         req.userId = user._id.toString();
@@ -192,6 +192,26 @@ const authenticateToken = async (req, res, next) => {
       }
     }
 
+    // Find user by ID from token first (needed for session timeout preference)
+    const user = await User.findById(payload.userId).select('-password');
+    if (!user) {
+      if (isMobileRequest) {
+        res.status(401).json({
+          success: false,
+          message: 'User not found.',
+          error: { code: 'USER_NOT_FOUND' }
+        });
+      } else {
+        JWTUtils.clearTokenCookies(res);
+        res.status(401).json({
+          success: false,
+          message: 'User not found.',
+          error: { code: 'USER_NOT_FOUND' }
+        });
+      }
+      return;
+    }
+
     // Validate session if found
     if (session) {
       if (session.expiresAt < new Date()) {
@@ -214,32 +234,12 @@ const authenticateToken = async (req, res, next) => {
         return;
       }
 
-      // Update session activity
-      session.lastActiveAt = new Date();
-      await session.save();
+  // Update session activity only
+  session.lastActiveAt = new Date();
+  await session.save();
       
       // Add session ID to request
       req.sessionId = session._id.toString();
-    }
-
-    // Find user by ID from token
-    const user = await User.findById(payload.userId).select('-password');
-    if (!user) {
-      if (isMobileRequest) {
-        res.status(401).json({
-          success: false,
-          message: 'User not found.',
-          error: { code: 'USER_NOT_FOUND' }
-        });
-      } else {
-        JWTUtils.clearTokenCookies(res);
-        res.status(401).json({
-          success: false,
-          message: 'User not found.',
-          error: { code: 'USER_NOT_FOUND' }
-        });
-      }
-      return;
     }
 
     // Check if user account is active

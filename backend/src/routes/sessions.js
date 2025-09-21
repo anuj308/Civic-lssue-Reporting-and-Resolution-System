@@ -56,6 +56,13 @@ router.delete('/:sessionId', SessionController.revokeSession);
 router.post('/revoke-all', SessionController.revokeAllSessions);
 
 /**
+ * @route   GET /api/sessions/security-settings
+ * @desc    Get user security settings
+ * @access  Private
+ */
+router.get('/security-settings', SessionController.getSecuritySettings);
+
+/**
  * @route   PATCH /api/sessions/security-settings
  * @desc    Update user security settings
  * @access  Private
@@ -119,6 +126,20 @@ router.patch('/security/alerts/:alertId/dismiss', SecurityAlertController.dismis
 router.patch('/security/alerts/mark-all-read', SecurityAlertController.markAllRead);
 
 /**
+ * @route   DELETE /api/sessions/security/alerts
+ * @desc    Clear all security alerts for user
+ * @access  Private
+ */
+router.delete('/security/alerts', SecurityAlertController.clearSecurityAlerts);
+
+/**
+ * @route   GET /api/sessions/security-export
+ * @desc    Export user security data
+ * @access  Private
+ */
+router.get('/security-export', SecurityAlertController.exportSecurityData);
+
+/**
  * @route   GET /api/sessions/security/alert-preferences
  * @desc    Get user's alert notification preferences
  * @access  Private
@@ -159,6 +180,7 @@ router.use('*', (req, res) => {
       'GET /api/sessions/:sessionId/details',
       'DELETE /api/sessions/:sessionId',
       'POST /api/sessions/revoke-all',
+      'GET /api/sessions/security-settings',
       'PATCH /api/sessions/security-settings',
       'POST /api/sessions/report-suspicious',
       'GET /api/sessions/security/alerts',
@@ -167,6 +189,8 @@ router.use('*', (req, res) => {
       'PATCH /api/sessions/security/alerts/:alertId/acknowledge',
       'PATCH /api/sessions/security/alerts/:alertId/dismiss',
       'PATCH /api/sessions/security/alerts/mark-all-read',
+      'DELETE /api/sessions/security/alerts',
+      'GET /api/sessions/security-export',
       'GET /api/sessions/security/alert-preferences',
       'PATCH /api/sessions/security/alert-preferences'
     ]

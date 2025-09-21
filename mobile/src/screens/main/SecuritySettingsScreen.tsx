@@ -31,7 +31,6 @@ interface SecuritySettings {
   newDeviceAlerts: boolean;
   locationAlerts: boolean;
   failedLoginAlerts: boolean;
-  sessionTimeout: number;
   twoFactorEnabled: boolean;
   loginNotifications: boolean;
   suspiciousActivityAlerts: boolean;
@@ -49,13 +48,11 @@ export default function SecuritySettingsScreen() {
     newDeviceAlerts: true,
     locationAlerts: true,
     failedLoginAlerts: true,
-    sessionTimeout: 30,
     twoFactorEnabled: false,
     loginNotifications: true,
     suspiciousActivityAlerts: true,
     weeklySecurityReport: false,
   });
-  const [showTimeoutDialog, setShowTimeoutDialog] = useState(false);
   const [showTwoFactorDialog, setShowTwoFactorDialog] = useState(false);
 
   useEffect(() => {
@@ -66,7 +63,8 @@ export default function SecuritySettingsScreen() {
     try {
       setLoading(true);
       const response = await sessionApi.getSecuritySettings();
-      setSettings(response.data.data.settings);
+      const serverSettings = response.data.data.settings;
+      setSettings(serverSettings);
     } catch (error: any) {
       console.error('Error loading security settings:', error);
       Alert.alert('Error', 'Failed to load security settings');
@@ -107,11 +105,6 @@ export default function SecuritySettingsScreen() {
     updateSetting(key, !currentValue);
   };
 
-  const handleSessionTimeoutChange = (timeout: number) => {
-    setShowTimeoutDialog(false);
-    updateSetting('sessionTimeout', timeout);
-  };
-
   const handleEnableTwoFactor = () => {
     setShowTwoFactorDialog(false);
     Alert.alert(
@@ -144,19 +137,25 @@ export default function SecuritySettingsScreen() {
   };
 
   const timeoutOptions = [
-    { label: '15 minutes', value: 15 },
-    { label: '30 minutes', value: 30 },
-    { label: '1 hour', value: 60 },
-    { label: '2 hours', value: 120 },
-    { label: '4 hours', value: 240 },
-    { label: '8 hours', value: 480 },
+    { label: '15 minutes', value: 15 * 60 * 1000, displayValue: 15 },
+    { label: '30 minutes', value: 30 * 60 * 1000, displayValue: 30 },
+    { label: '1 hour', value: 60 * 60 * 1000, displayValue: 60 },
+    { label: '2 hours', value: 2 * 60 * 60 * 1000, displayValue: 120 },
+    { label: '4 hours', value: 4 * 60 * 60 * 1000, displayValue: 240 },
+    { label: '8 hours', value: 8 * 60 * 60 * 1000, displayValue: 480 },
+    { label: '7 days', value: 7 * 24 * 60 * 60 * 1000, displayValue: 7 * 24 * 60 },
   ];
 
-  const getTimeoutLabel = (minutes: number) => {
+  const getTimeoutLabel = (milliseconds: number) => {
+    const minutes = Math.floor(milliseconds / (60 * 1000));
     if (minutes < 60) {
       return `${minutes} minutes`;
+    } else if (minutes < 1440) { // Less than 24 hours
+      const hours = Math.floor(minutes / 60);
+      return `${hours} hour${hours > 1 ? 's' : ''}`;
     } else {
-      return `${minutes / 60} hour${minutes / 60 > 1 ? 's' : ''}`;
+      const days = Math.floor(minutes / 1440);
+      return `${days} day${days > 1 ? 's' : ''}`;
     }
   };
 
@@ -267,7 +266,7 @@ export default function SecuritySettingsScreen() {
             <List.Item
               title="New Device Alerts"
               description="Alert when signing in from new device"
-              left={() => <Icon name="cellphone-plus" size={24} color={theme.colors.warning} />}
+              left={() => <Icon name="cellphone" size={24} color={theme.colors.warning} />}
               right={() => (
                 <Switch
                   value={settings.newDeviceAlerts}
@@ -325,15 +324,6 @@ export default function SecuritySettingsScreen() {
         <Card style={styles.settingsCard}>
           <Card.Content>
             <Text variant="titleMedium" style={styles.sectionTitle}>Session & Authentication</Text>
-            
-            <List.Item
-              title="Session Timeout"
-              description={`Automatically sign out after ${getTimeoutLabel(settings.sessionTimeout)} of inactivity`}
-              left={() => <Icon name="clock-outline" size={24} color={theme.colors.info} />}
-              right={() => <Icon name="chevron-right" size={24} color={theme.colors.onSurfaceVariant} />}
-              onPress={() => setShowTimeoutDialog(true)}
-            />
-            <Divider />
             
             <List.Item
               title="Two-Factor Authentication"
@@ -436,32 +426,6 @@ export default function SecuritySettingsScreen() {
           </Card.Content>
         </Card>
       </ScrollView>
-
-      {/* Session Timeout Dialog */}
-      <Portal>
-        <Dialog visible={showTimeoutDialog} onDismiss={() => setShowTimeoutDialog(false)}>
-          <Dialog.Title>Session Timeout</Dialog.Title>
-          <Dialog.Content>
-            <Text style={styles.dialogDescription}>
-              Choose how long you can be inactive before being automatically signed out:
-            </Text>
-            <RadioButton.Group
-              onValueChange={(value) => handleSessionTimeoutChange(parseInt(value))}
-              value={settings.sessionTimeout.toString()}
-            >
-              {timeoutOptions.map((option) => (
-                <View key={option.value} style={styles.radioOption}>
-                  <RadioButton value={option.value.toString()} />
-                  <Text style={styles.radioLabel}>{option.label}</Text>
-                </View>
-              ))}
-            </RadioButton.Group>
-          </Dialog.Content>
-          <Dialog.Actions>
-            <Button onPress={() => setShowTimeoutDialog(false)}>Cancel</Button>
-          </Dialog.Actions>
-        </Dialog>
-      </Portal>
 
       {/* Two-Factor Authentication Dialog */}
       <Portal>

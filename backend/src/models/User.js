@@ -128,7 +128,7 @@ const userSchema = new mongoose.Schema({
   preferences: {
     emailNotifications: { type: Boolean, default: true },
     pushNotifications: { type: Boolean, default: true },
-    smsNotifications: { type: Boolean, default: false }
+  smsNotifications: { type: Boolean, default: false }
   },
   stats: {
     totalReports: { type: Number, default: 0 },

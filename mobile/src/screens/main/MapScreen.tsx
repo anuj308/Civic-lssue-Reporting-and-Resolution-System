@@ -1,10 +1,12 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import {
   View,
   StyleSheet,
   Dimensions,
   Alert,
   TouchableOpacity,
+  ScrollView,
+  SafeAreaView,
 } from 'react-native';
 import {
   Surface,
@@ -21,13 +23,14 @@ import {
   FAB,
   ActivityIndicator,
 } from 'react-native-paper';
-import { SafeAreaView } from 'react-native-safe-area-context';
-import { useNavigation } from '@react-navigation/native';
+
+import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import MapView, { Marker, Callout, Region, PROVIDER_GOOGLE } from 'react-native-maps';
 import * as Location from 'expo-location';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 import { theme } from '../../theme';
 import { useAppDispatch, useAppSelector } from '../../store/store';
+import { issueApi } from '../../services/api';
 
 const { width, height } = Dimensions.get('window');
 const ASPECT_RATIO = width / height;
@@ -62,6 +65,7 @@ interface IssueCluster {
 }
 
 export default function MapScreen() {
+
   const navigation = useNavigation();
   const dispatch = useAppDispatch();
   
@@ -73,9 +77,10 @@ export default function MapScreen() {
   });
   
   const [issues, setIssues] = useState<Issue[]>([]);
-  const [clusters, setClusters] = useState<IssueCluster[]>([]);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [selectedIssue, setSelectedIssue] = useState<Issue | null>(null);
+  const [selectedCluster, setSelectedCluster] = useState<IssueCluster | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [showFilters, setShowFilters] = useState(false);
   const [mapType, setMapType] = useState<'standard' | 'satellite' | 'hybrid'>('standard');
@@ -165,17 +170,126 @@ export default function MapScreen() {
     { label: 'Resolved', value: 'resolved' },
   ];
 
-  useEffect(() => {
-    loadIssues();
-    requestLocationPermission();
-  }, []);
+  useFocusEffect(
+    useCallback(() => {
+      console.log('🎯 MapScreen focused - refreshing issues');
+      loadIssues();
+      requestLocationPermission();
+    }, [])
+  );
 
+  // Debug selectedIssue changes
   useEffect(() => {
-    if (issues.length > 0) {
-      const filteredIssues = getFilteredIssues();
-      generateClusters(filteredIssues);
+    console.log('🎯 selectedIssue changed:', selectedIssue ? selectedIssue.id : 'null');
+  }, [selectedIssue]);
+
+  // Debug selectedCluster changes
+  useEffect(() => {
+    console.log('🔗 selectedCluster changed:', selectedCluster ? `cluster with ${selectedCluster.count} issues` : 'null');
+  }, [selectedCluster]);
+
+  const clusters = useMemo(() => {
+    console.log('🔄 Creating clusters from issues:', issues.length, 'issues');
+    
+    if (issues.length === 0) {
+      console.log('⚠️ No issues to cluster');
+      return [];
     }
-  }, [issues, filterCategory, filterStatus]);
+
+    const filteredIssues = issues.filter(issue => {
+      // Additional validation for coordinates
+      const hasValidCoords = issue.location && 
+        typeof issue.location.latitude === 'number' && 
+        typeof issue.location.longitude === 'number' &&
+        !isNaN(issue.location.latitude) && 
+        !isNaN(issue.location.longitude) &&
+        issue.location.latitude >= -90 && issue.location.latitude <= 90 &&
+        issue.location.longitude >= -180 && issue.location.longitude <= 180;
+
+      if (!hasValidCoords) {
+        console.log('❌ Issue filtered out in clustering:', issue.id, issue.location);
+        return false;
+      }
+
+      const categoryMatch = filterCategory === 'all' || issue.category === filterCategory;
+      const statusMatch = filterStatus === 'all' || issue.status === filterStatus;
+      const searchMatch = searchQuery === '' ||
+        issue.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        issue.location.address.toLowerCase().includes(searchQuery.toLowerCase());
+
+      return categoryMatch && statusMatch && searchMatch;
+    });
+
+    console.log('📊 Filtered issues for clustering:', filteredIssues.length);
+
+    // Simple clustering algorithm based on distance
+    const clusters: IssueCluster[] = [];
+    const processedIssues = new Set<string>();
+    const clusterDistance = 0.001; // ~100 meters
+
+    filteredIssues.forEach(issue => {
+      if (processedIssues.has(issue.id)) return;
+
+      const nearbyIssues = filteredIssues.filter(otherIssue => {
+        if (processedIssues.has(otherIssue.id) || issue.id === otherIssue.id) return false;
+
+        const distance = Math.sqrt(
+          Math.pow(issue.location.latitude - otherIssue.location.latitude, 2) +
+          Math.pow(issue.location.longitude - otherIssue.location.longitude, 2)
+        );
+
+        return distance < clusterDistance;
+      });
+
+      const clusterIssues = [issue, ...nearbyIssues];
+      clusterIssues.forEach(clusterIssue => processedIssues.add(clusterIssue.id));
+
+      if (clusterIssues.length > 1) {
+        // Create cluster
+        const validCoords = clusterIssues.filter(i => i.location && 
+          typeof i.location.latitude === 'number' && typeof i.location.longitude === 'number');
+        
+        if (validCoords.length === 0) return; // Skip invalid clusters
+        
+        const centerLat = validCoords.reduce((sum, i) => sum + i.location.latitude, 0) / validCoords.length;
+        const centerLng = validCoords.reduce((sum, i) => sum + i.location.longitude, 0) / validCoords.length;
+
+        clusters.push({
+          id: `cluster_${issue.id}`,
+          coordinate: {
+            latitude: centerLat,
+            longitude: centerLng,
+          },
+          issues: clusterIssues,
+          count: clusterIssues.length,
+        });
+      } else {
+        // Single issue - use stable coordinate reference
+        if (!issue.location || 
+            typeof issue.location.latitude !== 'number' || 
+            typeof issue.location.longitude !== 'number') {
+          return; // Skip issues with invalid coordinates
+        }
+        
+        clusters.push({
+          id: issue.id,
+          coordinate: {
+            latitude: issue.location.latitude,
+            longitude: issue.location.longitude,
+          },
+          issues: [issue],
+          count: 1,
+        });
+      }
+    });
+
+    console.log('🎯 Final clusters created:', clusters.length);
+    clusters.forEach((cluster, index) => {
+      console.log(`Cluster ${index}:`, cluster.id, cluster.coordinate, cluster.count, 'issues');
+    });
+
+    return clusters;
+  }, [issues, filterCategory, filterStatus, searchQuery]);
 
   const requestLocationPermission = async () => {
     try {
@@ -200,78 +314,71 @@ export default function MapScreen() {
     }
   };
 
-  const loadIssues = async () => {
+  const loadIssues = async (isRefreshing = false) => {
+    console.log('🚀 loadIssues function called, isRefreshing:', isRefreshing);
     try {
-      setLoading(true);
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      setIssues(mockIssues);
-    } catch (error) {
-      console.error('Error loading issues:', error);
-      Alert.alert('Error', 'Failed to load issues');
+      if (!isRefreshing) {
+        setLoading(true);
+      } else {
+        setRefreshing(true);
+      }
+      
+      console.log('🔍 Loading issues from API...');
+      
+      // Get issues from real API
+      const response = await issueApi.getMapIssues();
+      console.log('📥 Raw API response:', response);
+      console.log('📊 Response data:', response.data);
+      
+      const issuesData = response.data.data.issues;
+      console.log('📋 Issues data array:', issuesData);
+      console.log('📏 Number of issues received:', issuesData?.length || 0);
+      
+      // Transform API data to match our Issue interface and filter out invalid coordinates
+      const transformedIssues: Issue[] = issuesData
+        .filter((issue: any) => {
+          const hasValidCoords = issue.location && 
+            typeof issue.location.latitude === 'number' && 
+            typeof issue.location.longitude === 'number' &&
+            !isNaN(issue.location.latitude) && 
+            !isNaN(issue.location.longitude) &&
+            issue.location.latitude >= -90 && issue.location.latitude <= 90 &&
+            issue.location.longitude >= -180 && issue.location.longitude <= 180;
+            
+          if (!hasValidCoords) {
+            console.log('❌ Issue filtered out due to invalid coordinates:', issue.id, issue.location);
+          }
+          
+          return hasValidCoords;
+        })
+        .map((issue: any) => {
+          console.log('✅ Transforming issue:', issue.id, issue.title, issue.location);
+          return {
+            id: issue.id,
+            title: issue.title,
+            category: issue.category,
+            priority: issue.priority,
+            status: issue.status,
+            location: issue.location,
+            createdAt: issue.createdAt,
+            author: issue.reportedBy?.name || 'Anonymous',
+            upvotes: issue.voteScore || 0,
+            comments: 0, // We'll need to add this to the API later
+          };
+        });
+      
+      console.log('🎯 Final transformed issues:', transformedIssues);
+      console.log('📊 Final issues count:', transformedIssues.length);
+      
+      setIssues(transformedIssues);
+    } catch (error: any) {
+      console.error('❌ Error loading issues:', error);
+      console.error('Error details:', error?.response?.data);
+      Alert.alert('Error', error?.response?.data?.message || 'Failed to load issues');
     } finally {
       setLoading(false);
+      setRefreshing(false);
     }
-  };
-
-  const getFilteredIssues = () => {
-    return issues.filter(issue => {
-      const categoryMatch = filterCategory === 'all' || issue.category === filterCategory;
-      const statusMatch = filterStatus === 'all' || issue.status === filterStatus;
-      const searchMatch = searchQuery === '' || 
-        issue.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        issue.location.address.toLowerCase().includes(searchQuery.toLowerCase());
-      
-      return categoryMatch && statusMatch && searchMatch;
-    });
-  };
-
-  const generateClusters = (filteredIssues: Issue[]) => {
-    // Simple clustering algorithm based on distance
-    const clusters: IssueCluster[] = [];
-    const processedIssues = new Set<string>();
-    const clusterDistance = 0.001; // ~100 meters
-
-    filteredIssues.forEach(issue => {
-      if (processedIssues.has(issue.id)) return;
-
-      const nearbyIssues = filteredIssues.filter(otherIssue => {
-        if (processedIssues.has(otherIssue.id) || issue.id === otherIssue.id) return false;
-        
-        const distance = Math.sqrt(
-          Math.pow(issue.location.latitude - otherIssue.location.latitude, 2) +
-          Math.pow(issue.location.longitude - otherIssue.location.longitude, 2)
-        );
-        
-        return distance < clusterDistance;
-      });
-
-      const clusterIssues = [issue, ...nearbyIssues];
-      clusterIssues.forEach(clusterIssue => processedIssues.add(clusterIssue.id));
-
-      if (clusterIssues.length > 1) {
-        // Create cluster
-        const centerLat = clusterIssues.reduce((sum, i) => sum + i.location.latitude, 0) / clusterIssues.length;
-        const centerLng = clusterIssues.reduce((sum, i) => sum + i.location.longitude, 0) / clusterIssues.length;
-        
-        clusters.push({
-          id: `cluster_${issue.id}`,
-          coordinate: { latitude: centerLat, longitude: centerLng },
-          issues: clusterIssues,
-          count: clusterIssues.length,
-        });
-      } else {
-        // Single issue
-        clusters.push({
-          id: issue.id,
-          coordinate: { latitude: issue.location.latitude, longitude: issue.location.longitude },
-          issues: [issue],
-          count: 1,
-        });
-      }
-    });
-
-    setClusters(clusters);
   };
 
   const getCategoryIcon = (category: string) => {
@@ -312,21 +419,24 @@ export default function MapScreen() {
   };
 
   const handleMarkerPress = (cluster: IssueCluster) => {
+    console.log('🗺️ Marker pressed:', cluster);
+    console.log('📊 Cluster count:', cluster.count);
+    console.log('📍 Cluster coordinate:', cluster.coordinate);
+
     if (cluster.count === 1) {
+      console.log('🎯 Single issue marker pressed, setting selectedIssue:', cluster.issues[0]);
       setSelectedIssue(cluster.issues[0]);
+      setSelectedCluster(null);
     } else {
-      // Zoom to cluster
-      const region = {
-        latitude: cluster.coordinate.latitude,
-        longitude: cluster.coordinate.longitude,
-        latitudeDelta: LATITUDE_DELTA / 4,
-        longitudeDelta: LONGITUDE_DELTA / 4,
-      };
-      mapRef.current?.animateToRegion(region, 1000);
+      console.log('🔍 Cluster marker pressed with', cluster.count, 'issues, showing preview');
+      // For clusters, show the first issue as a preview and store cluster info
+      setSelectedIssue(cluster.issues[0]);
+      setSelectedCluster(cluster);
     }
   };
 
   const handleIssuePress = (issue: Issue) => {
+    console.log('🚀 Navigating to IssueDetail for issue:', issue.id);
     setSelectedIssue(null);
     navigation.navigate('IssueDetail', { issueId: issue.id });
   };
@@ -370,6 +480,12 @@ export default function MapScreen() {
             <Text variant="headlineSmall" style={styles.headerTitle}>Issues Map</Text>
           </View>
           <View style={styles.headerRight}>
+            <IconButton
+              icon="refresh"
+              size={24}
+              onPress={() => loadIssues(true)}
+              disabled={loading || refreshing}
+            />
             <IconButton
               icon="filter-variant"
               size={24}
@@ -442,75 +558,177 @@ export default function MapScreen() {
 
       {/* Issue Detail Modal */}
       <Portal>
-        <Modal
-          visible={selectedIssue !== null}
-          onDismiss={() => setSelectedIssue(null)}
-          contentContainerStyle={styles.modalContainer}
-        >
+        {(() => {
+          const isVisible = selectedIssue !== null;
+          console.log('🎭 Modal visibility check:', isVisible, 'selectedIssue:', selectedIssue?.id || 'null');
+          return (
+            <Modal
+              visible={isVisible}
+              onDismiss={() => {
+                console.log('🗺️ Modal dismissed, clearing selectedIssue and selectedCluster');
+                setSelectedIssue(null);
+                setSelectedCluster(null);
+              }}
+              contentContainerStyle={styles.modalContainer}
+            >
           {selectedIssue && (
-            <Card style={styles.issueCard}>
-              <Card.Content style={styles.cardContent}>
-                <View style={styles.issueHeader}>
-                  <View style={styles.categoryRow}>
-                    <Icon
-                      name={getCategoryIcon(selectedIssue.category)}
-                      size={20}
-                      color={theme.colors.primary}
-                    />
-                    <Text style={styles.categoryText}>{selectedIssue.category}</Text>
-                  </View>
-                  <View style={styles.statusChips}>
-                    <Chip
-                      mode="flat"
-                      style={[styles.statusChip, { backgroundColor: getStatusColor(selectedIssue.status) + '20' }]}
-                      textStyle={[styles.chipText, { color: getStatusColor(selectedIssue.status) }]}
+            <>
+              {console.log('🎯 Modal rendering with selectedIssue:', selectedIssue)}
+              {selectedCluster && selectedCluster.count > 1 ? (
+                // Cluster view - show all issues in the cluster
+                <Card style={styles.issueCard}>
+                  <Card.Title
+                    title={`Issues at this location (${selectedCluster.count})`}
+                    titleStyle={styles.clusterTitle}
+                  />
+                  <Card.Content style={styles.clusterContent}>
+                    <ScrollView style={styles.issuesList}>
+                      {selectedCluster.issues.map((issue, index) => (
+                        <TouchableOpacity
+                          key={issue.id}
+                          style={styles.issueListItem}
+                          onPress={() => {
+                            console.log('📋 Selected issue from cluster:', issue.id);
+                            handleIssuePress(issue);
+                          }}
+                        >
+                          <View style={styles.issueListHeader}>
+                            <View style={styles.categoryRow}>
+                              <Icon
+                                name={getCategoryIcon(issue.category)}
+                                size={16}
+                                color={theme.colors.primary}
+                              />
+                              <Text style={styles.issueListCategory}>{issue.category}</Text>
+                            </View>
+                            <View style={styles.statusChips}>
+                              <Chip
+                                mode="flat"
+                                style={[styles.miniStatusChip, { backgroundColor: getStatusColor(issue.status) + '20' }]}
+                                textStyle={[styles.miniChipText, { color: getStatusColor(issue.status) }]}
+                              >
+                                {issue.status.replace('_', ' ').toUpperCase()}
+                              </Chip>
+                              <Chip
+                                mode="flat"
+                                style={[styles.miniPriorityChip, { backgroundColor: getPriorityColor(issue.priority) + '20' }]}
+                                textStyle={[styles.miniChipText, { color: getPriorityColor(issue.priority) }]}
+                              >
+                                {issue.priority.toUpperCase()}
+                              </Chip>
+                            </View>
+                          </View>
+                          <Text style={styles.issueListTitle} numberOfLines={2}>
+                            {issue.title}
+                          </Text>
+                          <View style={styles.issueListFooter}>
+                            <Text style={styles.issueListDate}>{formatDate(issue.createdAt)}</Text>
+                            <View style={styles.issueListStats}>
+                              <View style={styles.miniStatItem}>
+                                <Icon name="thumb-up-outline" size={12} color={theme.colors.onSurfaceVariant} />
+                                <Text style={styles.miniStatText}>{issue.upvotes}</Text>
+                              </View>
+                            </View>
+                          </View>
+                        </TouchableOpacity>
+                      ))}
+                    </ScrollView>
+                  </Card.Content>
+                  <Card.Actions>
+                    <Button onPress={() => {
+                      setSelectedIssue(null);
+                      setSelectedCluster(null);
+                    }}>Close</Button>
+                    <Button
+                      onPress={() => {
+                        console.log('🔍 Zooming to cluster area');
+                        const region = {
+                          latitude: selectedCluster.coordinate.latitude,
+                          longitude: selectedCluster.coordinate.longitude,
+                          latitudeDelta: LATITUDE_DELTA / 8,
+                          longitudeDelta: LONGITUDE_DELTA / 8,
+                        };
+                        mapRef.current?.animateToRegion(region, 1000);
+                        setSelectedIssue(null);
+                        setSelectedCluster(null);
+                      }}
                     >
-                      {selectedIssue.status.replace('_', ' ').toUpperCase()}
-                    </Chip>
-                    <Chip
-                      mode="flat"
-                      style={[styles.priorityChip, { backgroundColor: getPriorityColor(selectedIssue.priority) + '20' }]}
-                      textStyle={[styles.chipText, { color: getPriorityColor(selectedIssue.priority) }]}
+                      Zoom to Area
+                    </Button>
+                  </Card.Actions>
+                </Card>
+              ) : (
+                // Single issue view
+                <Card style={styles.issueCard}>
+                  <Card.Content style={styles.cardContent}>
+                    <View style={styles.issueHeader}>
+                      <View style={styles.categoryRow}>
+                        <Icon
+                          name={getCategoryIcon(selectedIssue.category)}
+                          size={20}
+                          color={theme.colors.primary}
+                        />
+                        <Text style={styles.categoryText}>{selectedIssue.category}</Text>
+                      </View>
+                      <View style={styles.statusChips}>
+                        <Chip
+                          mode="flat"
+                          style={[styles.statusChip, { backgroundColor: getStatusColor(selectedIssue.status) + '20' }]}
+                          textStyle={[styles.chipText, { color: getStatusColor(selectedIssue.status) }]}>
+                          {selectedIssue.status.replace('_', ' ').toUpperCase()}
+                        </Chip>
+                        <Chip
+                          mode="flat"
+                          style={[styles.priorityChip, { backgroundColor: getPriorityColor(selectedIssue.priority) + '20' }]}
+                          textStyle={[styles.chipText, { color: getPriorityColor(selectedIssue.priority) }]}>
+                          {selectedIssue.priority.toUpperCase()}
+                        </Chip>
+                      </View>
+                    </View>
+
+                    <Text style={styles.issueTitle}>
+                      {selectedIssue.title}
+                    </Text>
+
+                    <View style={styles.locationRow}>
+                      <Icon name="map-marker" size={16} color={theme.colors.onSurfaceVariant} />
+                      <Text style={styles.locationText}>{selectedIssue.location.address}</Text>
+                    </View>
+
+                    <View style={styles.issueFooter}>
+                      <View style={styles.statsRow}>
+                        <View style={styles.statItem}>
+                          <Icon name="thumb-up-outline" size={14} color={theme.colors.onSurfaceVariant} />
+                          <Text style={styles.statText}>{selectedIssue.upvotes}</Text>
+                        </View>
+                        <View style={styles.statItem}>
+                          <Icon name="comment-outline" size={14} color={theme.colors.onSurfaceVariant} />
+                          <Text style={styles.statText}>{selectedIssue.comments}</Text>
+                        </View>
+                      </View>
+                      <Text style={styles.dateText}>{formatDate(selectedIssue.createdAt)}</Text>
+                    </View>
+                  </Card.Content>
+
+                  <Card.Actions>
+                    <Button onPress={() => {
+                      setSelectedIssue(null);
+                      setSelectedCluster(null);
+                    }}>Close</Button>
+                    <Button
+                      mode="contained"
+                      onPress={() => handleIssuePress(selectedIssue)}
                     >
-                      {selectedIssue.priority.toUpperCase()}
-                    </Chip>
-                  </View>
-                </View>
-                
-                <Text style={styles.issueTitle}>{selectedIssue.title}</Text>
-                
-                <View style={styles.locationRow}>
-                  <Icon name="map-marker" size={16} color={theme.colors.onSurfaceVariant} />
-                  <Text style={styles.locationText}>{selectedIssue.location.address}</Text>
-                </View>
-                
-                <View style={styles.issueFooter}>
-                  <View style={styles.statsRow}>
-                    <View style={styles.statItem}>
-                      <Icon name="thumb-up-outline" size={14} color={theme.colors.onSurfaceVariant} />
-                      <Text style={styles.statText}>{selectedIssue.upvotes}</Text>
-                    </View>
-                    <View style={styles.statItem}>
-                      <Icon name="comment-outline" size={14} color={theme.colors.onSurfaceVariant} />
-                      <Text style={styles.statText}>{selectedIssue.comments}</Text>
-                    </View>
-                  </View>
-                  <Text style={styles.dateText}>{formatDate(selectedIssue.createdAt)}</Text>
-                </View>
-              </Card.Content>
-              
-              <Card.Actions>
-                <Button onPress={() => setSelectedIssue(null)}>Close</Button>
-                <Button
-                  mode="contained"
-                  onPress={() => handleIssuePress(selectedIssue)}
-                >
-                  View Details
-                </Button>
-              </Card.Actions>
-            </Card>
+                      View Details
+                    </Button>
+                  </Card.Actions>
+                </Card>
+              )}
+            </>
           )}
         </Modal>
+          );
+        })()}
       </Portal>
 
       {/* Filters Modal */}
@@ -737,6 +955,11 @@ const styles = StyleSheet.create({
     color: theme.colors.onSurface,
     marginBottom: 8,
   },
+  clusterIndicator: {
+    fontSize: 14,
+    fontWeight: 'normal',
+    color: theme.colors.onSurfaceVariant,
+  },
   locationRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -824,5 +1047,70 @@ const styles = StyleSheet.create({
     right: 16,
     bottom: 16,
     backgroundColor: theme.colors.primary,
+  },
+  clusterTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: theme.colors.onSurface,
+  },
+  clusterContent: {
+    padding: 0,
+    maxHeight: height * 0.6,
+  },
+  issuesList: {
+    maxHeight: height * 0.5,
+  },
+  issueListItem: {
+    padding: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: theme.colors.outlineVariant,
+  },
+  issueListHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  issueListCategory: {
+    fontSize: 14,
+    color: theme.colors.primary,
+    fontWeight: '600',
+  },
+  issueListTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: theme.colors.onSurface,
+    marginBottom: 8,
+  },
+  issueListFooter: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  issueListDate: {
+    fontSize: 12,
+    color: theme.colors.onSurfaceVariant,
+  },
+  issueListStats: {
+    flexDirection: 'row',
+  },
+  miniStatusChip: {
+    height: 20,
+  },
+  miniPriorityChip: {
+    height: 20,
+  },
+  miniChipText: {
+    fontSize: 8,
+    fontWeight: '600',
+  },
+  miniStatItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 2,
+  },
+  miniStatText: {
+    color: theme.colors.onSurfaceVariant,
+    fontSize: 10,
   },
 });

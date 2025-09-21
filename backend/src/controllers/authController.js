@@ -559,7 +559,9 @@ class AuthController {
         role: user.role
       }, refreshTokenFamily);
 
-      // Create session record
+      // Create session record with user's timeout preference
+      const userTimeoutMs = user.preferences?.sessionTimeoutMs || (7 * 24 * 60 * 60 * 1000); // Default 7 days in milliseconds
+      
       const sessionData = {
         userId: user._id,
         refreshTokenFamily,
@@ -582,7 +584,7 @@ class AuthController {
         },
         isActive: true,
         lastActiveAt: new Date(),
-        expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000) // 7 days from now
+        expiresAt: new Date(Date.now() + userTimeoutMs) // Use user's timeout preference in milliseconds
         // expiresAt explicitly set to avoid validation error
       };
 
@@ -1332,6 +1334,69 @@ class AuthController {
       res.status(500).json({
         success: false,
         message: 'Internal server error during OTP resend'
+      });
+    }
+  }
+
+  /**
+   * Get user statistics
+   * @param {Object} req - Express request object
+   * @param {Object} res - Express response object
+   */
+  static async getUserStats(req, res) {
+    try {
+      const userId = req.user.id;
+      const { Issue } = require('../models/Issue');
+
+      // Get total issues reported by user
+      const totalIssues = await Issue.countDocuments({ reportedBy: userId });
+
+      // Get resolved issues reported by user
+      const resolvedIssues = await Issue.countDocuments({
+        reportedBy: userId,
+        status: 'resolved'
+      });
+
+      // Get total upvotes received on user's issues
+      const userIssues = await Issue.find({ reportedBy: userId }, 'votes.upvotes');
+      const upvotesReceived = userIssues.reduce((total, issue) => {
+        return total + (issue.votes?.upvotes?.length || 0);
+      }, 0);
+
+      // Calculate contribution level based on activity
+      let contributionLevel = 'Bronze';
+      if (totalIssues >= 50 || resolvedIssues >= 25) {
+        contributionLevel = 'Platinum';
+      } else if (totalIssues >= 25 || resolvedIssues >= 10) {
+        contributionLevel = 'Gold';
+      } else if (totalIssues >= 10 || resolvedIssues >= 5) {
+        contributionLevel = 'Silver';
+      }
+
+      // Generate badges based on achievements
+      const badgesEarned = [];
+      if (totalIssues >= 1) badgesEarned.push('First Reporter');
+      if (resolvedIssues >= 1) badgesEarned.push('Problem Solver');
+      if (upvotesReceived >= 10) badgesEarned.push('Community Helper');
+      if (totalIssues >= 10) badgesEarned.push('Active Citizen');
+      if (resolvedIssues >= 5) badgesEarned.push('Impact Maker');
+
+      res.status(200).json({
+        success: true,
+        data: {
+          totalIssues,
+          resolvedIssues,
+          upvotesReceived,
+          contributionLevel,
+          badgesEarned
+        }
+      });
+
+    } catch (error) {
+      console.error('❌ Get user stats error:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Internal server error while fetching user statistics'
       });
     }
   }

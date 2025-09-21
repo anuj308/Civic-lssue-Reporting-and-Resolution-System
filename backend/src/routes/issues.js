@@ -151,6 +151,13 @@ router.get('/public', IssueController.getPublicIssues);
 router.get('/nearby', nearbyIssuesValidation, IssueController.getNearbyIssues);
 
 /**
+ * @route   GET /api/issues/map
+ * @desc    Get all public issues with coordinates for map display
+ * @access  Public
+ */
+router.get('/map', IssueController.getMapIssues);
+
+/**
  * @route   GET /api/issues/:issueId
  * @desc    Get issue by ID
  * @access  Public (but respects privacy settings)

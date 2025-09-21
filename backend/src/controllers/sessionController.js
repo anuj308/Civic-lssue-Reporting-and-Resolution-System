@@ -1,5 +1,6 @@
 const { Session } = require('../models/Session');
 const { SecurityAlert } = require('../models/SecurityAlert');
+const { User } = require('../models/User');
 const { LocationService } = require('../utils/locationService');
 
 /**
@@ -81,15 +82,15 @@ class SessionController {
       // Create security alert
       await SecurityAlert.create({
         userId: userId,
-        sessionId: req.sessionId,
-        type: 'session_revoked',
-        severity: 'info',
-        title: 'Device Session Revoked',
-        description: `Session revoked for ${session.deviceInfo.type} device from ${session.location.city}`,
+        sessionId: sessionId,
+        type: 'session_revoke',
+        severity: 'medium',
+        title: 'Session Revoked',
+        description: 'Your session has been revoked by the user',
         metadata: {
-          revokedSessionId: sessionId,
-          deviceInfo: session.deviceInfo,
-          location: session.location
+          sessionId: sessionId,
+          userId: userId,
+          action: 'revoke'
         }
       });
 
@@ -108,7 +109,7 @@ class SessionController {
   }
 
   /**
-   * Revoke all sessions except current
+   * Revoke all sessions except current one
    * @route POST /api/sessions/revoke-all
    */
   static async revokeAllSessions(req, res) {
@@ -116,42 +117,50 @@ class SessionController {
       const userId = req.user._id;
       const currentSessionId = req.sessionId;
 
-      // Find all other active sessions
-      const sessions = await Session.find({
+      // Find all active sessions except current one
+      const sessionsToRevoke = await Session.find({
         userId: userId,
-        _id: { $ne: currentSessionId },
-        isActive: true
+        isActive: true,
+        _id: { $ne: currentSessionId }
       });
 
+      if (sessionsToRevoke.length === 0) {
+        return res.json({
+          success: true,
+          message: 'No other active sessions to revoke',
+          data: { revokedCount: 0 }
+        });
+      }
+
       // Revoke all sessions
-      const revokePromises = sessions.map(session => 
-        session.markAsInactive()
-      );
+      const revokePromises = sessionsToRevoke.map(session => session.markAsInactive());
       await Promise.all(revokePromises);
 
-      // Create security alert
+      // Create security alert for mass session revocation
       await SecurityAlert.create({
         userId: userId,
         sessionId: currentSessionId,
-        type: 'all_sessions_revoked',
-        severity: 'info',
-        title: 'All Device Sessions Revoked',
-        description: `${sessions.length} device sessions were revoked by user`,
+        type: 'mass_session_revoke',
+        severity: 'high',
+        title: 'All Sessions Revoked',
+        description: `User revoked ${sessionsToRevoke.length} active sessions`,
         metadata: {
-          revokedCount: sessions.length,
-          revokedSessions: sessions.map(s => ({
-            deviceType: s.deviceInfo.type,
-            location: s.location.city,
-            lastActivity: s.lastActiveAt
+          action: 'revoke_all',
+          revokedCount: sessionsToRevoke.length,
+          revokedSessions: sessionsToRevoke.map(s => ({
+            sessionId: s._id,
+            deviceInfo: s.deviceInfo,
+            location: s.location
           }))
         }
       });
 
       res.json({
         success: true,
-        message: `Successfully revoked ${sessions.length} sessions`,
+        message: `${sessionsToRevoke.length} sessions revoked successfully`,
         data: {
-          revokedCount: sessions.length
+          revokedCount: sessionsToRevoke.length,
+          currentSessionKept: true
         }
       });
 
@@ -159,205 +168,110 @@ class SessionController {
       console.error('❌ Revoke all sessions error:', error);
       res.status(500).json({
         success: false,
-        message: 'Failed to revoke sessions'
+        message: 'Failed to revoke all sessions'
       });
     }
   }
 
   /**
-   * Get session activity and security overview
-   * @route GET /api/sessions/security-overview
+   * Get user security settings
+   * @route GET /api/sessions/security-settings
    */
-  static async getSecurityOverview(req, res) {
+  static async getSecuritySettings(req, res) {
     try {
       const userId = req.user._id;
 
-      // Get recent sessions (last 30 days)
-      const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
+      // Get user with their security preferences
+      const user = await User.findById(userId).select('preferences');
       
-      const [
-        activeSessions,
-        recentSessions,
-        recentAlerts,
-        securityStatsResult
-      ] = await Promise.all([
-        // Active sessions
-        Session.find({ userId, isActive: true }).countDocuments(),
-        
-        // Recent sessions with basic info
-        Session.find({
-          userId,
-          createdAt: { $gte: thirtyDaysAgo }
-        })
-        .select('deviceInfo location createdAt isActive security')
-        .sort({ createdAt: -1 })
-        .limit(10),
-
-        // Recent security alerts
-        SecurityAlert.find({
-          userId,
-          createdAt: { $gte: thirtyDaysAgo }
-        })
-        .select('type severity title createdAt status')
-        .sort({ createdAt: -1 })
-        .limit(5),
-
-        // Security statistics
-        Session.getSecurityStats(userId)
-      ]);
-
-      // Extract security stats from aggregation result
-      const securityStats = securityStatsResult.length > 0 ? securityStatsResult[0] : {
-        totalSessions: 0,
-        activeSessions: 0,
-        averageRiskScore: 0,
-        countries: [],
-        devices: [],
-        lastLogin: null
+      const settings = {
+        emailAlerts: user?.preferences?.emailNotifications ?? true,
+        pushNotifications: user?.preferences?.pushNotifications ?? true,
+        newDeviceAlerts: user?.preferences?.newDeviceAlerts ?? true,
+        locationAlerts: user?.preferences?.locationAlerts ?? true,
+        failedLoginAlerts: user?.preferences?.failedLoginAlerts ?? true,
+        twoFactorEnabled: user?.preferences?.twoFactorEnabled ?? false,
+        loginNotifications: user?.preferences?.loginNotifications ?? true,
+        suspiciousActivityAlerts: user?.preferences?.suspiciousActivityAlerts ?? true,
+        weeklySecurityReport: user?.preferences?.weeklySecurityReport ?? false,
+        // Backwards compatibility
+        enableLocationAlerts: user?.preferences?.locationAlerts ?? true,
+        enableNewDeviceAlerts: user?.preferences?.newDeviceAlerts ?? true,
+        requireStrongAuth: false
       };
 
-      // Get unique locations and devices from recent sessions
-      const uniqueLocations = new Set();
-      const uniqueDevices = new Set();
-      let highRiskCount = 0;
-
-      recentSessions.forEach(session => {
-        uniqueLocations.add(`${session.location.city}, ${session.location.country}`);
-        uniqueDevices.add(`${session.deviceInfo.type} - ${session.deviceInfo.os}`);
-        if (session.security.riskScore > 50) highRiskCount++;
-      });
-
       res.json({
         success: true,
         data: {
-          overview: {
-            activeSessions,
-            recentLoginCount: recentSessions.length,
-            uniqueLocations: uniqueLocations.size,
-            uniqueDevices: uniqueDevices.size,
-            highRiskLogins: highRiskCount,
-            pendingAlerts: recentAlerts.filter(a => a.status === 'unread').length
-          },
-          recentSessions: recentSessions.map(session => ({
-            id: session._id,
-            device: `${session.deviceInfo.type} - ${session.deviceInfo.os}`,
-            location: `${session.location.city}, ${session.location.country}`,
-            loginTime: session.createdAt,
-            status: session.isActive ? 'active' : 'inactive',
-            riskLevel: session.security.riskScore < 30 ? 'low' : session.security.riskScore < 60 ? 'medium' : 'high'
-          })),
-          recentAlerts,
-          securityStats
+          settings
         }
       });
 
     } catch (error) {
-      console.error('❌ Security overview error:', error);
+      console.error('❌ Get security settings error:', error);
       res.status(500).json({
         success: false,
-        message: 'Failed to fetch security overview'
+        message: 'Failed to get security settings'
       });
     }
   }
 
   /**
-   * Get detailed session information
-   * @route GET /api/sessions/:sessionId/details
-   */
-  static async getSessionDetails(req, res) {
-    try {
-      const { sessionId } = req.params;
-      const userId = req.user._id;
-
-      const session = await Session.findOne({
-        _id: sessionId,
-        userId: userId
-      }).select('-refreshToken');
-
-      if (!session) {
-        return res.status(404).json({
-          success: false,
-          message: 'Session not found'
-        });
-      }
-
-      // Get related security alerts
-      const alerts = await SecurityAlert.find({
-        sessionId: sessionId
-      }).select('type severity title description createdAt');
-
-      res.json({
-        success: true,
-        data: {
-          session: {
-            ...session.toObject(),
-            isCurrent: sessionId === req.sessionId
-          },
-          relatedAlerts: alerts
-        }
-      });
-
-    } catch (error) {
-      console.error('❌ Session details error:', error);
-      res.status(500).json({
-        success: false,
-        message: 'Failed to fetch session details'
-      });
-    }
-  }
-
-  /**
-   * Update session security settings
+   * Update user security settings
    * @route PATCH /api/sessions/security-settings
    */
   static async updateSecuritySettings(req, res) {
     try {
       const userId = req.user._id;
       const {
-        enableLocationAlerts = true,
-        enableNewDeviceAlerts = true,
-        sessionTimeout = 7 * 24 * 60 * 60 * 1000, // 7 days default
+        emailAlerts,
+        pushNotifications,
+        newDeviceAlerts,
+        locationAlerts,
+        failedLoginAlerts,
+        twoFactorEnabled,
+        loginNotifications,
+        suspiciousActivityAlerts,
+        weeklySecurityReport,
+        enableLocationAlerts, // backwards compatibility
+        enableNewDeviceAlerts, // backwards compatibility
         requireStrongAuth = false
       } = req.body;
 
-      // Validate session timeout (min: 1 hour, max: 30 days)
-      const minTimeout = 60 * 60 * 1000; // 1 hour
-      const maxTimeout = 30 * 24 * 60 * 60 * 1000; // 30 days
+      // Build update object for user preferences
+      const updateFields = {};
       
-      if (sessionTimeout < minTimeout || sessionTimeout > maxTimeout) {
-        return res.status(400).json({
-          success: false,
-          message: 'Session timeout must be between 1 hour and 30 days'
-        });
-      }
+      // Security notification preferences
+      if (emailAlerts !== undefined) updateFields['preferences.emailNotifications'] = emailAlerts;
+      if (pushNotifications !== undefined) updateFields['preferences.pushNotifications'] = pushNotifications;
+      if (loginNotifications !== undefined) updateFields['preferences.loginNotifications'] = loginNotifications;
+      if (weeklySecurityReport !== undefined) updateFields['preferences.weeklySecurityReport'] = weeklySecurityReport;
+      
+      // Alert type preferences  
+      if (newDeviceAlerts !== undefined) updateFields['preferences.newDeviceAlerts'] = newDeviceAlerts;
+      if (locationAlerts !== undefined) updateFields['preferences.locationAlerts'] = locationAlerts;
+      if (failedLoginAlerts !== undefined) updateFields['preferences.failedLoginAlerts'] = failedLoginAlerts;
+      if (suspiciousActivityAlerts !== undefined) updateFields['preferences.suspiciousActivityAlerts'] = suspiciousActivityAlerts;
+      
+      // Two-factor (placeholder for future implementation)
+      if (twoFactorEnabled !== undefined) updateFields['preferences.twoFactorEnabled'] = twoFactorEnabled;
 
-      // Update user's security preferences (you might want to add this to User model)
-      // For now, we'll store it in the current session as metadata
-      const currentSession = await Session.findById(req.sessionId);
-      if (currentSession) {
-        currentSession.metadata = {
-          ...currentSession.metadata,
-          securitySettings: {
-            enableLocationAlerts,
-            enableNewDeviceAlerts,
-            sessionTimeout,
-            requireStrongAuth,
-            updatedAt: new Date()
-          }
-        };
-        await currentSession.save();
-      }
+      // Backwards compatibility fields
+      if (enableLocationAlerts !== undefined) updateFields['preferences.locationAlerts'] = enableLocationAlerts;
+      if (enableNewDeviceAlerts !== undefined) updateFields['preferences.newDeviceAlerts'] = enableNewDeviceAlerts;
+
+      // Update user preferences
+      const updatedUser = await User.findByIdAndUpdate(
+        userId,
+        { $set: updateFields },
+        { new: true, runValidators: true }
+      ).select('preferences');
 
       res.json({
         success: true,
         message: 'Security settings updated successfully',
         data: {
-          settings: {
-            enableLocationAlerts,
-            enableNewDeviceAlerts,
-            sessionTimeout,
-            requireStrongAuth
-          }
+          settings: updatedUser.preferences
         }
       });
 
@@ -441,6 +355,52 @@ class SessionController {
   }
 
   /**
+   * Get detailed session information
+   * @route GET /api/sessions/:sessionId/details
+   */
+  static async getSessionDetails(req, res) {
+    try {
+      const { sessionId } = req.params;
+      const userId = req.user._id;
+
+      const session = await Session.findOne({
+        _id: sessionId,
+        userId: userId
+      }).select('-refreshToken');
+
+      if (!session) {
+        return res.status(404).json({
+          success: false,
+          message: 'Session not found'
+        });
+      }
+
+      // Get related security alerts
+      const alerts = await SecurityAlert.find({
+        sessionId: sessionId
+      }).select('type severity title description createdAt');
+
+      res.json({
+        success: true,
+        data: {
+          session: {
+            ...session.toObject(),
+            isCurrent: sessionId === req.sessionId
+          },
+          relatedAlerts: alerts
+        }
+      });
+
+    } catch (error) {
+      console.error('❌ Session details error:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Failed to fetch session details'
+      });
+    }
+  }
+
+  /**
    * Middleware to extract session info from request
    */
   static async attachSessionInfo(req, res, next) {
@@ -474,6 +434,88 @@ class SessionController {
     } catch (error) {
       console.error('❌ Update activity error:', error);
       next(); // Continue even if activity update fails
+    }
+  }
+
+  /**
+   * Get session activity and security overview
+   * @route GET /api/sessions/security-overview
+   */
+  static async getSecurityOverview(req, res) {
+    try {
+      const userId = req.user._id;
+
+      // Get recent sessions (last 30 days)
+      const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
+
+      const [
+        activeSessions,
+        recentSessions,
+        recentAlerts
+      ] = await Promise.all([
+        Session.find({ userId, isActive: true }).countDocuments(),
+        Session.find({
+          userId,
+          createdAt: { $gte: thirtyDaysAgo }
+        })
+        .select('deviceInfo location createdAt isActive security')
+        .sort({ createdAt: -1 })
+        .limit(10),
+        SecurityAlert.find({
+          userId,
+          createdAt: { $gte: thirtyDaysAgo }
+        })
+        .select('type severity title createdAt status')
+        .sort({ createdAt: -1 })
+        .limit(5)
+      ]);
+
+      // Get unique locations and devices from recent sessions
+      const uniqueLocations = new Set();
+      const uniqueDevices = new Set();
+      let highRiskCount = 0;
+
+      recentSessions.forEach(session => {
+        if (session.location.city && session.location.country) {
+          uniqueLocations.add(`${session.location.city}, ${session.location.country}`);
+        }
+        if (session.deviceInfo.type) {
+          uniqueDevices.add(session.deviceInfo.type);
+        }
+        if (session.security.riskScore > 60) {
+          highRiskCount++;
+        }
+      });
+
+      res.json({
+        success: true,
+        data: {
+          overview: {
+            activeSessions,
+            recentLoginCount: recentSessions.length,
+            uniqueLocations: uniqueLocations.size,
+            uniqueDevices: uniqueDevices.size,
+            highRiskLogins: highRiskCount,
+            pendingAlerts: recentAlerts.filter(a => a.status === 'unread').length
+          },
+          recentSessions: recentSessions.map(session => ({
+            id: session._id,
+            device: `${session.deviceInfo.type} - ${session.deviceInfo.os}`,
+            location: `${session.location.city}, ${session.location.country}`,
+            loginTime: session.createdAt,
+            status: session.isActive ? 'active' : 'inactive',
+            riskLevel: session.security.riskScore < 30 ? 'low' : session.security.riskScore < 60 ? 'medium' : 'high'
+          })),
+          recentAlerts
+        }
+      });
+
+    } catch (error) {
+      console.error('❌ Security overview error:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Failed to fetch security overview'
+      });
     }
   }
 }

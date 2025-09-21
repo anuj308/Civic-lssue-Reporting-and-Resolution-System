@@ -2,8 +2,18 @@ const mongoose = require('mongoose');
 
 /**
  * Issue Schema for the Civic Issue Reporting System
- * @typedef {Object} Issue
- * @property {string} _id - Unique identifier
+ * @typedef {Object} I    coordinates: {
+      type: [Number], // [longitude, latitude] for 2dsphere index
+      required: [true, 'Coordinates are required'],
+      validate: {
+        validator: function(coords) {
+          return coords && coords.length === 2 && 
+                 coords[0] >= -180 && coords[0] <= 180 && // longitude
+                 coords[1] >= -90 && coords[1] <= 90;     // latitude
+        },
+        message: 'Coordinates must be [longitude, latitude] with valid ranges'
+      }
+    },operty {string} _id - Unique identifier
  * @property {string} title - Issue title
  * @property {string} description - Detailed description
  * @property {string} category - Issue category
@@ -121,17 +131,15 @@ const issueSchema = new mongoose.Schema({
       match: [/^\d{6}$/, 'Please enter a valid 6-digit pincode']
     },
     coordinates: {
-      latitude: {
-        type: Number,
-        required: [true, 'Latitude is required'],
-        min: [-90, 'Latitude must be between -90 and 90'],
-        max: [90, 'Latitude must be between -90 and 90']
-      },
-      longitude: {
-        type: Number,
-        required: [true, 'Longitude is required'],
-        min: [-180, 'Longitude must be between -180 and 180'],
-        max: [180, 'Longitude must be between -180 and 180']
+      type: [Number], // [longitude, latitude] for 2dsphere index
+      required: [true, 'Coordinates are required'],
+      validate: {
+        validator: function(coords) {
+          return coords && coords.length === 2 && 
+                 coords[0] >= -180 && coords[0] <= 180 && // longitude
+                 coords[1] >= -90 && coords[1] <= 90;     // latitude
+        },
+        message: 'Coordinates must be [longitude, latitude] with valid ranges'
       }
     },
     landmark: {

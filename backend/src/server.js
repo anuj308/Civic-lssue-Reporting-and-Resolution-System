@@ -18,7 +18,7 @@ const { Server } = require('socket.io');
 const authRoutes = require('./routes/auth');
 const issueRoutes = require('./routes/issues');
 const sessionRoutes = require('./routes/sessions');
-// const userRoutes = require('./routes/users');
+const userRoutes = require('./routes/users');
 // const departmentRoutes = require('./routes/departments');
 // const analyticsRoutes = require('./routes/analytics');
 // const notificationRoutes = require('./routes/notifications');
@@ -129,7 +129,7 @@ app.get('/api/test', (req, res) => {
 app.use('/api/auth', authRoutes);
 app.use('/api/issues', issueRoutes);
 app.use('/api/sessions', sessionRoutes);
-// app.use('/api/users', userRoutes);
+app.use('/api/users', userRoutes);
 // app.use('/api/departments', departmentRoutes);
 // app.use('/api/analytics', analyticsRoutes);
 // app.use('/api/notifications', notificationRoutes);

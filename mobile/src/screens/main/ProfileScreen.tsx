@@ -32,6 +32,8 @@ import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 import { theme } from '../../theme';
 import { useAppDispatch, useAppSelector } from '../../store/store';
 import { logout, deleteAccount } from '../../store/slices/authSlice';
+import { updateUser } from '../../store/slices/authSlice';
+import { userApi } from '../../services/api';
 
 const { width } = Dimensions.get('window');
 
@@ -98,9 +100,11 @@ export default function ProfileScreen() {
     loadUserStats();
     loadNotificationSettings();
     if (user) {
+      // Split the name into first and last name for the form
+      const nameParts = user.name ? user.name.split(' ') : ['', ''];
       setEditForm({
-        firstName: user.firstName || '',
-        lastName: user.lastName || '',
+        firstName: nameParts[0] || '',
+        lastName: nameParts.slice(1).join(' ') || '',
         phone: user.phone || '',
       });
     }
@@ -108,11 +112,30 @@ export default function ProfileScreen() {
 
   const loadUserStats = async () => {
     try {
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      setUserStats(mockStats);
+      setLoading(true);
+      // Call the real user stats API
+      const response = await userApi.getProfile();
+      const userData = response.data.data;
+      
+      // Call the user stats API
+      const statsResponse = await userApi.getStats();
+      const statsData = statsResponse.data.data;
+      
+      setUserStats({
+        totalIssues: statsData.totalIssues,
+        resolvedIssues: statsData.resolvedIssues,
+        upvotesReceived: statsData.upvotesReceived,
+        contributionLevel: statsData.contributionLevel,
+        badgesEarned: statsData.badgesEarned,
+        joinDate: userData.createdAt,
+      });
     } catch (error) {
       console.error('Error loading user stats:', error);
+      // Fallback to mock data if API fails
+      setUserStats(mockStats);
+      Alert.alert('Error', 'Failed to load user statistics');
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -128,13 +151,30 @@ export default function ProfileScreen() {
   const handleUpdateProfile = async () => {
     try {
       setLoading(true);
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 1500));
+      
+      // Prepare the data to send to the API
+      const updateData = {
+        name: editForm.firstName && editForm.lastName 
+          ? `${editForm.firstName.trim()} ${editForm.lastName.trim()}` 
+          : user?.name,
+        phone: editForm.phone || undefined,
+      };
+      
+      // Call the real update profile API
+      await userApi.updateProfile(updateData);
+      
+      // Update the Redux store with the new user data
+      dispatch(updateUser({
+        name: updateData.name,
+        phone: updateData.phone,
+      }));
+      
       setShowEditDialog(false);
       Alert.alert('Success', 'Profile updated successfully');
-    } catch (error) {
+      
+    } catch (error: any) {
       console.error('Error updating profile:', error);
-      Alert.alert('Error', 'Failed to update profile');
+      Alert.alert('Error', error?.response?.data?.message || 'Failed to update profile');
     } finally {
       setLoading(false);
     }
@@ -327,7 +367,9 @@ export default function ProfileScreen() {
                   source={
                     avatarUri
                       ? { uri: avatarUri }
-                      : { uri: `https://ui-avatars.com/api/?name=${user.firstName}+${user.lastName}&background=random` }
+                      : user.profileImage
+                      ? { uri: user.profileImage }
+                      : { uri: `https://ui-avatars.com/api/?name=${encodeURIComponent(user.name || 'User')}&background=random` }
                   }
                 />
                 <View style={styles.avatarEdit}>
@@ -337,7 +379,7 @@ export default function ProfileScreen() {
               
               <View style={styles.userInfo}>
                 <Text style={styles.userName}>
-                  {user.firstName} {user.lastName}
+                  {user.name || 'User'}
                 </Text>
                 <Text style={styles.userEmail}>{user.email}</Text>
                 <View style={styles.contributionBadge}>

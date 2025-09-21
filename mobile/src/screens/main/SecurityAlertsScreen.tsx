@@ -189,7 +189,7 @@ export default function SecurityAlertsScreen() {
 
   const getAlertIcon = (type: string) => {
     switch (type) {
-      case 'new_device': return 'cellphone-plus';
+      case 'new_device': return 'cellphone';
       case 'suspicious_location': return 'map-marker-alert';
       case 'failed_login': return 'login-variant';
       case 'location_change': return 'map-marker-path';
@@ -503,7 +503,7 @@ export default function SecurityAlertsScreen() {
             <Text variant="titleMedium" style={styles.sectionTitle}>Security Alert Types</Text>
             
             <View style={styles.tip}>
-              <Icon name="cellphone-plus" size={20} color={theme.colors.info} />
+              <Icon name="cellphone" size={20} color={theme.colors.info} />
               <Text style={styles.tipText}>
                 <Text style={styles.tipBold}>New Device:</Text> Login from an unrecognized device
               </Text>
