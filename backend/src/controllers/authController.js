@@ -1,6 +1,9 @@
 const bcrypt = require('bcryptjs');
 const { User } = require('../models/User');
+const { Session } = require('../models/Session');
+const { SecurityAlert } = require('../models/SecurityAlert');
 const { JWTUtils } = require('../utils/jwt');
+const { LocationService } = require('../utils/locationService');
 const { validationResult } = require('express-validator');
 const { emailService } = require('../utils/emailService');
 
@@ -445,7 +448,7 @@ class AuthController {
   }
 
   /**
-   * User login
+   * User login with enhanced security tracking
    * @param {Request} req - Express request object
    * @param {Response} res - Express response object
    */
@@ -528,16 +531,210 @@ class AuthController {
         return;
       }
 
-      // Update last login
-      await User.findByIdAndUpdate(user._id, {
-        lastLoginAt: new Date()
-      });
+      // ================================
+      // ENHANCED SECURITY TRACKING
+      // ================================
 
-      // Generate tokens
+      // Get client information
+      const clientIP = LocationService.getClientIP(req);
+      const userAgent = req.get('User-Agent') || '';
+      
+      // Get location and device information
+      const [locationData, deviceInfo] = await Promise.all([
+        LocationService.getLocationFromIP(clientIP),
+        Promise.resolve(LocationService.parseUserAgent(userAgent))
+      ]);
+
+      // Get user's recent sessions for risk analysis
+      const recentSessions = await Session.find({
+        userId: user._id,
+        createdAt: { $gte: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000) } // Last 30 days
+      }).sort({ createdAt: -1 }).limit(10);
+
+      // Generate tokens with session family
+      const refreshTokenFamily = JWTUtils.generateTokenFamily();
       const tokens = JWTUtils.generateTokens({
         userId: user._id.toString(),
         email: user.email,
         role: user.role
+      }, refreshTokenFamily);
+
+      // Create session record
+      const sessionData = {
+        userId: user._id,
+        refreshTokenFamily,
+        deviceInfo,
+        location: {
+          ...locationData,
+          ip: clientIP // Ensure IP is set in the correct location
+        },
+        security: {
+          isVPN: locationData.isVPN || false,
+          isProxy: locationData.isProxy || false,
+          isTor: locationData.isTor || false,
+          riskScore: 0, // Will be calculated by pre-save middleware
+          requiresVerification: false
+        },
+        metadata: {
+          loginMethod: 'password',
+          sessionDuration: 0,
+          refreshCount: 0
+        },
+        isActive: true,
+        lastActiveAt: new Date(),
+        expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000) // 7 days from now
+        // expiresAt explicitly set to avoid validation error
+      };
+
+      // Analyze security risk
+      const riskAnalysis = LocationService.analyzeSecurityRisk(sessionData, recentSessions);
+      sessionData.security.riskScore = riskAnalysis.riskScore;
+
+      // ================================
+      // HANDLE EXISTING DEVICE SESSIONS
+      // ================================
+      
+      // Check for existing active sessions from the same device
+      const existingDeviceSessions = await Session.find({
+        userId: user._id,
+        isActive: true,
+        'deviceInfo.type': deviceInfo.type,
+        'deviceInfo.os': deviceInfo.os,
+        'location.ip': clientIP
+      });
+
+      console.log(`🔍 Found ${existingDeviceSessions.length} existing sessions from this device`);
+
+      // If there are existing sessions from the same device/IP, revoke them
+      // This prevents multiple active sessions from the same device
+      if (existingDeviceSessions.length > 0) {
+        console.log('🔄 Revoking existing sessions from same device to prevent duplicates');
+        
+        for (const existingSession of existingDeviceSessions) {
+          await existingSession.revoke('replaced_by_new_login');
+          console.log(`📝 Revoked session ${existingSession._id}`);
+        }
+      }
+
+      // Create session
+      const session = await Session.create(sessionData);
+
+      // Create security alerts based on risk analysis
+      const alertPromises = [];
+
+      // High risk login alert
+      if (session.security.riskScore > 50) {
+        alertPromises.push(
+          SecurityAlert.create({
+            userId: user._id,
+            sessionId: session._id,
+            type: 'high_risk_login',
+            severity: session.security.riskScore > 70 ? 'high' : 'medium',
+            title: 'High Risk Login Detected',
+            description: `Login from ${locationData.city}, ${locationData.country} with elevated risk factors`,
+            metadata: {
+              riskScore: session.security.riskScore,
+              riskFactors: riskAnalysis.riskFactors,
+              deviceInfo,
+              locationData
+            }
+          })
+        );
+      }
+
+      // New device alert
+      const isNewDevice = !recentSessions.some(s => 
+        s.deviceInfo.type === deviceInfo.type && 
+        s.deviceInfo.os === deviceInfo.os
+      );
+
+      if (isNewDevice) {
+        alertPromises.push(
+          SecurityAlert.create({
+            userId: user._id,
+            sessionId: session._id,
+            type: 'new_device_login',
+            severity: 'info',
+            title: 'New Device Login',
+            description: `Login from new ${deviceInfo.type} device (${deviceInfo.os})`,
+            metadata: {
+              deviceInfo,
+              locationData,
+              isFirstTimeDevice: true
+            }
+          })
+        );
+      }
+
+      // New location alert (if user has previous sessions)
+      if (recentSessions.length > 0) {
+        const isNewCountry = !recentSessions.some(s => 
+          s.location.country === locationData.country
+        );
+
+        if (isNewCountry) {
+          alertPromises.push(
+            SecurityAlert.create({
+              userId: user._id,
+              sessionId: session._id,
+              type: 'new_location_login',
+              severity: 'medium',
+              title: 'Login from New Location',
+              description: `Login from new country: ${locationData.country}`,
+              metadata: {
+                newLocation: locationData,
+                previousLocations: recentSessions.map(s => ({
+                  country: s.location.country,
+                  city: s.location.city
+                })).slice(0, 3)
+              }
+            })
+          );
+        }
+      }
+
+      // VPN/Proxy alerts
+      if (locationData.isVPN) {
+        alertPromises.push(
+          SecurityAlert.create({
+            userId: user._id,
+            sessionId: session._id,
+            type: 'vpn_detected',
+            severity: 'medium',
+            title: 'VPN Connection Detected',
+            description: `Login detected through VPN service: ${locationData.isp}`,
+            metadata: { locationData, securityRecommendation: 'Monitor for suspicious activity' }
+          })
+        );
+      }
+
+      if (locationData.isTor) {
+        alertPromises.push(
+          SecurityAlert.create({
+            userId: user._id,
+            sessionId: session._id,
+            type: 'tor_detected',
+            severity: 'high',
+            title: 'Tor Network Detected',
+            description: 'Login detected through Tor network',
+            metadata: { locationData, securityRecommendation: 'Consider blocking Tor access' }
+          })
+        );
+      }
+
+      // Execute all alert creations in parallel
+      if (alertPromises.length > 0) {
+        try {
+          await Promise.all(alertPromises);
+        } catch (alertError) {
+          console.error('❌ Error creating security alerts:', alertError);
+          // Continue with login even if alerts fail
+        }
+      }
+
+      // Update last login
+      await User.findByIdAndUpdate(user._id, {
+        lastLoginAt: new Date()
       });
 
       // Set HTTP-only cookie for refresh token
@@ -549,6 +746,15 @@ class AuthController {
       });
 
       console.log('✅ User logged in successfully:', user.email);
+      console.log('📊 Security Analysis:', {
+        riskScore: session.security.riskScore,
+        riskLevel: riskAnalysis.riskLevel,
+        location: `${locationData.city}, ${locationData.country}`,
+        device: `${deviceInfo.type} - ${deviceInfo.os}`,
+        isNewDevice,
+        alertsCreated: alertPromises.length
+      });
+
       res.status(200).json({
         success: true,
         message: 'Login successful!',
@@ -563,7 +769,15 @@ class AuthController {
           },
           accessToken: tokens.accessToken,
           refreshToken: tokens.refreshToken, // Add refreshToken for mobile apps
-          expiresIn: '1h'
+          expiresIn: '1h',
+          session: {
+            id: session._id,
+            device: `${deviceInfo.type} - ${deviceInfo.os}`,
+            location: `${locationData.city}, ${locationData.country}`,
+            riskLevel: riskAnalysis.riskLevel,
+            isNewDevice,
+            securityAlerts: alertPromises.length
+          }
         }
       });
 
@@ -577,12 +791,44 @@ class AuthController {
   }
 
   /**
-   * Logout user
+   * Logout user with session cleanup
    * @param {Request} req - Express request object
    * @param {Response} res - Express response object
    */
   static async logout(req, res) {
     try {
+      // Get session info if available
+      const sessionId = req.sessionId; // This would be set by auth middleware
+      const userId = req.userId;
+
+      // Revoke current session if exists
+      if (sessionId) {
+        try {
+          const session = await Session.findById(sessionId);
+          if (session) {
+            await session.revoke('user_logout');
+            
+            // Create logout security alert
+            await SecurityAlert.create({
+              userId: userId,
+              sessionId: sessionId,
+              type: 'user_logout',
+              severity: 'info',
+              title: 'User Logout',
+              description: `User logged out from ${session.deviceInfo.type} device`,
+              metadata: {
+                deviceInfo: session.deviceInfo,
+                location: session.location,
+                sessionDuration: new Date() - session.createdAt
+              }
+            });
+          }
+        } catch (sessionError) {
+          console.error('❌ Session cleanup error during logout:', sessionError);
+          // Continue with logout even if session cleanup fails
+        }
+      }
+
       // Clear the refresh token cookie
       res.clearCookie('refreshToken', {
         httpOnly: true,
@@ -605,15 +851,19 @@ class AuthController {
   }
 
   /**
-   * Refresh access token
+   * Refresh access token with session validation
    * @param {Request} req - Express request object
    * @param {Response} res - Express response object
    */
   static async refreshToken(req, res) {
     try {
-      const { refreshToken } = req.cookies;
+      // Support both cookies (web) and request body (mobile)
+      const { refreshToken } = req.cookies || {};
+      const bodyRefreshToken = req.body?.refreshToken;
+      
+      const token = refreshToken || bodyRefreshToken;
 
-      if (!refreshToken) {
+      if (!token) {
         res.status(401).json({
           success: false,
           message: 'Refresh token not provided',
@@ -623,7 +873,7 @@ class AuthController {
       }
 
       // Verify refresh token
-      const decoded = JWTUtils.verifyRefreshToken(refreshToken);
+      const decoded = JWTUtils.verifyRefreshToken(token);
       if (!decoded) {
         res.status(401).json({
           success: false,
@@ -644,12 +894,80 @@ class AuthController {
         return;
       }
 
-      // Generate new tokens
+      // ================================
+      // SESSION VALIDATION & SECURITY
+      // ================================
+
+      // Find the session associated with this refresh token
+      const session = await Session.findOne({
+        refreshTokenFamily: decoded.tokenFamily || token,
+        userId: decoded.userId,
+        isActive: true
+      });
+
+      if (!session) {
+        console.log('❌ Session not found for refresh token. Token family:', decoded.tokenFamily || 'none');
+        res.status(401).json({
+          success: false,
+          message: 'Session not found or expired',
+          error: { code: 'SESSION_NOT_FOUND' }
+        });
+        return;
+      }
+
+      // Check if session is still valid
+      if (!session.isValid()) {
+        await session.revoke('session_expired');
+        res.status(401).json({
+          success: false,
+          message: 'Session has expired',
+          error: { code: 'SESSION_EXPIRED' }
+        });
+        return;
+      }
+
+      // Update session activity
+      session.lastActiveAt = new Date();
+      session.metadata = {
+        ...session.metadata,
+        lastTokenRefresh: new Date(),
+        refreshCount: (session.metadata.refreshCount || 0) + 1
+      };
+      await session.save();
+
+      // Check for suspicious refresh patterns
+      const refreshCount = session.metadata.refreshCount || 0;
+      if (refreshCount > 100) { // Too many refreshes might indicate token theft
+        await SecurityAlert.create({
+          userId: user._id,
+          sessionId: session._id,
+          type: 'suspicious_token_usage',
+          severity: 'medium',
+          title: 'Unusual Token Refresh Pattern',
+          description: `Session has refreshed tokens ${refreshCount} times`,
+          metadata: {
+            refreshCount,
+            sessionInfo: {
+              device: session.deviceInfo.type,
+              location: session.location.city,
+              createdAt: session.createdAt
+            }
+          }
+        });
+      }
+
+      // Generate new tokens (keeping the same family)
       const tokens = JWTUtils.generateTokens({
         userId: user._id.toString(),
         email: user.email,
         role: user.role
-      });
+      }, session.refreshTokenFamily);
+
+      // Don't update refreshTokenFamily - keep it consistent for the session
+      // The tokens.refreshToken is the new refresh token, but the family ID stays the same
+      // Don't update refreshTokenFamily - keep it consistent for the session
+      // The tokens.refreshToken is the new refresh token, but the family ID stays the same
+      await session.save();
 
       // Set new refresh token cookie
       res.cookie('refreshToken', tokens.refreshToken, {
@@ -664,7 +982,14 @@ class AuthController {
         message: 'Token refreshed successfully',
         data: {
           accessToken: tokens.accessToken,
-          expiresIn: '1h'
+          refreshToken: tokens.refreshToken, // Add refreshToken for mobile apps
+          expiresIn: '15m',
+          session: {
+            id: session._id,
+            device: `${session.deviceInfo.type} - ${session.deviceInfo.os}`,
+            location: `${session.location.city}, ${session.location.country}`,
+            lastActivity: session.lastActiveAt
+          }
         }
       });
 

@@ -1,7 +1,7 @@
 import React, { useEffect } from 'react';
 import { StyleSheet } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
-import { Provider } from 'react-redux';
+import { Provider, useDispatch } from 'react-redux';
 import { PersistGate } from 'redux-persist/integration/react';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
@@ -9,7 +9,8 @@ import { PaperProvider } from 'react-native-paper';
 import Toast from 'react-native-toast-message';
 import * as Notifications from 'expo-notifications';
 
-import { store, persistor } from './src/store/store';
+import { store, persistor, useAppDispatch } from './src/store/store';
+import { initializeAuth } from './src/store/slices/authSlice';
 import AppNavigator from './src/navigation/AppNavigator';
 import { theme } from './src/utils/theme';
 import LoadingScreen from './src/components/LoadingScreen';
@@ -24,13 +25,21 @@ if (NOTIFICATIONS_ENABLED) {
       shouldShowAlert: true,
       shouldPlaySound: true,
       shouldSetBadge: false,
+      shouldShowBanner: true,
+      shouldShowList: true,
     }),
   });
 }
 
 // App content component that has access to store after provider
 const AppContent = () => {
+  const dispatch = useAppDispatch();
+
   useEffect(() => {
+    // Initialize auth state from stored tokens
+    console.log('🔧 Initializing auth state from stored tokens...');
+    dispatch(initializeAuth());
+
     // Request notification permissions only if notifications are enabled
     if (NOTIFICATIONS_ENABLED) {
       const requestPermissions = async () => {
@@ -48,7 +57,7 @@ const AppContent = () => {
     } else {
       console.log('Push notifications disabled in development mode');
     }
-  }, []);
+  }, [dispatch]);
 
   return (
     <>

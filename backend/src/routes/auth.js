@@ -195,6 +195,13 @@ router.post('/logout', AuthController.logout);
 router.post('/refresh-token', AuthController.refreshToken);
 
 /**
+ * @route   POST /api/auth/refresh
+ * @desc    Refresh access token (alias for mobile compatibility)
+ * @access  Public (but requires refresh token in cookies)
+ */
+router.post('/refresh', AuthController.refreshToken);
+
+/**
  * @route   POST /api/auth/forgot-password
  * @desc    Request password reset
  * @access  Public

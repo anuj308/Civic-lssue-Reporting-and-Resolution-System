@@ -1,4 +1,5 @@
 const jwt = require('jsonwebtoken');
+const { v4: uuidv4 } = require('uuid');
 
 /**
  * JWT Utility class for handling JSON Web Tokens
@@ -10,23 +11,43 @@ class JWTUtils {
   static REFRESH_TOKEN_EXPIRES_IN = '7d';
 
   /**
-   * Generate access token
+   * Generate a unique token family ID for session tracking
+   * @returns {string} Unique token family ID
+   */
+  static generateTokenFamily() {
+    return uuidv4();
+  }
+
+  /**
+   * Generate access token with session family
    * @param {Object} payload - Token payload containing userId, email, role
+   * @param {string} tokenFamily - Token family ID for session tracking
    * @returns {string} Generated access token
    */
-  static generateAccessToken(payload) {
-    return jwt.sign(payload, this.ACCESS_TOKEN_SECRET, {
+  static generateAccessToken(payload, tokenFamily = null) {
+    const tokenPayload = { ...payload };
+    if (tokenFamily) {
+      tokenPayload.tokenFamily = tokenFamily;
+    }
+    
+    return jwt.sign(tokenPayload, this.ACCESS_TOKEN_SECRET, {
       expiresIn: this.ACCESS_TOKEN_EXPIRES_IN,
     });
   }
 
   /**
-   * Generate refresh token
+   * Generate refresh token with session family
    * @param {Object} payload - Token payload containing userId, email, role
+   * @param {string} tokenFamily - Token family ID for session tracking
    * @returns {string} Generated refresh token
    */
-  static generateRefreshToken(payload) {
-    return jwt.sign(payload, this.REFRESH_TOKEN_SECRET, {
+  static generateRefreshToken(payload, tokenFamily = null) {
+    const tokenPayload = { ...payload };
+    if (tokenFamily) {
+      tokenPayload.tokenFamily = tokenFamily;
+    }
+    
+    return jwt.sign(tokenPayload, this.REFRESH_TOKEN_SECRET, {
       expiresIn: this.REFRESH_TOKEN_EXPIRES_IN,
     });
   }
@@ -60,14 +81,18 @@ class JWTUtils {
   }
 
   /**
-   * Generate both access and refresh tokens
+   * Generate both access and refresh tokens with session family
    * @param {Object} payload - Token payload containing userId, email, role
-   * @returns {Object} Object containing both tokens
+   * @param {string} tokenFamily - Optional token family ID, generates new one if not provided
+   * @returns {Object} Object containing both tokens and token family
    */
-  static generateTokens(payload) {
+  static generateTokens(payload, tokenFamily = null) {
+    const family = tokenFamily || this.generateTokenFamily();
+    
     return {
-      accessToken: this.generateAccessToken(payload),
-      refreshToken: this.generateRefreshToken(payload),
+      accessToken: this.generateAccessToken(payload, family),
+      refreshToken: this.generateRefreshToken(payload, family),
+      tokenFamily: family
     };
   }
 

@@ -17,6 +17,7 @@ const { Server } = require('socket.io');
 // Import routes
 const authRoutes = require('./routes/auth');
 const issueRoutes = require('./routes/issues');
+const sessionRoutes = require('./routes/sessions');
 // const userRoutes = require('./routes/users');
 // const departmentRoutes = require('./routes/departments');
 // const analyticsRoutes = require('./routes/analytics');
@@ -27,6 +28,14 @@ const issueRoutes = require('./routes/issues');
 const { errorHandler } = require('./middleware/errorHandler');
 const { notFound } = require('./middleware/notFound');
 const { authenticateToken } = require('./middleware/auth');
+
+// Import models to register them with Mongoose
+const { User } = require('./models/User');
+const { Issue } = require('./models/Issue');
+const { Department } = require('./models/Department');
+const { Session } = require('./models/Session');
+const { SecurityAlert } = require('./models/SecurityAlert');
+const { Notification } = require('./models/Notification');
 
 // Import services
 const { connectDatabase } = require('./config/database');
@@ -119,6 +128,7 @@ app.get('/api/test', (req, res) => {
 // API routes
 app.use('/api/auth', authRoutes);
 app.use('/api/issues', issueRoutes);
+app.use('/api/sessions', sessionRoutes);
 // app.use('/api/users', userRoutes);
 // app.use('/api/departments', departmentRoutes);
 // app.use('/api/analytics', analyticsRoutes);

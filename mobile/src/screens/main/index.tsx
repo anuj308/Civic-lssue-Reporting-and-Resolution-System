@@ -5,6 +5,12 @@ export { default as IssueDetailScreen } from './IssueDetailScreen';
 export { default as ReportIssueScreen } from './ReportIssueScreen';
 export { default as IssuesScreen } from './IssuesScreen';
 
+// Security screens
+export { default as SecurityScreen } from './SecurityScreen';
+export { default as DeviceManagementScreen } from './DeviceManagementScreen';
+export { default as SecurityAlertsScreen } from './SecurityAlertsScreen';
+export { default as SecuritySettingsScreen } from './SecuritySettingsScreen';
+
 // Simple placeholder screens for missing components
 import React from 'react';
 import { View, StyleSheet } from 'react-native';

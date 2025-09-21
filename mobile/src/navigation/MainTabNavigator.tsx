@@ -10,6 +10,10 @@ import ProfileScreen from '../screens/main/ProfileScreen';
 import IssueDetailScreen from '../screens/main/IssueDetailScreen';
 import ReportIssueScreen from '../screens/main/ReportIssueScreen';
 import IssuesScreen from '../screens/main/IssuesScreen';
+import SecurityScreen from '../screens/main/SecurityScreen';
+import DeviceManagementScreen from '../screens/main/DeviceManagementScreen';
+import SecurityAlertsScreen from '../screens/main/SecurityAlertsScreen';
+import SecuritySettingsScreen from '../screens/main/SecuritySettingsScreen';
 
 export type MainTabParamList = {
   Issues: undefined;
@@ -22,6 +26,11 @@ export type MainStackParamList = {
   MainTabs: undefined;
   ReportIssue: undefined;
   IssueDetail: { issueId: string };
+  Security: undefined;
+  DeviceManagement: undefined;
+  SecurityAlerts: undefined;
+  SecurityAlert: { alertId: string };
+  SecuritySettings: undefined;
 };
 
 const Tab = createBottomTabNavigator<MainTabParamList>();
@@ -120,6 +129,38 @@ const MainTabNavigator = () => {
         options={{
           headerShown: true,
           title: 'Issue Details',
+        }}
+      />
+      <Stack.Screen 
+        name="Security" 
+        component={SecurityScreen}
+        options={{
+          headerShown: false,
+          title: 'Security',
+        }}
+      />
+      <Stack.Screen 
+        name="DeviceManagement" 
+        component={DeviceManagementScreen}
+        options={{
+          headerShown: false,
+          title: 'Device Management',
+        }}
+      />
+      <Stack.Screen 
+        name="SecurityAlerts" 
+        component={SecurityAlertsScreen}
+        options={{
+          headerShown: false,
+          title: 'Security Alerts',
+        }}
+      />
+      <Stack.Screen 
+        name="SecuritySettings" 
+        component={SecuritySettingsScreen}
+        options={{
+          headerShown: false,
+          title: 'Security Settings',
         }}
       />
     </Stack.Navigator>

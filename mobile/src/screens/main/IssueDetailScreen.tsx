@@ -30,6 +30,7 @@ import { RouteProp, useRoute, useNavigation } from '@react-navigation/native';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 import { theme } from '../../theme';
 import { useAppDispatch, useAppSelector } from '../../store/store';
+import { fetchIssueById, clearError } from '../../store/slices/issueSlice';
 import { RootStackParamList } from '../../navigation/types';
 
 const { width } = Dimensions.get('window');
@@ -67,8 +68,11 @@ export default function IssueDetailScreen() {
   const dispatch = useAppDispatch();
   const { issueId } = route.params;
 
-  const [issue, setIssue] = useState<any>(null);
-  const [loading, setLoading] = useState(true);
+  // Redux state
+  const { currentIssue: issue, isLoading, error } = useAppSelector((state) => state.issues);
+  const { user } = useAppSelector((state) => state.auth);
+
+  // Local state
   const [refreshing, setRefreshing] = useState(false);
   const [currentPhotoIndex, setCurrentPhotoIndex] = useState(0);
   const [showCommentDialog, setShowCommentDialog] = useState(false);
@@ -77,129 +81,25 @@ export default function IssueDetailScreen() {
   const [hasUpvoted, setHasUpvoted] = useState(false);
   const [upvoteCount, setUpvoteCount] = useState(0);
 
-  const { user } = useAppSelector((state) => state.auth);
-
-  const mockIssue = {
-    id: issueId,
-    title: 'Broken Street Light on Main Road',
-    description: 'The street light on Main Road near the community center has been broken for over a week. This creates a safety hazard for pedestrians and drivers, especially during evening hours.',
-    category: 'Infrastructure',
-    priority: 'high',
-    status: 'in_progress',
-    location: {
-      address: '123 Main Road, Downtown',
-      coordinates: { lat: 40.7128, lng: -74.0060 },
-    },
-    photos: [
-      'https://via.placeholder.com/400x240?text=Street+Light+1',
-      'https://via.placeholder.com/400x240?text=Street+Light+2',
-      'https://via.placeholder.com/400x240?text=Street+Light+3',
-    ],
-    author: {
-      name: 'John Doe',
-      avatar: 'https://via.placeholder.com/40x40?text=JD',
-    },
-    createdAt: '2024-01-15T10:30:00Z',
-    updatedAt: '2024-01-18T14:45:00Z',
-    upvotes: 24,
-    comments: 8,
-    tags: ['safety', 'lighting', 'urgent'],
-    assignedTo: {
-      name: 'City Maintenance Team',
-      department: 'Public Works',
-    },
-    estimatedCompletion: '2024-01-25T00:00:00Z',
-  };
-
-  const mockComments: Comment[] = [
-    {
-      id: '1',
-      content: 'This is a serious safety issue. I witnessed a near-miss accident yesterday evening because of poor visibility.',
-      author: {
-        name: 'Sarah Wilson',
-        role: 'user',
-      },
-      createdAt: '2024-01-16T09:15:00Z',
-      likes: 5,
-    },
-    {
-      id: '2',
-      content: 'We have received this report and assigned it to our maintenance team. Expected completion is within 7 business days.',
-      author: {
-        name: 'City Admin',
-        role: 'admin',
-      },
-      createdAt: '2024-01-16T11:30:00Z',
-      likes: 12,
-    },
-    {
-      id: '3',
-      content: 'Thank you for the quick response! Looking forward to the fix.',
-      author: {
-        name: 'John Doe',
-        role: 'user',
-      },
-      createdAt: '2024-01-16T11:45:00Z',
-      likes: 3,
-    },
-  ];
-
-  const mockTimeline: TimelineEvent[] = [
-    {
-      id: '1',
-      type: 'status_change',
-      title: 'Issue Reported',
-      description: 'Issue was submitted and is pending review',
-      timestamp: '2024-01-15T10:30:00Z',
-      author: 'John Doe',
-    },
-    {
-      id: '2',
-      type: 'status_change',
-      title: 'Under Review',
-      description: 'Issue has been reviewed and approved for action',
-      timestamp: '2024-01-16T09:00:00Z',
-      author: 'City Admin',
-    },
-    {
-      id: '3',
-      type: 'priority_change',
-      title: 'Priority Updated',
-      description: 'Priority changed from Medium to High due to safety concerns',
-      timestamp: '2024-01-16T10:15:00Z',
-      author: 'Safety Coordinator',
-    },
-    {
-      id: '4',
-      type: 'status_change',
-      title: 'In Progress',
-      description: 'Maintenance team has been assigned and work has begun',
-      timestamp: '2024-01-18T14:45:00Z',
-      author: 'City Maintenance Team',
-    },
-  ];
-
   useEffect(() => {
     loadIssue();
   }, [issueId]);
 
   useEffect(() => {
     if (issue) {
-      setUpvoteCount(issue.upvotes);
+      // Set upvote count when issue loads - adjust field name based on your API response
+      setUpvoteCount(issue.voteScore || issue.upvotes || 0);
     }
   }, [issue]);
 
   const loadIssue = async () => {
     try {
-      setLoading(true);
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      setIssue(mockIssue);
-    } catch (error) {
-      console.error('Error loading issue:', error);
-      Alert.alert('Error', 'Failed to load issue details');
-    } finally {
-      setLoading(false);
+      console.log('🔍 Loading issue details for ID:', issueId);
+      await dispatch(fetchIssueById(issueId)).unwrap();
+      console.log('✅ Issue details loaded successfully');
+    } catch (error: any) {
+      console.error('❌ Error loading issue:', error);
+      Alert.alert('Error', error || 'Failed to load issue details');
     }
   };
 
@@ -301,7 +201,7 @@ export default function IssueDetailScreen() {
     }
   };
 
-  if (loading) {
+  if (isLoading && !issue) {
     return (
       <SafeAreaView style={styles.loadingContainer}>
         <ActivityIndicator size="large" color={theme.colors.primary} />
@@ -353,7 +253,7 @@ export default function IssueDetailScreen() {
         </Surface>
 
         {/* Photo Carousel */}
-        {issue.photos && issue.photos.length > 0 && (
+        {issue.media?.images && issue.media.images.length > 0 && (
           <View style={styles.photoContainer}>
             <ScrollView
               horizontal
@@ -364,18 +264,18 @@ export default function IssueDetailScreen() {
                 setCurrentPhotoIndex(index);
               }}
             >
-              {issue.photos.map((photo: string, index: number) => (
+              {issue.media.images.map((imageUrl: string, index: number) => (
                 <Image
                   key={index}
-                  source={{ uri: photo }}
+                  source={{ uri: imageUrl }}
                   style={styles.photo}
                   resizeMode="cover"
                 />
               ))}
             </ScrollView>
-            {issue.photos.length > 1 && (
+            {issue.media.images.length > 1 && (
               <View style={styles.photoIndicators}>
-                {issue.photos.map((_: any, index: number) => (
+                {issue.media.images.map((_: any, index: number) => (
                   <View
                     key={index}
                     style={[
@@ -423,12 +323,14 @@ export default function IssueDetailScreen() {
           {/* Author and Date */}
           <Surface style={styles.authorSection}>
             <View style={styles.authorRow}>
-              <Avatar.Image 
+              <Avatar.Text 
                 size={40} 
-                source={{ uri: issue.author.avatar }} 
+                label={issue.reportedBy?.name?.charAt(0) || 'U'} 
               />
               <View style={styles.authorInfo}>
-                <Text style={styles.authorName}>{issue.author.name}</Text>
+                <Text style={styles.authorName}>
+                  {issue.reportedBy?.name || 'Anonymous User'}
+                </Text>
                 <Text style={styles.authorDate}>
                   Reported {formatDate(issue.createdAt)}
                 </Text>
@@ -474,24 +376,20 @@ export default function IssueDetailScreen() {
           )}
 
           {/* Assignment Info */}
-          {issue.assignedTo && (
+          {issue.assignedDepartment && (
             <Surface style={styles.assignmentSection}>
               <Text style={styles.sectionTitle}>Assigned To</Text>
               <View style={styles.assignmentRow}>
                 <Icon name="account-group" size={20} color={theme.colors.primary} />
                 <View style={styles.assignmentInfo}>
-                  <Text style={styles.assignmentName}>{issue.assignedTo.name}</Text>
-                  <Text style={styles.assignmentDepartment}>{issue.assignedTo.department}</Text>
-                </View>
-              </View>
-              {issue.estimatedCompletion && (
-                <View style={styles.estimationRow}>
-                  <Icon name="clock-outline" size={16} color={theme.colors.onSurfaceVariant} />
-                  <Text style={styles.estimationText}>
-                    Expected completion: {formatDate(issue.estimatedCompletion)}
+                  <Text style={styles.assignmentName}>
+                    {issue.assignedDepartment.name || 'Department'}
+                  </Text>
+                  <Text style={styles.assignmentDepartment}>
+                    {issue.assignedDepartment.code || 'Code'}
                   </Text>
                 </View>
-              )}
+              </View>
             </Surface>
           )}
 
@@ -510,94 +408,65 @@ export default function IssueDetailScreen() {
               </TouchableOpacity>
               <View style={styles.statItem}>
                 <Icon name="comment-outline" size={20} color={theme.colors.onSurfaceVariant} />
-                <Text style={styles.statText}>{issue.comments}</Text>
+                <Text style={styles.statText}>0</Text>
               </View>
               <View style={styles.statItem}>
                 <Icon name="eye-outline" size={20} color={theme.colors.onSurfaceVariant} />
-                <Text style={styles.statText}>156</Text>
+                <Text style={styles.statText}>-</Text>
+              </View>
+              <View style={styles.statItem}>
+                <Icon name="calendar" size={20} color={theme.colors.onSurfaceVariant} />
+                <Text style={styles.statText}>{issue.daysSinceReported || 0} days</Text>
               </View>
             </View>
           </Surface>
 
-          {/* Timeline */}
+          {/* Basic Timeline showing status history */}
           <Surface style={styles.timelineSection}>
             <Text style={styles.sectionTitle}>Timeline</Text>
-            {mockTimeline.map((event, index) => (
-              <View key={event.id} style={styles.timelineItem}>
+            <View style={styles.timelineItem}>
+              <View style={styles.timelineIcon}>
+                <Icon 
+                  name="flag" 
+                  size={16} 
+                  color={theme.colors.primary} 
+                />
+              </View>
+              <View style={styles.timelineContent}>
+                <Text style={styles.timelineTitle}>Issue Reported</Text>
+                <Text style={styles.timelineDescription}>
+                  Issue was submitted and is {issue.statusDisplay || issue.status}
+                </Text>
+                <View style={styles.timelineFooter}>
+                  <Text style={styles.timelineAuthor}>
+                    {issue.reportedBy?.name || 'Anonymous'}
+                  </Text>
+                  <Text style={styles.timelineDate}>{formatDate(issue.createdAt)}</Text>
+                </View>
+              </View>
+            </View>
+            
+            {issue.updatedAt !== issue.createdAt && (
+              <View style={styles.timelineItem}>
                 <View style={styles.timelineIcon}>
                   <Icon 
-                    name={getTimelineIcon(event.type)} 
+                    name="update" 
                     size={16} 
                     color={theme.colors.primary} 
                   />
                 </View>
                 <View style={styles.timelineContent}>
-                  <Text style={styles.timelineTitle}>{event.title}</Text>
-                  {event.description && (
-                    <Text style={styles.timelineDescription}>{event.description}</Text>
-                  )}
+                  <Text style={styles.timelineTitle}>Last Updated</Text>
+                  <Text style={styles.timelineDescription}>
+                    Issue status or details were updated
+                  </Text>
                   <View style={styles.timelineFooter}>
-                    <Text style={styles.timelineAuthor}>{event.author}</Text>
-                    <Text style={styles.timelineDate}>{formatDate(event.timestamp)}</Text>
+                    <Text style={styles.timelineAuthor}>System</Text>
+                    <Text style={styles.timelineDate}>{formatDate(issue.updatedAt)}</Text>
                   </View>
                 </View>
-                {index < mockTimeline.length - 1 && <View style={styles.timelineLine} />}
               </View>
-            ))}
-          </Surface>
-
-          {/* Comments */}
-          <Surface style={styles.commentsSection}>
-            <View style={styles.commentsSectionHeader}>
-              <Text style={styles.sectionTitle}>Comments ({mockComments.length})</Text>
-              <Button
-                mode="outlined"
-                compact
-                onPress={() => setShowCommentDialog(true)}
-              >
-                Add Comment
-              </Button>
-            </View>
-            
-            {mockComments.map((comment) => (
-              <View key={comment.id} style={styles.comment}>
-                <View style={styles.commentHeader}>
-                  <View style={styles.commentAuthor}>
-                    <Avatar.Text 
-                      size={32} 
-                      label={comment.author.name.charAt(0)} 
-                    />
-                    <View style={styles.commentAuthorInfo}>
-                      <View style={styles.commentAuthorRow}>
-                        <Text style={styles.commentAuthorName}>{comment.author.name}</Text>
-                        {comment.author.role === 'admin' && (
-                          <Chip mode="flat" compact style={styles.adminChip}>
-                            Admin
-                          </Chip>
-                        )}
-                      </View>
-                      <Text style={styles.commentDate}>{formatDate(comment.createdAt)}</Text>
-                    </View>
-                  </View>
-                  <IconButton
-                    icon="dots-vertical"
-                    size={16}
-                    onPress={() => {/* Show comment menu */}}
-                  />
-                </View>
-                <Text style={styles.commentContent}>{comment.content}</Text>
-                <View style={styles.commentActions}>
-                  <TouchableOpacity style={styles.commentAction}>
-                    <Icon name="thumb-up-outline" size={16} color={theme.colors.onSurfaceVariant} />
-                    <Text style={styles.commentActionText}>{comment.likes}</Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity style={styles.commentAction}>
-                    <Icon name="reply" size={16} color={theme.colors.onSurfaceVariant} />
-                    <Text style={styles.commentActionText}>Reply</Text>
-                  </TouchableOpacity>
-                </View>
-              </View>
-            ))}
+            )}
           </Surface>
         </View>
       </ScrollView>

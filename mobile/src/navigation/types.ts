@@ -8,6 +8,11 @@ export type RootStackParamList = {
   IssueDetail: { issueId: string };
   Map: undefined;
   Profile: undefined;
+  Security: undefined;
+  SecurityAlerts: undefined;
+  SecurityAlert: { alertId: string };
+  DeviceManagement: undefined;
+  SecuritySettings: undefined;
 };
 
 export type MainTabParamList = {
@@ -22,6 +27,14 @@ export type AuthStackParamList = {
   Login: undefined;
   Register: undefined;
   OTPVerification: { email: string; phone?: string; isLoginVerification?: boolean; password?: string };
+};
+
+export type SecurityStackParamList = {
+  Security: undefined;
+  SecurityAlerts: undefined;
+  SecurityAlert: { alertId: string };
+  DeviceManagement: undefined;
+  SecuritySettings: undefined;
 };
 
 declare global {

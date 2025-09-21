@@ -459,6 +459,53 @@ export default function ProfileScreen() {
           </Card.Content>
         </Card>
 
+        {/* Security Settings */}
+        <Card style={styles.settingsCard}>
+          <Card.Content>
+            <Text style={styles.settingsTitle}>Security & Privacy</Text>
+            
+            <List.Item
+              title="Security Dashboard"
+              description="Manage devices, sessions, and security alerts"
+              left={props => <List.Icon {...props} icon="shield-check" />}
+              right={props => <List.Icon {...props} icon="chevron-right" />}
+              onPress={() => navigation.navigate('Security')}
+            />
+            <Divider />
+            
+            <List.Item
+              title="Device Management"
+              description="View and manage your active sessions"
+              left={props => <List.Icon {...props} icon="devices" />}
+              right={props => <List.Icon {...props} icon="chevron-right" />}
+              onPress={() => navigation.navigate('DeviceManagement')}
+            />
+            <Divider />
+            
+            <List.Item
+              title="Security Alerts"
+              description="View and manage security notifications"
+              left={props => <List.Icon {...props} icon="alert-circle" />}
+              right={() => (
+                <View style={styles.alertsRight}>
+                  <Badge size={18} style={styles.alertsBadge}>3</Badge>
+                  <List.Icon icon="chevron-right" />
+                </View>
+              )}
+              onPress={() => navigation.navigate('SecurityAlerts')}
+            />
+            <Divider />
+            
+            <List.Item
+              title="Security Settings"
+              description="Configure security preferences and notifications"
+              left={props => <List.Icon {...props} icon="cog" />}
+              right={props => <List.Icon {...props} icon="chevron-right" />}
+              onPress={() => navigation.navigate('SecuritySettings')}
+            />
+          </Card.Content>
+        </Card>
+
         {/* Notification Settings */}
         <Card style={styles.settingsCard}>
           <Card.Content>
@@ -878,5 +925,13 @@ const styles = StyleSheet.create({
   deleteWarning: {
     color: theme.colors.error,
     lineHeight: 20,
+  },
+  alertsRight: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  alertsBadge: {
+    backgroundColor: theme.colors.error,
   },
 });

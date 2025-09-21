@@ -6,6 +6,7 @@ import {
   Alert,
   Platform,
   KeyboardAvoidingView,
+  Image,
 } from 'react-native';
 import {
   Text,
@@ -160,11 +161,27 @@ const ReportIssueScreen: React.FC = () => {
         allowsEditing: true,
         aspect: [4, 3],
         quality: 0.8,
+        base64: true, // This will include base64 data
         allowsMultipleSelection: true,
       });
 
       if (!result.canceled && result.assets) {
-        const newImages = result.assets.map(asset => asset.uri);
+        const newImages = result.assets.map(asset => {
+          console.log('📸 Image asset:', {
+            uri: asset.uri,
+            hasBase64: !!asset.base64,
+            base64Length: asset.base64?.length || 0
+          });
+          
+          // Return base64 data URI instead of file URI
+          if (asset.base64) {
+            return `data:image/jpeg;base64,${asset.base64}`;
+          } else {
+            console.warn('⚠️ No base64 data available for image');
+            return asset.uri; // Fallback to URI
+          }
+        });
+        console.log('📸 New images converted to base64, count:', newImages.length);
         setImages(prev => [...prev, ...newImages].slice(0, 5)); // Max 5 images
       }
     } catch (error) {
@@ -185,10 +202,26 @@ const ReportIssueScreen: React.FC = () => {
         allowsEditing: true,
         aspect: [4, 3],
         quality: 0.8,
+        base64: true, // This will include base64 data
       });
 
       if (!result.canceled && result.assets) {
-        setImages(prev => [...prev, result.assets[0].uri].slice(0, 5));
+        const asset = result.assets[0];
+        console.log('📸 Camera image asset:', {
+          uri: asset.uri,
+          hasBase64: !!asset.base64,
+          base64Length: asset.base64?.length || 0
+        });
+        
+        // Convert to base64 data URI instead of file URI
+        if (asset.base64) {
+          const base64Image = `data:image/jpeg;base64,${asset.base64}`;
+          setImages(prev => [...prev, base64Image].slice(0, 5));
+          console.log('📸 Camera image converted to base64');
+        } else {
+          console.warn('⚠️ No base64 data available for camera image');
+          setImages(prev => [...prev, asset.uri].slice(0, 5)); // Fallback to URI
+        }
       }
     } catch (error) {
       console.error('Error taking photo:', error);
@@ -206,42 +239,72 @@ const ReportIssueScreen: React.FC = () => {
       return;
     }
 
-    if (images.length === 0) {
-      Alert.alert('Images Required', 'Please add at least one image to help identify the issue.');
+    if (!data.category) {
+      Alert.alert('Category Required', 'Please select a category for the issue.');
       return;
     }
 
     try {
-      // Create FormData for multipart upload
-      const formData = new FormData();
-      
-      // Add text fields
-      formData.append('title', data.title);
-      formData.append('description', data.description);
-      formData.append('category', data.category);
-      if (data.subcategory) formData.append('subcategory', data.subcategory);
-      formData.append('priority', data.priority);
-      
-      // Add location data
-      formData.append('location[address]', data.address);
-      formData.append('location[city]', 'Ranchi'); // Default city
-      formData.append('location[state]', 'Jharkhand'); // Default state
-      formData.append('location[pincode]', data.pincode);
-      if (data.landmark) formData.append('location[landmark]', data.landmark);
-      formData.append('location[coordinates][latitude]', location.latitude.toString());
-      formData.append('location[coordinates][longitude]', location.longitude.toString());
-      
-      // Add images
-      images.forEach((imageUri, index) => {
-        formData.append('media[images]', {
-          uri: imageUri,
-          type: 'image/jpeg',
-          name: `issue_image_${index}.jpg`,
-        } as any);
+      console.log('🔍 Processing images before submission:');
+      console.log('  - Raw images state:', images);
+      console.log('  - Images type check:', images.map(img => ({ 
+        value: img.substring(0, 50) + '...', 
+        type: typeof img,
+        isBase64: img.startsWith('data:'),
+        length: img.length
+      })));
+
+      // Validate that all images are base64 data URIs
+      const validImages = images.filter(img => {
+        const isValid = typeof img === 'string' && img.startsWith('data:image/');
+        if (!isValid) {
+          console.warn('⚠️ Invalid image format detected:', img.substring(0, 100));
+        }
+        return isValid;
       });
 
-      console.log('🔥 Submitting issue:', data);
-      await dispatch(createIssue(formData)).unwrap();
+      console.log(`📊 Validated ${validImages.length} out of ${images.length} images`);
+
+      // Ensure clean data by deep cloning and ensuring strings
+      const issueData = {
+        title: data.title.trim(),
+        description: data.description.trim(),
+        category: data.category,
+        subcategory: data.subcategory?.trim() || '',
+        priority: data.priority,
+        location: {
+          address: data.address.trim(),
+          city: 'Ranchi', // Default city for now
+          state: 'Jharkhand', // Default state
+          pincode: data.pincode.trim(),
+          landmark: data.landmark?.trim() || '',
+          coordinates: {
+            latitude: location.latitude,
+            longitude: location.longitude
+          }
+        },
+        media: {
+          images: validImages, // Send base64 data URIs to backend
+          videos: [],
+          audio: null
+        },
+        tags: [],
+        isPublic: true
+      };
+
+      console.log('🔥 Submitting issue with data:');
+      console.log('  - Title:', issueData.title);
+      console.log('  - Description:', issueData.description);
+      console.log('  - Category:', issueData.category);
+      console.log('  - Priority:', issueData.priority);
+      console.log('  - Address:', issueData.location.address);
+      console.log('  - Pincode:', issueData.location.pincode);
+      console.log('  - Location coords:', issueData.location.coordinates);
+      console.log('  - Images count:', issueData.media.images.length);
+      console.log('  - Images are base64:', issueData.media.images.every(img => img.startsWith('data:')));
+      console.log('  - Sample image data:', issueData.media.images[0]?.substring(0, 100) + '...');
+      
+      await dispatch(createIssue(issueData)).unwrap();
       
       Alert.alert(
         'Success!',
@@ -349,14 +412,25 @@ const ReportIssueScreen: React.FC = () => {
               {/* Category Selection */}
               <Surface style={styles.selectionContainer}>
                 <Text style={styles.selectionLabel}>Category *</Text>
-                <Button
-                  mode="outlined"
-                  onPress={() => setCategoryModalVisible(true)}
-                  style={styles.selectionButton}
-                  contentStyle={styles.selectionButtonContent}
-                >
-                  {selectedCategory ? getCategoryLabel(selectedCategory) : 'Select Category'}
-                </Button>
+              <Controller
+                control={control}
+                name="category"
+                rules={{
+                  required: 'Category is required',
+                }}
+                render={({ field: { value } }) => (
+                  <View>
+                    <Button
+                      mode="outlined"
+                      onPress={() => setCategoryModalVisible(true)}
+                      style={styles.selectionButton}
+                      contentStyle={styles.selectionButtonContent}
+                    >
+                      {value ? getCategoryLabel(value) : 'Select Category'}
+                    </Button>
+                  </View>
+                )}
+              />
                 {errors.category && (
                   <Text style={styles.errorText}>{errors.category.message}</Text>
                 )}
@@ -514,8 +588,11 @@ const ReportIssueScreen: React.FC = () => {
                   {images.map((image, index) => (
                     <View key={index} style={styles.imageItem}>
                       <Surface style={styles.imageContainer}>
-                        {/* Note: Replace with actual Image component in real implementation */}
-                        <Text style={styles.imagePlaceholder}>Image {index + 1}</Text>
+                        <Image 
+                          source={{ uri: image }}
+                          style={styles.imagePreview}
+                          resizeMode="cover"
+                        />
                         <IconButton
                           icon="close"
                           size={20}
@@ -733,14 +810,19 @@ const styles = StyleSheet.create({
   imageContainer: {
     aspectRatio: 1,
     borderRadius: 8,
-    padding: 8,
     position: 'relative',
     backgroundColor: theme.colors.surfaceVariant,
+    overflow: 'hidden',
+  },
+  imagePreview: {
+    width: '100%',
+    height: '100%',
   },
   imagePlaceholder: {
     textAlign: 'center',
     color: theme.colors.onSurfaceVariant,
     fontSize: 12,
+    padding: 8,
   },
   removeImageButton: {
     position: 'absolute',

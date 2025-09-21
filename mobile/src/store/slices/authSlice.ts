@@ -330,6 +330,14 @@ const authSlice = createSlice({
         state.user = { ...state.user, ...action.payload };
       }
     },
+    // Add action to update tokens when refreshed by API service
+    updateTokens: (state, action: PayloadAction<{ accessToken: string; refreshToken?: string }>) => {
+      state.token = action.payload.accessToken;
+      if (action.payload.refreshToken) {
+        state.refreshToken = action.payload.refreshToken;
+      }
+      state.isAuthenticated = true;
+    },
   },
   extraReducers: (builder) => {
     // Initialize Auth
@@ -510,5 +518,5 @@ const authSlice = createSlice({
   },
 });
 
-export const { clearError, clearLoading, setFirstTime, updateUser } = authSlice.actions;
+export const { clearError, clearLoading, setFirstTime, updateUser, updateTokens } = authSlice.actions;
 export default authSlice.reducer;

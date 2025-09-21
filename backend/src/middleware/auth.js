@@ -1,5 +1,6 @@
 const { JWTUtils } = require('../utils/jwt');
 const { User } = require('../models/User');
+const { Session } = require('../models/Session');
 
 /**
  * Type guard to check if request is authenticated
@@ -34,7 +35,7 @@ function withAuth(handler) {
 }
 
 /**
- * Middleware to authenticate user using JWT tokens from cookies
+ * Middleware to authenticate user using JWT tokens with session validation
  * @param {Request} req - Express request object
  * @param {Response} res - Express response object
  * @param {NextFunction} next - Express next function
@@ -42,11 +43,13 @@ function withAuth(handler) {
 const authenticateToken = async (req, res, next) => {
   try {
     let accessToken, refreshToken;
+    let isMobileRequest = false;
 
     // Check for token in Authorization header first (for mobile apps)
     const authHeader = req.headers.authorization;
     if (authHeader && authHeader.startsWith('Bearer ')) {
       accessToken = authHeader.substring(7);
+      isMobileRequest = true;
       console.log('🔑 Found token in Authorization header for mobile app');
     } else {
       // Fall back to cookies (for web apps)
@@ -76,7 +79,7 @@ const authenticateToken = async (req, res, next) => {
       console.log('❌ Access token verification failed:', tokenError.message);
       
       // For mobile apps, we don't have refresh token in cookies, so just reject
-      if (authHeader) {
+      if (isMobileRequest) {
         res.status(401).json({
           success: false,
           message: 'Access token expired or invalid. Please login again.',
@@ -100,6 +103,22 @@ const authenticateToken = async (req, res, next) => {
       try {
         const refreshPayload = JWTUtils.verifyRefreshToken(refreshToken);
         
+        // Validate session for refresh token
+        const session = await Session.findOne({
+          refreshTokenFamily: refreshToken,
+          isActive: true
+        });
+
+        if (!session || session.expiresAt < new Date()) {
+          JWTUtils.clearTokenCookies(res);
+          res.status(401).json({
+            success: false,
+            message: 'Session expired. Please login again.',
+            error: { code: 'SESSION_EXPIRED' }
+          });
+          return;
+        }
+
         const user = await User.findById(refreshPayload.userId).select('-password');
         if (!user || !user.isActive) {
           JWTUtils.clearTokenCookies(res);
@@ -128,8 +147,13 @@ const authenticateToken = async (req, res, next) => {
           path: '/',
         });
 
+        // Update session activity
+        session.lastActiveAt = new Date();
+        await session.save();
+
         req.user = user;
         req.userId = user._id.toString();
+        req.sessionId = session._id.toString();
         
         return next();
       } catch (refreshError) {
@@ -143,18 +167,71 @@ const authenticateToken = async (req, res, next) => {
       }
     }
 
+    // ================================
+    // SESSION VALIDATION FOR ACTIVE TOKEN
+    // ================================
+
+    // For mobile apps, we need to find the session differently
+    // since we don't have refresh token in header
+    let session = null;
+    
+    if (isMobileRequest) {
+      // For mobile, find the most recent active session for this user
+      // In production, you might want to include session ID in JWT payload
+      session = await Session.findOne({
+        userId: payload.userId,
+        isActive: true
+      }).sort({ lastActiveAt: -1 });
+    } else {
+      // For web apps, find session by refresh token
+      if (refreshToken) {
+        session = await Session.findOne({
+          refreshTokenFamily: refreshToken,
+          isActive: true
+        });
+      }
+    }
+
+    // Validate session if found
+    if (session) {
+      if (session.expiresAt < new Date()) {
+        await session.markAsInactive();
+        
+        if (isMobileRequest) {
+          res.status(401).json({
+            success: false,
+            message: 'Session expired. Please login again.',
+            error: { code: 'SESSION_EXPIRED' }
+          });
+        } else {
+          JWTUtils.clearTokenCookies(res);
+          res.status(401).json({
+            success: false,
+            message: 'Session expired. Please login again.',
+            error: { code: 'SESSION_EXPIRED' }
+          });
+        }
+        return;
+      }
+
+      // Update session activity
+      session.lastActiveAt = new Date();
+      await session.save();
+      
+      // Add session ID to request
+      req.sessionId = session._id.toString();
+    }
+
     // Find user by ID from token
     const user = await User.findById(payload.userId).select('-password');
     if (!user) {
-      if (authHeader) {
-        // For mobile apps, just return error
+      if (isMobileRequest) {
         res.status(401).json({
           success: false,
           message: 'User not found.',
           error: { code: 'USER_NOT_FOUND' }
         });
       } else {
-        // For web apps, clear cookies
         JWTUtils.clearTokenCookies(res);
         res.status(401).json({
           success: false,
@@ -167,15 +244,13 @@ const authenticateToken = async (req, res, next) => {
 
     // Check if user account is active
     if (!user.isActive) {
-      if (authHeader) {
-        // For mobile apps, just return error
+      if (isMobileRequest) {
         res.status(401).json({
           success: false,
           message: 'User account is deactivated.',
           error: { code: 'ACCOUNT_DEACTIVATED' }
         });
       } else {
-        // For web apps, clear cookies
         JWTUtils.clearTokenCookies(res);
         res.status(401).json({
           success: false,
@@ -195,14 +270,12 @@ const authenticateToken = async (req, res, next) => {
   } catch (error) {
     console.error('❌ Authentication error:', error);
     if (req.headers.authorization) {
-      // For mobile apps, just return error
       res.status(500).json({
         success: false,
         message: 'Internal server error during authentication.',
         error: { code: 'AUTH_ERROR' }
       });
     } else {
-      // For web apps, clear cookies
       JWTUtils.clearTokenCookies(res);
       res.status(500).json({
         success: false,

@@ -81,10 +81,54 @@ class ApiService {
         if (error.response?.status === 401 && !originalRequest._retry) {
           originalRequest._retry = true;
           
-          // Clear stored tokens on 401 error
-          await AsyncStorage.multiRemove(['token', 'refreshToken']);
+          console.log('🔄 Access token expired, attempting refresh...');
           
-          return Promise.reject(error);
+          try {
+            // Get stored refresh token
+            const refreshToken = await AsyncStorage.getItem('refreshToken');
+            
+            if (!refreshToken) {
+              console.log('❌ No refresh token available, redirecting to login');
+              await AsyncStorage.multiRemove(['token', 'refreshToken']);
+              return Promise.reject(error);
+            }
+            
+            console.log('🔄 Using refresh token to get new access token');
+            
+            // Create a separate axios instance for refresh to avoid recursion
+            const refreshAxios = axios.create({
+              baseURL: BASE_URL,
+              timeout: 10000,
+            });
+            
+            // Call refresh token API
+            const refreshResponse = await refreshAxios.post('/auth/refresh', { refreshToken });
+            const { accessToken, refreshToken: newRefreshToken } = refreshResponse.data.data;
+            
+            console.log('✅ Token refresh successful');
+            
+            // Store new tokens
+            await AsyncStorage.setItem('token', accessToken);
+            if (newRefreshToken) {
+              await AsyncStorage.setItem('refreshToken', newRefreshToken);
+            }
+            
+            // Update original request with new token
+            originalRequest.headers.Authorization = `Bearer ${accessToken}`;
+            
+            console.log('🔄 Retrying original request with new token');
+            
+            // Retry original request
+            return this.api(originalRequest);
+            
+          } catch (refreshError: any) {
+            console.error('❌ Token refresh failed:', refreshError);
+            
+            // Refresh failed, clear tokens and redirect to login
+            await AsyncStorage.multiRemove(['token', 'refreshToken']);
+            
+            return Promise.reject(error);
+          }
         }
 
         return Promise.reject(error);
@@ -219,8 +263,15 @@ export const authApi = {
 
 // Issue API
 export const issueApi = {
-  create: (issueData: FormData) =>
-    apiService.upload('/issues', issueData),
+  create: (issueData: any) => {
+    console.log('🚀 IssueAPI.create called with:', typeof issueData, issueData);
+    console.log('🔍 Media data detailed inspection:');
+    console.log('  - media object:', issueData.media);
+    console.log('  - images array:', issueData.media?.images);
+    console.log('  - images type check:', issueData.media?.images?.map((img: any, i: number) => 
+      ({ index: i, value: img, type: typeof img, isString: typeof img === 'string' })));
+    return apiService.post('/issues', issueData);
+  },
   
   getMyIssues: (params: { page?: number; limit?: number } = {}) =>
     apiService.get('/issues/my', { params }),
@@ -269,6 +320,84 @@ export const notificationApi = {
   
   updatePushToken: (token: string) =>
     apiService.post('/notifications/push-token', { token }),
+};
+
+// Session Management API
+export const sessionApi = {
+  // Session Management
+  getMySessions: () =>
+    apiService.get('/sessions/my-sessions'),
+  
+  getSecurityOverview: () =>
+    apiService.get('/sessions/security-overview'),
+  
+  getSessionDetails: (sessionId: string) =>
+    apiService.get(`/sessions/${sessionId}/details`),
+  
+  revokeSession: (sessionId: string) =>
+    apiService.delete(`/sessions/${sessionId}`),
+  
+  revokeAllSessions: () =>
+    apiService.post('/sessions/revoke-all'),
+  
+  updateSecuritySettings: (settings: {
+    enableLocationAlerts?: boolean;
+    enableNewDeviceAlerts?: boolean;
+    sessionTimeout?: number;
+    requireStrongAuth?: boolean;
+  }) =>
+    apiService.patch('/sessions/security-settings', settings),
+  
+  reportSuspiciousActivity: (data: {
+    sessionId: string;
+    reason: string;
+    description?: string;
+  }) =>
+    apiService.post('/sessions/report-suspicious', data),
+
+  // Security Alerts
+  getSecurityAlerts: (params: {
+    page?: number;
+    limit?: number;
+    severity?: 'low' | 'medium' | 'high';
+    status?: 'active' | 'resolved';
+    type?: string;
+    unreadOnly?: boolean;
+  } = {}) =>
+    apiService.get('/sessions/security/alerts', { params }),
+  
+  getSecurityAlertStats: (params: { days?: number } = {}) =>
+    apiService.get('/sessions/security/alerts/stats', { params }),
+  
+  getSecurityAlertDetails: (alertId: string) =>
+    apiService.get(`/sessions/security/alerts/${alertId}`),
+  
+  acknowledgeSecurityAlert: (alertId: string) =>
+    apiService.patch(`/sessions/security/alerts/${alertId}/acknowledge`),
+  
+  dismissSecurityAlert: (alertId: string) =>
+    apiService.patch(`/sessions/security/alerts/${alertId}/dismiss`),
+  
+  markAllAlertsRead: (alertIds?: string[]) =>
+    apiService.patch('/sessions/security/alerts/mark-all-read', { alertIds }),
+  
+  getAlertPreferences: () =>
+    apiService.get('/sessions/security/alert-preferences'),
+  
+  updateAlertPreferences: (preferences: {
+    enableEmailNotifications?: boolean;
+    enablePushNotifications?: boolean;
+    alertTypes?: string[];
+    severityThreshold?: 'low' | 'medium' | 'high';
+  }) =>
+    apiService.patch('/sessions/security/alert-preferences', preferences),
+
+  // Development/Testing
+  createTestAlert: (data: {
+    type?: string;
+    severity?: 'info' | 'low' | 'medium' | 'high';
+  } = {}) =>
+    apiService.post('/sessions/security/alerts/test', data),
 };
 
 export default apiService;

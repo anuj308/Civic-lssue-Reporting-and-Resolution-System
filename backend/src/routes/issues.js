@@ -44,6 +44,7 @@ const createIssueValidation = [
     .withMessage('Address must be between 5 and 300 characters'),
   
   body('location.city')
+    .optional()
     .trim()
     .isLength({ min: 2, max: 100 })
     .withMessage('City must be between 2 and 100 characters'),
@@ -169,5 +170,37 @@ router.put('/:issueId/status', authenticateToken, updateStatusValidation, IssueC
  * @access  Private (Issue reporter only)
  */
 router.delete('/:issueId', authenticateToken, issueIdValidation, IssueController.deleteIssue);
+
+/**
+ * @route   POST /api/issues/test-cloudinary
+ * @desc    Test Cloudinary image upload
+ * @access  Private (for testing only)
+ */
+router.post('/test-cloudinary', authenticateToken, async (req, res) => {
+  try {
+    const { uploadImage } = require('../utils/cloudinaryService');
+    
+    // Test with a simple base64 image (1x1 pixel red image)
+    const testBase64 = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8/5+hHgAHggJ/PchI7wAAAABJRU5ErkJggg==';
+    
+    const result = await uploadImage(testBase64, {
+      folder: 'civic-issues/test',
+      public_id: `test_${Date.now()}`
+    });
+    
+    res.json({
+      success: true,
+      message: 'Cloudinary test successful',
+      data: result
+    });
+  } catch (error) {
+    console.error('❌ Cloudinary test error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Cloudinary test failed',
+      error: error.message
+    });
+  }
+});
 
 module.exports = router;

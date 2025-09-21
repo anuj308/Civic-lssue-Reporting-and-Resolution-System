@@ -1,5 +1,6 @@
 const { validationResult } = require('express-validator');
 const { Issue } = require('../models/Issue');
+const { processIssueImages } = require('../utils/cloudinaryService');
 
 class IssueController {
   /**
@@ -11,6 +12,8 @@ class IssueController {
     try {
       const errors = validationResult(req);
       if (!errors.isEmpty()) {
+        console.log('❌ Validation errors:', JSON.stringify(errors.array(), null, 2));
+        console.log('📥 Request body:', JSON.stringify(req.body, null, 2));
         return res.status(400).json({
           success: false,
           message: 'Validation failed',
@@ -30,6 +33,55 @@ class IssueController {
         isPublic
       } = req.body;
 
+      console.log('🔍 Creating issue with data:', {
+        title,
+        description,
+        category,
+        location: location?.address,
+        mediaImages: media?.images?.length || 0
+      });
+
+      // Process images with Cloudinary if provided
+      let processedMedia = { images: [], videos: [], audio: null };
+      
+      if (media?.images && media.images.length > 0) {
+        console.log('📸 Processing images with Cloudinary...');
+        console.log('Raw images received:', media.images.length);
+        console.log('🔍 Image data analysis:');
+        media.images.forEach((img, index) => {
+          console.log(`  Image ${index}:`, {
+            type: typeof img,
+            length: img?.length,
+            preview: typeof img === 'string' ? img.substring(0, 100) + '...' : img,
+            startsWithFile: typeof img === 'string' ? img.startsWith('file://') : false,
+            startsWithData: typeof img === 'string' ? img.startsWith('data:') : false,
+          });
+        });
+        
+        try {
+          // Create a temporary issue ID for folder organization
+          const tempIssueId = new Date().getTime().toString();
+          
+          // Upload images to Cloudinary
+          const uploadedImages = await processIssueImages(media.images, tempIssueId);
+          
+          // Extract URLs for the database (keeping it simple as per schema)
+          processedMedia.images = uploadedImages.map(img => img.url);
+          
+          console.log('✅ Images processed successfully:', uploadedImages.length, 'uploaded');
+          console.log('📋 Image URLs:', processedMedia.images);
+        } catch (imageError) {
+          console.error('❌ Error processing images:', imageError);
+          // Continue with issue creation but log the error
+          // You might want to decide whether to fail the entire request or continue
+          processedMedia.images = []; // Fallback to empty array
+        }
+      }
+
+      // Copy other media types as-is
+      if (media?.videos) processedMedia.videos = media.videos;
+      if (media?.audio) processedMedia.audio = media.audio;
+
       // Create new issue
       const issue = new Issue({
         title,
@@ -37,9 +89,9 @@ class IssueController {
         category,
         subcategory,
         priority: priority || 'medium',
-        reportedBy: req.user.userId,
+        reportedBy: req.user._id, // Use req.user._id instead of req.user.userId
         location,
-        media: media || { images: [], videos: [], audio: null },
+        media: processedMedia,
         tags: tags || [],
         isPublic: isPublic !== false, // Default to true
         metadata: {
@@ -50,6 +102,17 @@ class IssueController {
 
       // Calculate urgency score
       issue.urgencyScore = calculateUrgencyScore(issue);
+
+      await issue.save();
+
+      console.log('✅ Issue created successfully:', issue._id);
+
+      // Update Cloudinary folder with actual issue ID
+      if (processedMedia.images.length > 0) {
+        console.log('📁 Updating Cloudinary folder organization for issue:', issue._id);
+        // Note: In a production environment, you might want to rename the folder
+        // For now, we'll keep the timestamp-based folder
+      }
 
       await issue.save();
 
@@ -104,7 +167,7 @@ class IssueController {
     try {
       const { page = 1, limit = 10, status, category, sortBy = 'createdAt', order = 'desc' } = req.query;
       
-      const filters = { reportedBy: req.user.userId };
+      const filters = { reportedBy: req.user._id };
       
       // Add optional filters
       if (status) filters.status = status;
@@ -116,7 +179,7 @@ class IssueController {
 
       const skip = (parseInt(page) - 1) * parseInt(limit);
 
-      console.log('🔍 Fetching issues for user:', req.user.userId, 'with filters:', filters);
+      console.log('🔍 Fetching issues for user:', req.user._id, 'with filters:', filters);
 
       const issues = await Issue.find(filters)
         .populate('reportedBy', 'name email')
@@ -130,7 +193,7 @@ class IssueController {
       const totalIssues = await Issue.countDocuments(filters);
       const totalPages = Math.ceil(totalIssues / parseInt(limit));
 
-      console.log(`✅ Found ${issues.length} issues for user ${req.user.userId}`);
+      console.log(`✅ Found ${issues.length} issues for user ${req.user._id}`);
 
       res.status(200).json({
         success: true,
@@ -362,7 +425,7 @@ class IssueController {
       }
 
       // Check if user has permission to view this issue
-      if (!issue.isPublic && (!req.user || req.user.userId !== issue.reportedBy._id.toString())) {
+      if (!issue.isPublic && (!req.user || req.user._id.toString() !== issue.reportedBy._id.toString())) {
         return res.status(403).json({
           success: false,
           message: 'Access denied. You do not have permission to view this issue.'
@@ -447,7 +510,7 @@ class IssueController {
       }
 
       // Check if user has permission to update status
-      if (req.user.role === 'citizen' && req.user.userId !== issue.reportedBy.toString()) {
+      if (req.user.role === 'citizen' && req.user._id.toString() !== issue.reportedBy.toString()) {
         return res.status(403).json({
           success: false,
           message: 'Access denied. You can only update your own issues.'
@@ -488,7 +551,7 @@ class IssueController {
       // Add status update comment
       if (comment) {
         issue.comments.push({
-          user: req.user.userId,
+          user: req.user._id,
           message: comment,
           isOfficial: req.user.role !== 'citizen'
         });
@@ -535,7 +598,7 @@ class IssueController {
       }
 
       // Only reporter can delete their own issue, and only if it's pending
-      if (req.user.userId !== issue.reportedBy.toString()) {
+      if (req.user._id.toString() !== issue.reportedBy.toString()) {
         return res.status(403).json({
           success: false,
           message: 'Access denied. You can only delete your own issues.'
@@ -551,7 +614,7 @@ class IssueController {
 
       await Issue.findByIdAndDelete(issueId);
 
-      console.log(`✅ Issue ${issueId} deleted by user ${req.user.userId}`);
+      console.log(`✅ Issue ${issueId} deleted by user ${req.user._id}`);
 
       res.status(200).json({
         success: true,

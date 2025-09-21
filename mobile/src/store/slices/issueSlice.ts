@@ -74,12 +74,24 @@ const initialState: IssueState = {
 // Async thunks
 export const createIssue = createAsyncThunk(
   'issues/create',
-  async (issueData: FormData, { rejectWithValue }) => {
+  async (issueData: any, { rejectWithValue }) => {
     try {
+      console.log('📤 Creating issue via API...');
       const response = await issueApi.create(issueData);
+      console.log('✅ Issue created successfully:', response.data);
       return response.data;
     } catch (error: any) {
-      return rejectWithValue(error.response?.data?.message || 'Failed to create issue');
+      console.log('📥 API Error Response:', error.response?.data);
+      const errorMessage = error.response?.data?.message || 'Failed to create issue';
+      const errors = error.response?.data?.errors || [];
+      
+      if (errors.length > 0) {
+        console.log('❌ Validation errors:', errors);
+        const errorDetails = errors.map((err: any) => `${err.path || err.param}: ${err.msg}`).join(', ');
+        return rejectWithValue(`Validation failed: ${errorDetails}`);
+      }
+      
+      return rejectWithValue(errorMessage);
     }
   }
 );
@@ -195,7 +207,7 @@ const issueSlice = createSlice({
       })
       .addCase(createIssue.fulfilled, (state, action) => {
         state.isSubmitting = false;
-        state.myIssues.unshift(action.payload);
+        state.myIssues.unshift(action.payload.data.issue);
         state.error = null;
       })
       .addCase(createIssue.rejected, (state, action) => {
@@ -211,15 +223,20 @@ const issueSlice = createSlice({
       })
       .addCase(fetchMyIssues.fulfilled, (state, action) => {
         state.isLoading = false;
-        const { issues, pagination } = action.payload;
+        const { issues, pagination } = action.payload.data;
         
-        if (pagination.page === 1) {
+        if (pagination.currentPage === 1) {
           state.myIssues = issues;
         } else {
           state.myIssues.push(...issues);
         }
         
-        state.pagination = pagination;
+        state.pagination = {
+          page: pagination.currentPage,
+          limit: 10, // Default limit
+          total: pagination.totalIssues,
+          hasMore: pagination.hasNextPage,
+        };
         state.error = null;
       })
       .addCase(fetchMyIssues.rejected, (state, action) => {
@@ -235,7 +252,7 @@ const issueSlice = createSlice({
       })
       .addCase(fetchNearbyIssues.fulfilled, (state, action) => {
         state.isLoading = false;
-        state.nearbyIssues = action.payload.issues;
+        state.nearbyIssues = action.payload.data.issues;
         state.error = null;
       })
       .addCase(fetchNearbyIssues.rejected, (state, action) => {
@@ -251,7 +268,7 @@ const issueSlice = createSlice({
       })
       .addCase(fetchIssueById.fulfilled, (state, action) => {
         state.isLoading = false;
-        state.currentIssue = action.payload;
+        state.currentIssue = action.payload.data.issue;
         state.error = null;
       })
       .addCase(fetchIssueById.rejected, (state, action) => {
@@ -262,7 +279,7 @@ const issueSlice = createSlice({
     // Update Issue
     builder
       .addCase(updateIssue.fulfilled, (state, action) => {
-        const updatedIssue = action.payload;
+        const updatedIssue = action.payload.data.issue;
         
         // Update in myIssues
         const myIssueIndex = state.myIssues.findIndex(issue => issue.id === updatedIssue.id);
@@ -279,7 +296,7 @@ const issueSlice = createSlice({
     // Submit Feedback
     builder
       .addCase(submitFeedback.fulfilled, (state, action) => {
-        const updatedIssue = action.payload;
+        const updatedIssue = action.payload.data.issue;
         
         // Update in myIssues
         const myIssueIndex = state.myIssues.findIndex(issue => issue.id === updatedIssue.id);
