@@ -1,7 +1,7 @@
 const { Router } = require('express');
 const { body, param, query } = require('express-validator');
 const { IssueController } = require('../controllers/issueController');
-const { authenticateToken } = require('../middleware/auth');
+const { authenticateToken, optionalAuth } = require('../middleware/auth');
 
 const router = Router();
 
@@ -122,6 +122,30 @@ const nearbyIssuesValidation = [
     .withMessage('Radius must be between 100 and 50000 meters')
 ];
 
+// Validation for voting
+const voteValidation = [
+  ...issueIdValidation,
+  body('type')
+    .isIn(['upvote', 'downvote'])
+    .withMessage('Vote type must be either upvote or downvote')
+];
+
+// Validation for adding comments
+const addCommentValidation = [
+  ...issueIdValidation,
+  body('message')
+    .trim()
+    .isLength({ min: 1, max: 500 })
+    .withMessage('Comment message must be between 1 and 500 characters')
+];
+
+// Validation for comment ID parameter
+const commentIdValidation = [
+  param('commentId')
+    .isMongoId()
+    .withMessage('Invalid comment ID format')
+];
+
 /**
  * @route   POST /api/issues
  * @desc    Create a new issue
@@ -141,28 +165,28 @@ router.get('/my', authenticateToken, IssueController.getMyIssues);
  * @desc    Get all public issues
  * @access  Public
  */
-router.get('/public', IssueController.getPublicIssues);
+router.get('/public', optionalAuth, IssueController.getPublicIssues);
 
 /**
  * @route   GET /api/issues/nearby
  * @desc    Get nearby issues based on location
  * @access  Public
  */
-router.get('/nearby', nearbyIssuesValidation, IssueController.getNearbyIssues);
+router.get('/nearby', optionalAuth, nearbyIssuesValidation, IssueController.getNearbyIssues);
 
 /**
  * @route   GET /api/issues/map
  * @desc    Get all public issues with coordinates for map display
  * @access  Public
  */
-router.get('/map', IssueController.getMapIssues);
+router.get('/map', optionalAuth, IssueController.getMapIssues);
 
 /**
  * @route   GET /api/issues/:issueId
  * @desc    Get issue by ID
  * @access  Public (but respects privacy settings)
  */
-router.get('/:issueId', issueIdValidation, IssueController.getIssueById);
+router.get('/:issueId', optionalAuth, issueIdValidation, IssueController.getIssueById);
 
 /**
  * @route   PUT /api/issues/:issueId/status
@@ -177,6 +201,34 @@ router.put('/:issueId/status', authenticateToken, updateStatusValidation, IssueC
  * @access  Private (Issue reporter only)
  */
 router.delete('/:issueId', authenticateToken, issueIdValidation, IssueController.deleteIssue);
+
+/**
+ * @route   POST /api/issues/:issueId/vote
+ * @desc    Vote on an issue (upvote or downvote)
+ * @access  Private (Authenticated users)
+ */
+router.post('/:issueId/vote', authenticateToken, voteValidation, IssueController.voteIssue);
+
+/**
+ * @route   DELETE /api/issues/:issueId/vote
+ * @desc    Remove vote from an issue
+ * @access  Private (Authenticated users)
+ */
+router.delete('/:issueId/vote', authenticateToken, issueIdValidation, IssueController.removeVote);
+
+/**
+ * @route   POST /api/issues/:issueId/comments
+ * @desc    Add a comment to an issue
+ * @access  Private (Authenticated users)
+ */
+router.post('/:issueId/comments', authenticateToken, addCommentValidation, IssueController.addComment);
+
+/**
+ * @route   DELETE /api/issues/:issueId/comments/:commentId
+ * @desc    Delete a comment from an issue
+ * @access  Private (Comment author or authorized users)
+ */
+router.delete('/:issueId/comments/:commentId', authenticateToken, [...issueIdValidation, ...commentIdValidation], IssueController.deleteComment);
 
 /**
  * @route   POST /api/issues/test-cloudinary

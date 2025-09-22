@@ -212,32 +212,46 @@ class IssueController {
 
       console.log(`✅ Found ${issues.length} issues for user ${req.user._id}`);
 
+      // Add user vote status to each issue
+      const issuesWithUserVotes = issues.map(issue => {
+        let userVote = null;
+        const userId = req.user._id.toString();
+        if (issue.votes?.upvotes?.some(id => id.toString() === userId)) {
+          userVote = 'upvote';
+        } else if (issue.votes?.downvotes?.some(id => id.toString() === userId)) {
+          userVote = 'downvote';
+        }
+
+        return {
+          id: issue._id,
+          title: issue.title,
+          description: issue.description,
+          category: issue.category,
+          subcategory: issue.subcategory,
+          priority: issue.priority,
+          status: issue.status,
+          statusDisplay: getStatusDisplay(issue.status),
+          location: issue.location,
+          media: issue.media,
+          timeline: issue.timeline,
+          reportedBy: issue.reportedBy,
+          assignedTo: issue.assignedTo,
+          assignedDepartment: issue.assignedDepartment,
+          voteScore: (issue.votes?.upvotes?.length || 0) - (issue.votes?.downvotes?.length || 0),
+          userVote: userVote,
+          daysSinceReported: Math.floor((Date.now() - new Date(issue.timeline?.reported || issue.createdAt).getTime()) / (1000 * 60 * 60 * 24)),
+          tags: issue.tags,
+          isPublic: issue.isPublic,
+          createdAt: issue.createdAt,
+          updatedAt: issue.updatedAt
+        };
+      });
+
       res.status(200).json({
         success: true,
         message: 'Issues retrieved successfully',
         data: {
-          issues: issues.map(issue => ({
-            id: issue._id,
-            title: issue.title,
-            description: issue.description,
-            category: issue.category,
-            subcategory: issue.subcategory,
-            priority: issue.priority,
-            status: issue.status,
-            statusDisplay: getStatusDisplay(issue.status),
-            location: issue.location,
-            media: issue.media,
-            timeline: issue.timeline,
-            reportedBy: issue.reportedBy,
-            assignedTo: issue.assignedTo,
-            assignedDepartment: issue.assignedDepartment,
-            voteScore: (issue.votes?.upvotes?.length || 0) - (issue.votes?.downvotes?.length || 0),
-            daysSinceReported: Math.floor((Date.now() - new Date(issue.timeline?.reported || issue.createdAt).getTime()) / (1000 * 60 * 60 * 24)),
-            tags: issue.tags,
-            isPublic: issue.isPublic,
-            createdAt: issue.createdAt,
-            updatedAt: issue.updatedAt
-          })),
+          issues: issuesWithUserVotes,
           pagination: {
             currentPage: parseInt(page),
             totalPages,
@@ -290,37 +304,53 @@ class IssueController {
       const totalIssues = await Issue.countDocuments(filters);
       const totalPages = Math.ceil(totalIssues / parseInt(limit));
 
+      // Add user vote status to each issue (if user is authenticated)
+      const issuesWithUserVotes = issues.map(issue => {
+        let userVote = null;
+        if (req.user) {
+          const userId = req.user._id.toString();
+          if (issue.votes?.upvotes?.some(id => id.toString() === userId)) {
+            userVote = 'upvote';
+          } else if (issue.votes?.downvotes?.some(id => id.toString() === userId)) {
+            userVote = 'downvote';
+          }
+        }
+
+        return {
+          id: issue._id,
+          title: issue.title,
+          description: issue.description,
+          category: issue.category,
+          subcategory: issue.subcategory,
+          priority: issue.priority,
+          status: issue.status,
+          statusDisplay: getStatusDisplay(issue.status),
+          location: {
+            address: issue.location.address,
+            city: issue.location.city,
+            state: issue.location.state,
+            pincode: issue.location.pincode,
+            landmark: issue.location.landmark
+            // Don't expose exact coordinates for privacy
+          },
+          media: issue.media,
+          timeline: issue.timeline,
+          reportedBy: issue.reportedBy ? { name: issue.reportedBy.name } : null,
+          assignedDepartment: issue.assignedDepartment,
+          voteScore: (issue.votes?.upvotes?.length || 0) - (issue.votes?.downvotes?.length || 0),
+          userVote: userVote,
+          daysSinceReported: Math.floor((Date.now() - new Date(issue.timeline?.reported || issue.createdAt).getTime()) / (1000 * 60 * 60 * 24)),
+          tags: issue.tags,
+          createdAt: issue.createdAt,
+          updatedAt: issue.updatedAt
+        };
+      });
+
       res.status(200).json({
         success: true,
         message: 'Public issues retrieved successfully',
         data: {
-          issues: issues.map(issue => ({
-            id: issue._id,
-            title: issue.title,
-            description: issue.description,
-            category: issue.category,
-            subcategory: issue.subcategory,
-            priority: issue.priority,
-            status: issue.status,
-            statusDisplay: getStatusDisplay(issue.status),
-            location: {
-              address: issue.location.address,
-              city: issue.location.city,
-              state: issue.location.state,
-              pincode: issue.location.pincode,
-              landmark: issue.location.landmark
-              // Don't expose exact coordinates for privacy
-            },
-            media: issue.media,
-            timeline: issue.timeline,
-            reportedBy: issue.reportedBy ? { name: issue.reportedBy.name } : null,
-            assignedDepartment: issue.assignedDepartment,
-            voteScore: (issue.votes?.upvotes?.length || 0) - (issue.votes?.downvotes?.length || 0),
-            daysSinceReported: Math.floor((Date.now() - new Date(issue.timeline?.reported || issue.createdAt).getTime()) / (1000 * 60 * 60 * 24)),
-            tags: issue.tags,
-            createdAt: issue.createdAt,
-            updatedAt: issue.updatedAt
-          })),
+          issues: issuesWithUserVotes,
           pagination: {
             currentPage: parseInt(page),
             totalPages,
@@ -377,29 +407,45 @@ class IssueController {
       .limit(parseInt(limit))
       .lean();
 
+      // Add user vote status to each issue (if user is authenticated)
+      const issuesWithUserVotes = issues.map(issue => {
+        let userVote = null;
+        if (req.user) {
+          const userId = req.user._id.toString();
+          if (issue.votes?.upvotes?.some(id => id.toString() === userId)) {
+            userVote = 'upvote';
+          } else if (issue.votes?.downvotes?.some(id => id.toString() === userId)) {
+            userVote = 'downvote';
+          }
+        }
+
+        return {
+          id: issue._id,
+          title: issue.title,
+          description: issue.description,
+          category: issue.category,
+          priority: issue.priority,
+          status: issue.status,
+          statusDisplay: getStatusDisplay(issue.status),
+          location: issue.location,
+          media: issue.media,
+          timeline: issue.timeline,
+          reportedBy: issue.reportedBy ? { name: issue.reportedBy.name } : null,
+          assignedDepartment: issue.assignedDepartment,
+          voteScore: (issue.votes?.upvotes?.length || 0) - (issue.votes?.downvotes?.length || 0),
+          userVote: userVote,
+          daysSinceReported: Math.floor((Date.now() - new Date(issue.timeline?.reported || issue.createdAt).getTime()) / (1000 * 60 * 60 * 24)),
+          tags: issue.tags,
+          createdAt: issue.createdAt,
+          updatedAt: issue.updatedAt
+        };
+      });
+
       res.status(200).json({
         success: true,
         message: 'Nearby issues retrieved successfully',
         data: {
-          issues: issues.map(issue => ({
-            id: issue._id,
-            title: issue.title,
-            description: issue.description,
-            category: issue.category,
-            priority: issue.priority,
-            status: issue.status,
-            statusDisplay: getStatusDisplay(issue.status),
-            location: issue.location,
-            media: issue.media,
-            timeline: issue.timeline,
-            reportedBy: issue.reportedBy ? { name: issue.reportedBy.name } : null,
-            assignedDepartment: issue.assignedDepartment,
-            voteScore: (issue.votes?.upvotes?.length || 0) - (issue.votes?.downvotes?.length || 0),
-            daysSinceReported: Math.floor((Date.now() - new Date(issue.timeline?.reported || issue.createdAt).getTime()) / (1000 * 60 * 60 * 24)),
-            tags: issue.tags,
-            createdAt: issue.createdAt,
-            updatedAt: issue.updatedAt
-          })),
+          issues: issuesWithUserVotes,
           searchParams: {
             latitude: parseFloat(latitude),
             longitude: parseFloat(longitude),
@@ -452,6 +498,17 @@ class IssueController {
       // Increment view count
       await Issue.findByIdAndUpdate(issueId, { $inc: { 'analytics.views': 1 } });
 
+      // Determine user's vote status
+      let userVote = null;
+      if (req.user) {
+        const userId = req.user._id.toString();
+        if (issue.votes?.upvotes?.some(id => id.toString() === userId)) {
+          userVote = 'upvote';
+        } else if (issue.votes?.downvotes?.some(id => id.toString() === userId)) {
+          userVote = 'downvote';
+        }
+      }
+
       res.status(200).json({
         success: true,
         message: 'Issue retrieved successfully',
@@ -477,6 +534,7 @@ class IssueController {
             assignedDepartment: issue.assignedDepartment,
             votes: issue.votes,
             voteScore: (issue.votes?.upvotes?.length || 0) - (issue.votes?.downvotes?.length || 0),
+            userVote: userVote, // Whether current user has voted and how
             comments: issue.comments,
             daysSinceReported: Math.floor((Date.now() - new Date(issue.timeline?.reported || issue.createdAt).getTime()) / (1000 * 60 * 60 * 24)),
             resolutionTimeHours: issue.timeline?.resolved ? Math.round((new Date(issue.timeline.resolved).getTime() - new Date(issue.timeline.reported).getTime()) / (1000 * 60 * 60)) : null,
@@ -709,26 +767,42 @@ class IssueController {
       // Debug log
       console.log(`🔍 getMapIssues: Found ${issues.length} issues, ${validIssues.length} with valid coordinates`);
 
+      // Add user vote status to each issue (if user is authenticated)
+      const issuesWithUserVotes = validIssues.map(issue => {
+        let userVote = null;
+        if (req.user) {
+          const userId = req.user._id.toString();
+          if (issue.votes?.upvotes?.some(id => id.toString() === userId)) {
+            userVote = 'upvote';
+          } else if (issue.votes?.downvotes?.some(id => id.toString() === userId)) {
+            userVote = 'downvote';
+          }
+        }
+
+        return {
+          id: issue._id,
+          title: issue.title,
+          category: issue.category,
+          priority: issue.priority,
+          status: issue.status,
+          location: {
+            latitude: issue._normalizedLocation.latitude,
+            longitude: issue._normalizedLocation.longitude,
+            address: issue._normalizedLocation.address
+          },
+          createdAt: issue.createdAt,
+          reportedBy: issue.reportedBy ? { name: issue.reportedBy.name } : null,
+          voteScore: (issue.votes?.upvotes?.length || 0) - (issue.votes?.downvotes?.length || 0),
+          userVote: userVote,
+          daysSinceReported: Math.floor((Date.now() - new Date(issue.timeline?.reported || issue.createdAt).getTime()) / (1000 * 60 * 60 * 24))
+        };
+      });
+
       res.status(200).json({
         success: true,
         message: 'Map issues retrieved successfully',
         data: {
-          issues: validIssues.map(issue => ({
-            id: issue._id,
-            title: issue.title,
-            category: issue.category,
-            priority: issue.priority,
-            status: issue.status,
-            location: {
-              latitude: issue._normalizedLocation.latitude,
-              longitude: issue._normalizedLocation.longitude,
-              address: issue._normalizedLocation.address
-            },
-            createdAt: issue.createdAt,
-            reportedBy: issue.reportedBy ? { name: issue.reportedBy.name } : null,
-            voteScore: (issue.votes?.upvotes?.length || 0) - (issue.votes?.downvotes?.length || 0),
-            daysSinceReported: Math.floor((Date.now() - new Date(issue.timeline?.reported || issue.createdAt).getTime()) / (1000 * 60 * 60 * 24))
-          }))
+          issues: issuesWithUserVotes
         }
       });
 
@@ -737,6 +811,274 @@ class IssueController {
       res.status(500).json({
         success: false,
         message: 'Internal server error while fetching map issues'
+      });
+    }
+  }
+
+  /**
+   * Vote on an issue (upvote or downvote)
+   * @param {Object} req - Express request object
+   * @param {Object} res - Express response object
+   */
+  static async voteIssue(req, res) {
+    try {
+      const errors = validationResult(req);
+      if (!errors.isEmpty()) {
+        return res.status(400).json({
+          success: false,
+          message: 'Validation failed',
+          errors: errors.array()
+        });
+      }
+
+      const { issueId } = req.params;
+      const { type } = req.body; // 'upvote' or 'downvote'
+      const userId = req.user._id;
+
+      const issue = await Issue.findById(issueId);
+      if (!issue) {
+        return res.status(404).json({
+          success: false,
+          message: 'Issue not found'
+        });
+      }
+
+      // Check if user already voted
+      const hasUpvoted = issue.votes.upvotes.some(id => id.toString() === userId.toString());
+      const hasDownvoted = issue.votes.downvotes.some(id => id.toString() === userId.toString());
+
+      // Remove existing votes first
+      if (hasUpvoted) {
+        issue.votes.upvotes = issue.votes.upvotes.filter(id => id.toString() !== userId.toString());
+      }
+      if (hasDownvoted) {
+        issue.votes.downvotes = issue.votes.downvotes.filter(id => id.toString() !== userId.toString());
+      }
+
+      // Add new vote
+      if (type === 'upvote') {
+        issue.votes.upvotes.push(userId);
+      } else if (type === 'downvote') {
+        issue.votes.downvotes.push(userId);
+      }
+
+      await issue.save();
+
+      const voteScore = issue.votes.upvotes.length - issue.votes.downvotes.length;
+
+      console.log(`✅ User ${userId} ${type}d issue ${issueId}. New score: ${voteScore}`);
+
+      res.status(200).json({
+        success: true,
+        message: `Issue ${type}d successfully`,
+        data: {
+          issueId: issue._id,
+          voteScore,
+          userVote: type
+        }
+      });
+
+    } catch (error) {
+      console.error('❌ Error voting on issue:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Internal server error while voting on issue'
+      });
+    }
+  }
+
+  /**
+   * Remove vote from an issue
+   * @param {Object} req - Express request object
+   * @param {Object} res - Express response object
+   */
+  static async removeVote(req, res) {
+    try {
+      const { issueId } = req.params;
+      const userId = req.user._id;
+
+      const issue = await Issue.findById(issueId);
+      if (!issue) {
+        return res.status(404).json({
+          success: false,
+          message: 'Issue not found'
+        });
+      }
+
+      // Remove user's vote from both arrays
+      const originalUpvoteCount = issue.votes.upvotes.length;
+      const originalDownvoteCount = issue.votes.downvotes.length;
+
+      issue.votes.upvotes = issue.votes.upvotes.filter(id => id.toString() !== userId.toString());
+      issue.votes.downvotes = issue.votes.downvotes.filter(id => id.toString() !== userId.toString());
+
+      // Only save if vote was actually removed
+      if (issue.votes.upvotes.length !== originalUpvoteCount || issue.votes.downvotes.length !== originalDownvoteCount) {
+        await issue.save();
+      }
+
+      const voteScore = issue.votes.upvotes.length - issue.votes.downvotes.length;
+
+      console.log(`✅ User ${userId} removed vote from issue ${issueId}. New score: ${voteScore}`);
+
+      res.status(200).json({
+        success: true,
+        message: 'Vote removed successfully',
+        data: {
+          issueId: issue._id,
+          voteScore,
+          userVote: null
+        }
+      });
+
+    } catch (error) {
+      console.error('❌ Error removing vote:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Internal server error while removing vote'
+      });
+    }
+  }
+
+  /**
+   * Add a comment to an issue
+   * @param {Object} req - Express request object
+   * @param {Object} res - Express response object
+   */
+  static async addComment(req, res) {
+    try {
+      const errors = validationResult(req);
+      if (!errors.isEmpty()) {
+        return res.status(400).json({
+          success: false,
+          message: 'Validation failed',
+          errors: errors.array()
+        });
+      }
+
+      const { issueId } = req.params;
+      const { message } = req.body;
+      const userId = req.user._id;
+
+      const issue = await Issue.findById(issueId);
+      if (!issue) {
+        return res.status(404).json({
+          success: false,
+          message: 'Issue not found'
+        });
+      }
+
+      // Check if user has permission to comment (public issues or own issues)
+      if (!issue.isPublic && issue.reportedBy.toString() !== userId.toString()) {
+        return res.status(403).json({
+          success: false,
+          message: 'Access denied. You do not have permission to comment on this issue.'
+        });
+      }
+
+      // Create new comment
+      const newComment = {
+        user: userId,
+        message: message.trim(),
+        timestamp: new Date(),
+        isOfficial: req.user.role !== 'citizen' // Official if not a citizen
+      };
+
+      issue.comments.push(newComment);
+      await issue.save();
+
+      // Populate the user info for the response
+      await issue.populate('comments.user', 'name');
+
+      const addedComment = issue.comments[issue.comments.length - 1];
+
+      console.log(`✅ User ${userId} added comment to issue ${issueId}`);
+
+      res.status(201).json({
+        success: true,
+        message: 'Comment added successfully',
+        data: {
+          issueId: issue._id,
+          comment: {
+            id: addedComment._id,
+            user: addedComment.user,
+            message: addedComment.message,
+            timestamp: addedComment.timestamp,
+            isOfficial: addedComment.isOfficial
+          }
+        }
+      });
+
+    } catch (error) {
+      console.error('❌ Error adding comment:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Internal server error while adding comment'
+      });
+    }
+  }
+
+  /**
+   * Delete a comment from an issue
+   * @param {Object} req - Express request object
+   * @param {Object} res - Express response object
+   */
+  static async deleteComment(req, res) {
+    try {
+      const { issueId, commentId } = req.params;
+      const userId = req.user._id;
+
+      const issue = await Issue.findById(issueId);
+      if (!issue) {
+        return res.status(404).json({
+          success: false,
+          message: 'Issue not found'
+        });
+      }
+
+      // Find the comment
+      const commentIndex = issue.comments.findIndex(comment => comment._id.toString() === commentId);
+      if (commentIndex === -1) {
+        return res.status(404).json({
+          success: false,
+          message: 'Comment not found'
+        });
+      }
+
+      const comment = issue.comments[commentIndex];
+
+      // Check if user can delete this comment (own comment or admin/official)
+      const canDelete = comment.user.toString() === userId.toString() ||
+                       req.user.role === 'admin' ||
+                       req.user.role === 'official';
+
+      if (!canDelete) {
+        return res.status(403).json({
+          success: false,
+          message: 'Access denied. You can only delete your own comments.'
+        });
+      }
+
+      // Remove the comment
+      issue.comments.splice(commentIndex, 1);
+      await issue.save();
+
+      console.log(`✅ Comment ${commentId} deleted from issue ${issueId} by user ${userId}`);
+
+      res.status(200).json({
+        success: true,
+        message: 'Comment deleted successfully',
+        data: {
+          issueId: issue._id,
+          commentId: commentId
+        }
+      });
+
+    } catch (error) {
+      console.error('❌ Error deleting comment:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Internal server error while deleting comment'
       });
     }
   }

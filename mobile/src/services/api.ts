@@ -296,6 +296,20 @@ export const issueApi = {
   
   getCategories: () =>
     apiService.get('/issues/categories'),
+  
+  // Voting endpoints
+  voteIssue: (issueId: string, voteType: 'upvote' | 'downvote') =>
+    apiService.post(`/issues/${issueId}/vote`, { type: voteType }),
+  
+  removeVote: (issueId: string) =>
+    apiService.delete(`/issues/${issueId}/vote`),
+  
+  // Commenting endpoints
+  addComment: (issueId: string, message: string) =>
+    apiService.post(`/issues/${issueId}/comments`, { message }),
+  
+  deleteComment: (issueId: string, commentId: string) =>
+    apiService.delete(`/issues/${issueId}/comments/${commentId}`),
 };
 
 // User API

@@ -356,7 +356,17 @@ const authorizeOwnerOrAdmin = (resourceUserIdField = 'userId') => {
  */
 const optionalAuth = async (req, res, next) => {
   try {
-    const { accessToken } = JWTUtils.extractTokenFromCookies(req.cookies);
+    let accessToken;
+
+    // Check for token in Authorization header first (for mobile apps)
+    const authHeader = req.headers.authorization;
+    if (authHeader && authHeader.startsWith('Bearer ')) {
+      accessToken = authHeader.substring(7);
+    } else {
+      // Fall back to cookies (for web apps)
+      const tokens = JWTUtils.extractTokenFromCookies(req.cookies);
+      accessToken = tokens.accessToken;
+    }
 
     if (!accessToken) {
       return next();
