@@ -204,29 +204,26 @@ export const deleteUser = createAsyncThunk(
   }
 );
 
-export const bulkUserOperations = createAsyncThunk(
-  'users/bulkOperations',
-  async (
-    { operation, userIds, data }: { operation: string; userIds: string[]; data?: any },
-    { rejectWithValue }
-  ) => {
+export const bulkUpdateUsers = createAsyncThunk(
+  'users/bulkUpdateUsers',
+  async ({ userIds, updates }: { userIds: string[]; updates: Partial<User> }, { rejectWithValue }) => {
     try {
-      const response = await fetch('/api/admin/users/bulk', {
-        method: 'POST',
+      const response = await fetch('/api/admin/users/bulk-update', {
+        method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
         },
         credentials: 'include',
-        body: JSON.stringify({ operation, userIds, data }),
+        body: JSON.stringify({ userIds, updates }),
       });
 
       const result = await response.json();
 
       if (!response.ok) {
-        return rejectWithValue(result.message || 'Bulk operation failed');
+        return rejectWithValue(result.message || 'Bulk update failed');
       }
 
-      return { operation, userIds, result };
+      return { userIds, updates, result };
     } catch (error) {
       return rejectWithValue('Network error occurred');
     }
@@ -356,18 +353,24 @@ const userSlice = createSlice({
         state.error = action.payload as string;
       });
 
-    // Bulk operations
+    // Bulk update users
     builder
-      .addCase(bulkUserOperations.pending, (state) => {
+      .addCase(bulkUpdateUsers.pending, (state) => {
         state.loading = true;
         state.error = null;
       })
-      .addCase(bulkUserOperations.fulfilled, (state, action) => {
+      .addCase(bulkUpdateUsers.fulfilled, (state, action) => {
         state.loading = false;
-        // Refresh users list after bulk operation
+        // Update users in the list with the new data
+        state.users = state.users.map(user => {
+          if (action.payload.userIds.includes(user.id)) {
+            return { ...user, ...action.payload.updates };
+          }
+          return user;
+        });
         state.error = null;
       })
-      .addCase(bulkUserOperations.rejected, (state, action) => {
+      .addCase(bulkUpdateUsers.rejected, (state, action) => {
         state.loading = false;
         state.error = action.payload as string;
       });
@@ -387,9 +390,9 @@ export const {
 export const selectUsers = (state: { users: UserState }) => state.users.users;
 export const selectSelectedUser = (state: { users: UserState }) => state.users.selectedUser;
 export const selectTotalUsers = (state: { users: UserState }) => state.users.totalUsers;
-export const selectUserLoading = (state: { users: UserState }) => state.users.loading;
-export const selectUserError = (state: { users: UserState }) => state.users.error;
+export const selectUsersLoading = (state: { users: UserState }) => state.users.loading;
+export const selectUsersError = (state: { users: UserState }) => state.users.error;
 export const selectUserFilters = (state: { users: UserState }) => state.users.filters;
-export const selectUserPagination = (state: { users: UserState }) => state.users.pagination;
+export const selectUsersPagination = (state: { users: UserState }) => state.users.pagination;
 
 export default userSlice.reducer;

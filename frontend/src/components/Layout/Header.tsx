@@ -215,7 +215,7 @@ const Header: React.FC<HeaderProps> = ({ onSidebarToggle, sidebarOpen }) => {
                 />
               ) : (
                 <Avatar sx={{ width: 32, height: 32, bgcolor: 'primary.main' }}>
-                  {user?.firstName.charAt(0)}{user?.lastName.charAt(0)}
+                  {user?.firstName?.charAt(0) || 'U'}{user?.lastName?.charAt(0) || ''}
                 </Avatar>
               )}
             </IconButton>
@@ -242,10 +242,10 @@ const Header: React.FC<HeaderProps> = ({ onSidebarToggle, sidebarOpen }) => {
         {user && (
           <Box sx={{ px: 2, py: 1 }}>
             <Typography variant="subtitle2" fontWeight={600}>
-              {user.firstName} {user.lastName}
+              {user.firstName || 'User'} {user.lastName || ''}
             </Typography>
             <Typography variant="caption" color="text.secondary">
-              {user.email}
+              {user.email || ''}
             </Typography>
           </Box>
         )}

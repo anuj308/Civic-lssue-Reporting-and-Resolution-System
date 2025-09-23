@@ -4,7 +4,7 @@ import { logoutUser, refreshToken } from '../store/slices/authSlice';
 
 // Create axios instance
 const api: AxiosInstance = axios.create({
-  baseURL: process.env.REACT_APP_API_URL || '/api',
+  baseURL: import.meta.env.VITE_API_URL || '/api',
   timeout: 30000,
   withCredentials: true, // Send cookies with requests
   headers: {
@@ -77,7 +77,7 @@ api.interceptors.response.use(
     }
 
     // Handle other errors
-    const errorMessage = error.response.data?.message || error.message || 'An error occurred';
+    const errorMessage = (error.response?.data as any)?.message || error.message || 'An error occurred';
     
     return Promise.reject({
       message: errorMessage,

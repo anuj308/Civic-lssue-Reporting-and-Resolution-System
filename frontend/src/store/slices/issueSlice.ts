@@ -1,14 +1,18 @@
 import { createSlice, createAsyncThunk, PayloadAction } from '@reduxjs/toolkit';
+import { issuesAPI } from '../../services/api';
 
 // Types
 export interface IssueLocation {
-  type: 'Point';
-  coordinates: [number, number]; // [longitude, latitude]
   address: string;
+  city?: string;
+  state?: string;
+  pincode?: string;
+  coordinates: [number, number]; // [longitude, latitude]
+  landmark?: string;
 }
 
 export interface IssueAttachment {
-  id: string;
+  _id: string;
   fileName: string;
   filePath: string;
   fileType: string;
@@ -17,15 +21,15 @@ export interface IssueAttachment {
 }
 
 export interface IssueComment {
-  id: string;
-  content: string;
-  author: {
-    id: string;
+  _id: string;
+  user: {
+    _id: string;
     name: string;
-    role: string;
+    role?: string;
   };
-  isInternal: boolean;
-  createdAt: string;
+  message: string;
+  timestamp: string;
+  isOfficial: boolean;
 }
 
 export interface IssueVote {
@@ -35,55 +39,62 @@ export interface IssueVote {
 }
 
 export interface Issue {
-  id: string;
+  _id: string;
   title: string;
   description: string;
   category: string;
-  priority: 'low' | 'medium' | 'high' | 'urgent';
-  status: 'pending' | 'acknowledged' | 'in-progress' | 'resolved' | 'closed';
+  subcategory?: string;
+  priority: 'low' | 'medium' | 'high' | 'critical';
+  status: 'pending' | 'acknowledged' | 'in_progress' | 'resolved' | 'closed' | 'rejected';
   location: IssueLocation;
-  attachments: IssueAttachment[];
+  media: {
+    images: string[];
+    videos?: string[];
+    audio?: string;
+  };
   reportedBy: {
-    id: string;
+    _id: string;
     name: string;
-    email: string;
+    email?: string;
   };
   assignedDepartment?: {
-    id: string;
+    _id: string;
     name: string;
   };
   assignedTo?: {
-    id: string;
+    _id: string;
     name: string;
   };
   timeline: {
     reported: string;
     acknowledged?: string;
-    'in-progress'?: string;
+    started?: string;
     resolved?: string;
     closed?: string;
   };
   comments: IssueComment[];
-  votes: IssueVote[];
-  voteCount: number;
+  votes: {
+    upvotes: string[];
+    downvotes: string[];
+  };
+  voteScore?: number;
   isPublic: boolean;
   tags: string[];
   createdAt: string;
   updatedAt: string;
+  commentsCount?: number;
+  upvotes?: number;
 }
 
 export interface CreateIssueData {
   title: string;
   description: string;
   category: string;
-  priority: string;
   location: {
-    coordinates: [number, number];
     address: string;
+    coordinates: [number, number];
   };
-  attachments?: File[];
-  isPublic?: boolean;
-  tags?: string[];
+  images?: File[];
 }
 
 export interface UpdateIssueData {
@@ -92,10 +103,10 @@ export interface UpdateIssueData {
   category?: string;
   priority?: string;
   status?: string;
-  assignedDepartment?: string;
   assignedTo?: string;
-  isPublic?: boolean;
-  tags?: string[];
+  assignedDepartment?: string;
+  dueDate?: string;
+  notes?: string;
 }
 
 export interface IssueFilters {
@@ -106,14 +117,6 @@ export interface IssueFilters {
   assignedTo?: string;
   reportedBy?: string;
   isPublic?: boolean;
-  dateRange?: {
-    startDate: string;
-    endDate: string;
-  };
-  location?: {
-    center: [number, number];
-    radius: number;
-  };
   search?: string;
 }
 
@@ -128,6 +131,7 @@ export interface IssueState {
     page: number;
     limit: number;
     totalPages: number;
+    currentPage: number;
   };
   categories: string[];
   mapMode: boolean;
@@ -145,16 +149,29 @@ const initialState: IssueState = {
     page: 1,
     limit: 10,
     totalPages: 0,
+    currentPage: 1,
   },
   categories: [
-    'Roads & Transportation',
-    'Water & Utilities',
-    'Waste Management',
-    'Public Safety',
-    'Parks & Recreation',
-    'Health & Sanitation',
-    'Education',
-    'Other'
+    'pothole',
+    'streetlight',
+    'garbage',
+    'water_supply',
+    'sewerage',
+    'traffic',
+    'park_maintenance',
+    'road_maintenance',
+    'electrical',
+    'construction',
+    'noise_pollution',
+    'air_pollution',
+    'water_pollution',
+    'stray_animals',
+    'illegal_parking',
+    'illegal_construction',
+    'public_transport',
+    'healthcare',
+    'education',
+    'other'
   ],
   mapMode: false,
 };
@@ -162,43 +179,21 @@ const initialState: IssueState = {
 // Async thunks
 export const fetchIssues = createAsyncThunk(
   'issues/fetchIssues',
-  async (params: { page?: number; limit?: number; filters?: IssueFilters }, { rejectWithValue }) => {
+  async (params: { page?: number; limit?: number; status?: string; category?: string; priority?: string; reportedBy?: string; search?: string }, { rejectWithValue }) => {
     try {
-      const searchParams = new URLSearchParams();
-      
-      if (params.page) searchParams.append('page', params.page.toString());
-      if (params.limit) searchParams.append('limit', params.limit.toString());
-      if (params.filters?.status) searchParams.append('status', params.filters.status);
-      if (params.filters?.category) searchParams.append('category', params.filters.category);
-      if (params.filters?.priority) searchParams.append('priority', params.filters.priority);
-      if (params.filters?.assignedDepartment) searchParams.append('assignedDepartment', params.filters.assignedDepartment);
-      if (params.filters?.assignedTo) searchParams.append('assignedTo', params.filters.assignedTo);
-      if (params.filters?.reportedBy) searchParams.append('reportedBy', params.filters.reportedBy);
-      if (params.filters?.isPublic !== undefined) searchParams.append('isPublic', params.filters.isPublic.toString());
-      if (params.filters?.search) searchParams.append('search', params.filters.search);
-      if (params.filters?.dateRange) {
-        searchParams.append('startDate', params.filters.dateRange.startDate);
-        searchParams.append('endDate', params.filters.dateRange.endDate);
-      }
-      if (params.filters?.location) {
-        searchParams.append('lat', params.filters.location.center[1].toString());
-        searchParams.append('lng', params.filters.location.center[0].toString());
-        searchParams.append('radius', params.filters.location.radius.toString());
-      }
+      const queryParams: any = {};
+      if (params.page) queryParams.page = params.page;
+      if (params.limit) queryParams.limit = params.limit;
+      if (params.status) queryParams.status = params.status;
+      if (params.category) queryParams.category = params.category;
+      if (params.priority) queryParams.priority = params.priority;
+      if (params.reportedBy) queryParams.reportedBy = params.reportedBy;
+      if (params.search) queryParams.search = params.search;
 
-      const response = await fetch(`/api/issues?${searchParams.toString()}`, {
-        credentials: 'include',
-      });
-
-      const data = await response.json();
-
-      if (!response.ok) {
-        return rejectWithValue(data.message || 'Failed to fetch issues');
-      }
-
+      const data = await issuesAPI.getIssues(queryParams);
       return data;
-    } catch (error) {
-      return rejectWithValue('Network error occurred');
+    } catch (error: any) {
+      return rejectWithValue(error.message || 'Failed to fetch issues');
     }
   }
 );
@@ -207,64 +202,22 @@ export const fetchIssueById = createAsyncThunk(
   'issues/fetchIssueById',
   async (issueId: string, { rejectWithValue }) => {
     try {
-      const response = await fetch(`/api/issues/${issueId}`, {
-        credentials: 'include',
-      });
-
-      const data = await response.json();
-
-      if (!response.ok) {
-        return rejectWithValue(data.message || 'Failed to fetch issue');
-      }
-
+      const data = await issuesAPI.getIssueById(issueId);
       return data;
-    } catch (error) {
-      return rejectWithValue('Network error occurred');
+    } catch (error: any) {
+      return rejectWithValue(error.message || 'Failed to fetch issue');
     }
   }
 );
 
 export const createIssue = createAsyncThunk(
   'issues/createIssue',
-  async (issueData: CreateIssueData, { rejectWithValue }) => {
+  async (formData: FormData, { rejectWithValue }) => {
     try {
-      const formData = new FormData();
-      
-      formData.append('title', issueData.title);
-      formData.append('description', issueData.description);
-      formData.append('category', issueData.category);
-      formData.append('priority', issueData.priority);
-      formData.append('location', JSON.stringify(issueData.location));
-      
-      if (issueData.isPublic !== undefined) {
-        formData.append('isPublic', issueData.isPublic.toString());
-      }
-      
-      if (issueData.tags) {
-        formData.append('tags', JSON.stringify(issueData.tags));
-      }
-
-      if (issueData.attachments) {
-        issueData.attachments.forEach((file, index) => {
-          formData.append(`attachments`, file);
-        });
-      }
-
-      const response = await fetch('/api/issues', {
-        method: 'POST',
-        credentials: 'include',
-        body: formData,
-      });
-
-      const data = await response.json();
-
-      if (!response.ok) {
-        return rejectWithValue(data.message || 'Failed to create issue');
-      }
-
+      const data = await issuesAPI.createIssue(formData);
       return data;
-    } catch (error) {
-      return rejectWithValue('Network error occurred');
+    } catch (error: any) {
+      return rejectWithValue(error.message || 'Failed to create issue');
     }
   }
 );
@@ -365,6 +318,72 @@ export const voteOnIssue = createAsyncThunk(
   }
 );
 
+export const assignIssue = createAsyncThunk(
+  'issues/assignIssue',
+  async ({ issueId, assigneeId, priority, dueDate, notes }: { 
+    issueId: string; 
+    assigneeId?: string; 
+    priority?: string; 
+    dueDate?: string; 
+    notes?: string; 
+  }, { rejectWithValue }) => {
+    try {
+      const response = await fetch(`/api/issues/${issueId}/assign`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        credentials: 'include',
+        body: JSON.stringify({
+          assignedTo: assigneeId,
+          priority,
+          dueDate,
+          notes,
+        }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        return rejectWithValue(data.message || 'Failed to assign issue');
+      }
+
+      return data;
+    } catch (error) {
+      return rejectWithValue('Network error occurred');
+    }
+  }
+);
+
+export const bulkUpdateIssues = createAsyncThunk(
+  'issues/bulkUpdateIssues',
+  async ({ issueIds, updates }: { issueIds: string[]; updates: UpdateIssueData }, { rejectWithValue }) => {
+    try {
+      const response = await fetch('/api/issues/bulk-update', {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        credentials: 'include',
+        body: JSON.stringify({
+          issueIds,
+          updates,
+        }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        return rejectWithValue(data.message || 'Failed to bulk update issues');
+      }
+
+      return data;
+    } catch (error) {
+      return rejectWithValue('Network error occurred');
+    }
+  }
+);
+
 // Issue slice
 const issueSlice = createSlice({
   name: 'issues',
@@ -401,12 +420,17 @@ const issueSlice = createSlice({
       })
       .addCase(fetchIssues.fulfilled, (state, action) => {
         state.loading = false;
-        state.issues = action.payload.data.issues;
-        state.totalIssues = action.payload.data.total;
+        state.issues = action.payload.issues.map((issue: any) => ({
+          ...issue,
+          _id: issue.id,
+          commentsCount: issue.comments?.length || 0,
+          upvotes: issue.votes?.upvotes?.length || 0,
+        }));
+        state.totalIssues = action.payload.total || action.payload.issues.length;
         state.pagination = {
-          page: action.payload.data.currentPage,
-          limit: action.payload.data.limit,
-          totalPages: action.payload.data.totalPages,
+          ...state.pagination,
+          ...action.payload.pagination,
+          currentPage: action.payload.currentPage || action.payload.pagination?.currentPage || 1,
         };
         state.error = null;
       })
@@ -423,7 +447,13 @@ const issueSlice = createSlice({
       })
       .addCase(fetchIssueById.fulfilled, (state, action) => {
         state.loading = false;
-        state.selectedIssue = action.payload.data.issue;
+        const issue = action.payload.issue;
+        state.selectedIssue = {
+          ...issue,
+          _id: issue.id,
+          commentsCount: issue.comments?.length || 0,
+          upvotes: issue.votes?.upvotes?.length || 0,
+        };
         state.error = null;
       })
       .addCase(fetchIssueById.rejected, (state, action) => {
@@ -439,7 +469,14 @@ const issueSlice = createSlice({
       })
       .addCase(createIssue.fulfilled, (state, action) => {
         state.loading = false;
-        state.issues.unshift(action.payload.data.issue);
+        const issue = action.payload.issue;
+        const normalizedIssue = {
+          ...issue,
+          _id: issue.id,
+          commentsCount: issue.comments?.length || 0,
+          upvotes: issue.votes?.upvotes?.length || 0,
+        };
+        state.issues.unshift(normalizedIssue);
         state.totalIssues += 1;
         state.error = null;
       })
@@ -531,6 +568,52 @@ const issueSlice = createSlice({
         state.loading = false;
         state.error = action.payload as string;
       });
+
+    // Assign issue
+    builder
+      .addCase(assignIssue.pending, (state) => {
+        state.loading = true;
+        state.error = null;
+      })
+      .addCase(assignIssue.fulfilled, (state, action) => {
+        state.loading = false;
+        const updatedIssue = action.payload.data.issue;
+        const index = state.issues.findIndex(issue => issue._id === updatedIssue._id);
+        if (index !== -1) {
+          state.issues[index] = updatedIssue;
+        }
+        if (state.selectedIssue && state.selectedIssue._id === updatedIssue._id) {
+          state.selectedIssue = updatedIssue;
+        }
+        state.error = null;
+      })
+      .addCase(assignIssue.rejected, (state, action) => {
+        state.loading = false;
+        state.error = action.payload as string;
+      });
+
+    // Bulk update issues
+    builder
+      .addCase(bulkUpdateIssues.pending, (state) => {
+        state.loading = true;
+        state.error = null;
+      })
+      .addCase(bulkUpdateIssues.fulfilled, (state, action) => {
+        state.loading = false;
+        // Update all issues that were bulk updated
+        const updatedIssues = action.payload.data.issues || [];
+        updatedIssues.forEach((updatedIssue: Issue) => {
+          const index = state.issues.findIndex(issue => issue._id === updatedIssue._id);
+          if (index !== -1) {
+            state.issues[index] = updatedIssue;
+          }
+        });
+        state.error = null;
+      })
+      .addCase(bulkUpdateIssues.rejected, (state, action) => {
+        state.loading = false;
+        state.error = action.payload as string;
+      });
   },
 });
 
@@ -548,11 +631,10 @@ export const {
 export const selectIssues = (state: { issues: IssueState }) => state.issues.issues;
 export const selectSelectedIssue = (state: { issues: IssueState }) => state.issues.selectedIssue;
 export const selectTotalIssues = (state: { issues: IssueState }) => state.issues.totalIssues;
-export const selectIssueLoading = (state: { issues: IssueState }) => state.issues.loading;
-export const selectIssueError = (state: { issues: IssueState }) => state.issues.error;
-export const selectIssueFilters = (state: { issues: IssueState }) => state.issues.filters;
-export const selectIssuePagination = (state: { issues: IssueState }) => state.issues.pagination;
-export const selectIssueCategories = (state: { issues: IssueState }) => state.issues.categories;
+export const selectIssuesLoading = (state: { issues: IssueState }) => state.issues.loading;
+export const selectIssuesError = (state: { issues: IssueState }) => state.issues.error;
+export const selectIssuesPagination = (state: { issues: IssueState }) => state.issues.pagination;
+export const selectIssuesCategories = (state: { issues: IssueState }) => state.issues.categories;
 export const selectMapMode = (state: { issues: IssueState }) => state.issues.mapMode;
 
 export default issueSlice.reducer;

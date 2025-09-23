@@ -33,6 +33,8 @@ import {
   NotificationsActive,
   Security,
   Map,
+  Add,
+  AccountCircle,
 } from '@mui/icons-material';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useSelector } from 'react-redux';
@@ -56,94 +58,6 @@ interface MenuItem {
   roles?: string[];
 }
 
-const menuItems: MenuItem[] = [
-  {
-    id: 'dashboard',
-    label: 'Dashboard',
-    icon: <Dashboard />,
-    path: '/dashboard',
-  },
-  {
-    id: 'issues',
-    label: 'Issues Management',
-    icon: <ReportProblem />,
-    children: [
-      {
-        id: 'issues-list',
-        label: 'All Issues',
-        icon: <Assignment />,
-        path: '/issues',
-      },
-      {
-        id: 'issues-map',
-        label: 'Issue Map',
-        icon: <Map />,
-        path: '/map',
-      },
-    ],
-  },
-  {
-    id: 'users',
-    label: 'User Management',
-    icon: <People />,
-    path: '/users',
-    roles: ['admin'],
-  },
-  {
-    id: 'departments',
-    label: 'Departments',
-    icon: <Business />,
-    path: '/departments',
-    roles: ['admin', 'department_head'],
-  },
-  {
-    id: 'analytics',
-    label: 'Analytics & Reports',
-    icon: <Analytics />,
-    children: [
-      {
-        id: 'analytics-overview',
-        label: 'Overview',
-        icon: <TrendingUp />,
-        path: '/analytics',
-      },
-      {
-        id: 'analytics-performance',
-        label: 'Performance',
-        icon: <Analytics />,
-        path: '/analytics/performance',
-      },
-    ],
-  },
-  {
-    id: 'notifications',
-    label: 'Notifications',
-    icon: <Notifications />,
-    children: [
-      {
-        id: 'notifications-list',
-        label: 'All Notifications',
-        icon: <NotificationsActive />,
-        path: '/notifications',
-      },
-      {
-        id: 'notifications-create',
-        label: 'Create Announcement',
-        icon: <NotificationsActive />,
-        path: '/notifications/create',
-        roles: ['admin', 'department_head'],
-      },
-    ],
-  },
-  {
-    id: 'settings',
-    label: 'System Settings',
-    icon: <Settings />,
-    path: '/settings',
-    roles: ['admin'],
-  },
-];
-
 const Sidebar: React.FC<SidebarProps> = ({
   open,
   onToggle,
@@ -157,6 +71,138 @@ const Sidebar: React.FC<SidebarProps> = ({
   const user = useSelector(selectUser);
   
   const [expandedItems, setExpandedItems] = React.useState<string[]>([]);
+
+  // Define menu items based on user role
+  const getMenuItems = (): MenuItem[] => {
+    const isAdmin = user?.role && ['admin', 'department_head', 'department_staff'].includes(user.role);
+    
+    if (isAdmin) {
+      // Admin menu items
+      return [
+        {
+          id: 'dashboard',
+          label: 'Dashboard',
+          icon: <Dashboard />,
+          path: '/dashboard',
+        },
+        {
+          id: 'issues',
+          label: 'Issues Management',
+          icon: <ReportProblem />,
+          children: [
+            {
+              id: 'issues-list',
+              label: 'All Issues',
+              icon: <Assignment />,
+              path: '/issues',
+            },
+            {
+              id: 'issues-map',
+              label: 'Issue Map',
+              icon: <Map />,
+              path: '/map',
+            },
+          ],
+        },
+        {
+          id: 'users',
+          label: 'User Management',
+          icon: <People />,
+          path: '/users',
+          roles: ['admin'],
+        },
+        {
+          id: 'departments',
+          label: 'Departments',
+          icon: <Business />,
+          path: '/departments',
+          roles: ['admin', 'department_head'],
+        },
+        {
+          id: 'analytics',
+          label: 'Analytics & Reports',
+          icon: <Analytics />,
+          children: [
+            {
+              id: 'analytics-overview',
+              label: 'Overview',
+              icon: <TrendingUp />,
+              path: '/analytics',
+            },
+            {
+              id: 'analytics-performance',
+              label: 'Performance',
+              icon: <Analytics />,
+              path: '/analytics/performance',
+            },
+          ],
+        },
+        {
+          id: 'notifications',
+          label: 'Notifications',
+          icon: <Notifications />,
+          children: [
+            {
+              id: 'notifications-list',
+              label: 'All Notifications',
+              icon: <NotificationsActive />,
+              path: '/notifications',
+            },
+            {
+              id: 'notifications-create',
+              label: 'Create Announcement',
+              icon: <NotificationsActive />,
+              path: '/notifications/create',
+              roles: ['admin', 'department_head'],
+            },
+          ],
+        },
+        {
+          id: 'settings',
+          label: 'System Settings',
+          icon: <Settings />,
+          path: '/settings',
+          roles: ['admin'],
+        },
+      ];
+    } else {
+      // User menu items
+      return [
+        {
+          id: 'dashboard',
+          label: 'Dashboard',
+          icon: <Dashboard />,
+          path: '/dashboard',
+        },
+        {
+          id: 'my-issues',
+          label: 'My Issues',
+          icon: <Assignment />,
+          path: '/my-issues',
+        },
+        {
+          id: 'report-issue',
+          label: 'Report Issue',
+          icon: <Add />,
+          path: '/report-issue',
+        },
+        {
+          id: 'map',
+          label: 'Issue Map',
+          icon: <Map />,
+          path: '/map',
+        },
+        {
+          id: 'profile',
+          label: 'Profile',
+          icon: <AccountCircle />,
+          path: '/profile',
+        },
+      ];
+    }
+  };
+
+  const menuItems = getMenuItems();
 
   const handleItemClick = (item: MenuItem) => {
     if (item.children) {
@@ -280,10 +326,21 @@ const Sidebar: React.FC<SidebarProps> = ({
       >
         {open && (
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-            <AdminPanelSettings color="primary" />
-            <Typography variant="h6" noWrap fontWeight="bold">
-              Admin Panel
-            </Typography>
+            {user?.role && ['admin', 'department_head', 'department_staff'].includes(user.role) ? (
+              <>
+                <AdminPanelSettings color="primary" />
+                <Typography variant="h6" noWrap fontWeight="bold">
+                  Admin Panel
+                </Typography>
+              </>
+            ) : (
+              <>
+                <AccountCircle color="primary" />
+                <Typography variant="h6" noWrap fontWeight="bold">
+                  User Dashboard
+                </Typography>
+              </>
+            )}
           </Box>
         )}
         
@@ -308,13 +365,13 @@ const Sidebar: React.FC<SidebarProps> = ({
               bgcolor: 'primary.main',
             }}
           >
-            {user.firstName.charAt(0)}{user.lastName.charAt(0)}
+            {user.firstName?.charAt(0) || 'U'}{user.lastName?.charAt(0) || ''}
           </Avatar>
           <Typography variant="subtitle2" noWrap>
-            {user.firstName} {user.lastName}
+            {user.firstName || 'User'} {user.lastName || ''}
           </Typography>
           <Typography variant="caption" color="text.secondary" noWrap>
-            {user.role.replace('_', ' ').toUpperCase()}
+            {user.role?.replace('_', ' ').toUpperCase() || 'USER'}
           </Typography>
         </Box>
       )}

@@ -24,7 +24,7 @@ import { useForm, Controller } from 'react-hook-form';
 import { yupResolver } from '@hookform/resolvers/yup';
 import * as yup from 'yup';
 import { useDispatch, useSelector } from 'react-redux';
-import { useNavigate, useLocation } from 'react-router-dom';
+import { useNavigate, useLocation, Link as RouterLink } from 'react-router-dom';
 import { loginUser, selectAuth, clearError } from '../../store/slices/authSlice';
 import { AppDispatch } from '../../store/store';
 
@@ -245,6 +245,16 @@ const Login: React.FC = () => {
               Admin Access Only
             </Typography>
           </Divider>
+
+          {/* Register Link */}
+          <Box sx={{ textAlign: 'center', mb: 2 }}>
+            <Typography variant="body2" color="text.secondary">
+              Don't have an account?{' '}
+              <Link component={RouterLink} to="/register" color="primary">
+                Create one here
+              </Link>
+            </Typography>
+          </Box>
 
           {/* Footer Info */}
           <Box sx={{ textAlign: 'center' }}>
