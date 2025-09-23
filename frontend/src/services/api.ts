@@ -182,6 +182,19 @@ export const authAPI = {
   
   changePassword: (data: { currentPassword: string; newPassword: string }) =>
     apiService.put('/auth/change-password', data),
+  
+  // OTP-related endpoints
+  verifyOTP: (data: { email: string; otpCode: string }) =>
+    apiService.post('/auth/verify-otp', data),
+  
+  resendOTP: (data: { email: string }) =>
+    apiService.post('/auth/resend-otp', data),
+  
+  verifyAndLogin: (data: { email: string; otpCode: string; password?: string }) =>
+    apiService.post('/auth/verify-and-login', data),
+  
+  resendLoginOTP: (data: { email: string }) =>
+    apiService.post('/auth/resend-login-otp', data),
 };
 
 // Users API

@@ -6,10 +6,9 @@ import {
   TextField,
   Button,
   Typography,
-  Alert,
+  CircularProgress,
   InputAdornment,
   IconButton,
-  CircularProgress,
   Link,
   Divider,
 } from '@mui/material';
@@ -18,15 +17,16 @@ import {
   VisibilityOff,
   Email,
   Lock,
-  AdminPanelSettings,
+  AccountCircle,
 } from '@mui/icons-material';
 import { useForm, Controller } from 'react-hook-form';
 import { yupResolver } from '@hookform/resolvers/yup';
 import * as yup from 'yup';
 import { useDispatch, useSelector } from 'react-redux';
 import { useNavigate, useLocation, Link as RouterLink } from 'react-router-dom';
-import { loginUser, selectAuth, clearError } from '../../store/slices/authSlice';
+import { loginUser, selectAuth, clearError, clearVerificationState } from '../../store/slices/authSlice';
 import { AppDispatch } from '../../store/store';
+import { showToast } from '../../utils/toast';
 
 // Validation schema
 const loginSchema = yup.object({
@@ -36,7 +36,6 @@ const loginSchema = yup.object({
     .required('Email is required'),
   password: yup
     .string()
-    .min(6, 'Password must be at least 6 characters')
     .required('Password is required'),
 });
 
@@ -51,7 +50,7 @@ const Login: React.FC = () => {
   const navigate = useNavigate();
   const location = useLocation();
   
-  const { loading, error, isAuthenticated } = useSelector(selectAuth);
+  const { loading, error, isAuthenticated, needsVerification, verificationEmail, verificationPassword } = useSelector(selectAuth);
 
   const {
     control,
@@ -73,6 +72,26 @@ const Login: React.FC = () => {
       navigate(from, { replace: true });
     }
   }, [isAuthenticated, navigate, location]);
+
+  // Handle email verification required
+  React.useEffect(() => {
+    if (needsVerification && verificationEmail) {
+      navigate('/verify-otp', {
+        state: {
+          email: verificationEmail,
+          isLoginVerification: true,
+          password: verificationPassword,
+          from: location.state?.from?.pathname,
+        },
+        replace: true,
+      });
+    }
+  }, [needsVerification, verificationEmail, verificationPassword, navigate, location]);
+
+  // Clear verification state when component mounts (allows user to start fresh)
+  React.useEffect(() => {
+    dispatch(clearVerificationState());
+  }, [dispatch]);
 
   // Clear error when component unmounts
   React.useEffect(() => {
@@ -134,26 +153,15 @@ const Login: React.FC = () => {
                 mb: 2,
               }}
             >
-              <AdminPanelSettings sx={{ fontSize: 32 }} />
+              <AccountCircle sx={{ fontSize: 32 }} />
             </Box>
             <Typography variant="h4" component="h1" gutterBottom fontWeight="bold">
-              Admin Portal
+              Welcome Back
             </Typography>
             <Typography variant="body1" color="text.secondary">
-              Civic Issue Reporting & Resolution System
+              Sign in to Civic Issue Reporting System
             </Typography>
           </Box>
-
-          {/* Error Alert */}
-          {error && (
-            <Alert 
-              severity="error" 
-              sx={{ mb: 3 }}
-              onClose={handleClearError}
-            >
-              {error}
-            </Alert>
-          )}
 
           {/* Login Form */}
           <Box component="form" onSubmit={handleSubmit(onSubmit)} noValidate>
@@ -242,7 +250,7 @@ const Login: React.FC = () => {
 
           <Divider sx={{ my: 3 }}>
             <Typography variant="body2" color="text.secondary">
-              Admin Access Only
+              New to the platform?
             </Typography>
           </Divider>
 
@@ -259,7 +267,7 @@ const Login: React.FC = () => {
           {/* Footer Info */}
           <Box sx={{ textAlign: 'center' }}>
             <Typography variant="body2" color="text.secondary" paragraph>
-              This portal is restricted to authorized administrators only.
+              Report civic issues, track progress, and engage with your community.
             </Typography>
             <Typography variant="body2" color="text.secondary">
               Need help? Contact{' '}

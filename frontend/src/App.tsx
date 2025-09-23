@@ -6,6 +6,8 @@ import { Provider } from 'react-redux';
 import { PersistGate } from 'redux-persist/integration/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { ReactQueryDevtools } from '@tanstack/react-query-devtools';
+import { ToastContainer } from 'react-toastify';
+import 'react-toastify/dist/ReactToastify.css';
 import { useSelector } from 'react-redux';
 
 import { store, persistor } from './store/store';
@@ -15,6 +17,7 @@ import { selectUser } from './store/slices/authSlice';
 // Auth Components
 import Login from './pages/Auth/Login';
 import Register from './pages/Auth/Register';
+import OTPVerification from './pages/Auth/OTPVerification';
 import ProtectedRoute from './components/Auth/ProtectedRoute';
 
 // Layout Components
@@ -50,6 +53,7 @@ const AppRoutes: React.FC = () => {
       {/* Public Routes */}
       <Route path="/login" element={<Login />} />
       <Route path="/register" element={<Register />} />
+      <Route path="/verify-otp" element={<OTPVerification />} />
       
       {/* Protected Routes with Layout */}
       <Route
@@ -93,6 +97,18 @@ const App: React.FC = () => {
           <QueryClientProvider client={queryClient}>
             <ThemeProvider theme={theme}>
               <CssBaseline />
+              <ToastContainer
+                position="top-right"
+                autoClose={5000}
+                hideProgressBar={false}
+                newestOnTop
+                closeOnClick
+                rtl={false}
+                pauseOnFocusLoss
+                draggable
+                pauseOnHover
+                theme="colored"
+              />
               <AppRoutes />
               {process.env.NODE_ENV === 'development' && (
                 <ReactQueryDevtools initialIsOpen={false} />

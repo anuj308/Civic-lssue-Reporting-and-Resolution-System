@@ -6,10 +6,9 @@ import {
   TextField,
   Button,
   Typography,
-  Alert,
+  CircularProgress,
   InputAdornment,
   IconButton,
-  CircularProgress,
   Link,
   Divider,
 } from '@mui/material';
@@ -27,7 +26,8 @@ import * as yup from 'yup';
 import { useDispatch, useSelector } from 'react-redux';
 import { useNavigate, Link as RouterLink } from 'react-router-dom';
 
-import { registerUser, selectAuth, clearError } from '../../store/slices/authSlice';
+import { registerUser, selectAuth, clearError, clearFieldError, selectFieldErrors, clearVerificationState } from '../../store/slices/authSlice';
+import { showToast } from '../../utils/toast';
 
 interface RegisterFormData {
   firstName: string;
@@ -64,14 +64,16 @@ const registerSchema = yup.object({
     .string()
     .min(8, 'Password must be at least 8 characters')
     .matches(
-      /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)/,
-      'Password must contain at least one uppercase letter, one lowercase letter, and one number'
+      /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])/,
+      'Password must contain at least one uppercase letter, one lowercase letter, one number, and one special character (@$!%*?&)'
     )
     .required('Password is required'),
   confirmPassword: yup
     .string()
-    .oneOf([yup.ref('password')], 'Passwords must match')
-    .required('Please confirm your password'),
+    .required('Please confirm your password')
+    .test('passwords-match', 'Passwords must match', function(value) {
+      return this.parent.password === value;
+    }),
 });
 
 const Register: React.FC = () => {
@@ -80,7 +82,7 @@ const Register: React.FC = () => {
   const dispatch = useDispatch<any>();
   const navigate = useNavigate();
 
-  const { loading, error } = useSelector(selectAuth);
+  const { loading, error, fieldErrors } = useSelector(selectAuth);
 
   const {
     control,
@@ -99,6 +101,11 @@ const Register: React.FC = () => {
     },
   });
 
+  // Clear verification state when component mounts (allows user to start fresh)
+  React.useEffect(() => {
+    dispatch(clearVerificationState());
+  }, [dispatch]);
+
   // Clear error when component unmounts
   React.useEffect(() => {
     return () => {
@@ -111,11 +118,13 @@ const Register: React.FC = () => {
       // Remove confirmPassword before sending to API
       const { confirmPassword, ...registerData } = data;
       await dispatch(registerUser(registerData)).unwrap();
-      // Navigate to login or dashboard based on your auth flow
-      navigate('/login', {
+      
+      // Navigate to OTP verification with email
+      navigate('/verify-otp', {
         state: {
-          message: 'Registration successful! Please log in with your credentials.'
-        }
+          email: data.email,
+          isLoginVerification: false,
+        },
       });
     } catch (error) {
       // Error will be handled by Redux state
@@ -133,6 +142,13 @@ const Register: React.FC = () => {
 
   const handleClearError = () => {
     dispatch(clearError());
+  };
+
+  const handleFieldFocus = (fieldName: string) => {
+    // Clear field error when user focuses on the field
+    if (fieldErrors[fieldName]) {
+      dispatch(clearFieldError(fieldName));
+    }
   };
 
   return (
@@ -180,17 +196,6 @@ const Register: React.FC = () => {
             </Typography>
           </Box>
 
-          {/* Error Alert */}
-          {error && (
-            <Alert
-              severity="error"
-              sx={{ mb: 3 }}
-              onClose={handleClearError}
-            >
-              {error}
-            </Alert>
-          )}
-
           {/* Register Form */}
           <Box component="form" onSubmit={handleSubmit(onSubmit)} noValidate>
             <Box sx={{ display: 'flex', gap: 2, mb: 3 }}>
@@ -203,9 +208,10 @@ const Register: React.FC = () => {
                     fullWidth
                     label="First Name"
                     autoComplete="given-name"
-                    error={!!errors.firstName}
-                    helperText={errors.firstName?.message}
+                    error={!!errors.firstName || !!fieldErrors.firstName}
+                    helperText={errors.firstName?.message || fieldErrors.firstName}
                     disabled={loading}
+                    onFocus={() => handleFieldFocus('firstName')}
                   />
                 )}
               />
@@ -218,9 +224,10 @@ const Register: React.FC = () => {
                     fullWidth
                     label="Last Name"
                     autoComplete="family-name"
-                    error={!!errors.lastName}
-                    helperText={errors.lastName?.message}
+                    error={!!errors.lastName || !!fieldErrors.lastName}
+                    helperText={errors.lastName?.message || fieldErrors.lastName}
                     disabled={loading}
+                    onFocus={() => handleFieldFocus('lastName')}
                   />
                 )}
               />
@@ -236,8 +243,8 @@ const Register: React.FC = () => {
                   label="Email Address"
                   type="email"
                   autoComplete="email"
-                  error={!!errors.email}
-                  helperText={errors.email?.message}
+                  error={!!errors.email || !!fieldErrors.email}
+                  helperText={errors.email?.message || fieldErrors.email}
                   disabled={loading}
                   InputProps={{
                     startAdornment: (
@@ -247,6 +254,7 @@ const Register: React.FC = () => {
                     ),
                   }}
                   sx={{ mb: 3 }}
+                  onFocus={() => handleFieldFocus('email')}
                 />
               )}
             />
@@ -261,8 +269,8 @@ const Register: React.FC = () => {
                   label="Phone Number (Optional)"
                   type="tel"
                   autoComplete="tel"
-                  error={!!errors.phoneNumber}
-                  helperText={errors.phoneNumber?.message}
+                  error={!!errors.phoneNumber || !!fieldErrors.phoneNumber}
+                  helperText={errors.phoneNumber?.message || fieldErrors.phoneNumber}
                   disabled={loading}
                   InputProps={{
                     startAdornment: (
@@ -272,6 +280,7 @@ const Register: React.FC = () => {
                     ),
                   }}
                   sx={{ mb: 3 }}
+                  onFocus={() => handleFieldFocus('phoneNumber')}
                 />
               )}
             />
@@ -286,8 +295,8 @@ const Register: React.FC = () => {
                   label="Password"
                   type={showPassword ? 'text' : 'password'}
                   autoComplete="new-password"
-                  error={!!errors.password}
-                  helperText={errors.password?.message}
+                  error={!!errors.password || !!fieldErrors.password}
+                  helperText={errors.password?.message || fieldErrors.password}
                   disabled={loading}
                   InputProps={{
                     startAdornment: (
@@ -309,6 +318,7 @@ const Register: React.FC = () => {
                     ),
                   }}
                   sx={{ mb: 3 }}
+                  onFocus={() => handleFieldFocus('password')}
                 />
               )}
             />
@@ -346,6 +356,7 @@ const Register: React.FC = () => {
                     ),
                   }}
                   sx={{ mb: 3 }}
+                  onFocus={() => handleFieldFocus('confirmPassword')}
                 />
               )}
             />
