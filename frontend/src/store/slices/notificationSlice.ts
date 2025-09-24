@@ -78,7 +78,7 @@ export const fetchNotifications = createAsyncThunk(
   async (params: { page?: number; limit?: number; filters?: NotificationFilters }, { rejectWithValue }) => {
     try {
       const searchParams = new URLSearchParams();
-      
+
       if (params.page) searchParams.append('page', params.page.toString());
       if (params.limit) searchParams.append('limit', params.limit.toString());
       if (params.filters?.type) searchParams.append('type', params.filters.type);

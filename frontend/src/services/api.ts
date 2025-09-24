@@ -12,15 +12,28 @@ const api: AxiosInstance = axios.create({
   },
 });
 
+// In-memory token storage (more secure than Redux)
+let accessToken: string | null = null;
+
+// Token management functions
+export const setAccessToken = (token: string) => {
+  accessToken = token;
+};
+
+export const getAccessToken = () => {
+  return accessToken;
+};
+
+export const clearAccessToken = () => {
+  accessToken = null;
+};
+
 // Request interceptor
 api.interceptors.request.use(
   (config) => {
-    // Add authorization header if token exists
-    const state = store.getState();
-    const token = state.auth.token;
-    
-    if (token) {
-      config.headers.Authorization = `Bearer ${token}`;
+    // Add authorization header if token exists in memory
+    if (accessToken) {
+      config.headers.Authorization = `Bearer ${accessToken}`;
     }
 
     return config;
@@ -43,27 +56,28 @@ api.interceptors.response.use(
       originalRequest._retry = true;
 
       try {
-        // Try to refresh the token
-        await store.dispatch(refreshToken());
-        
-        // Retry the original request
-        const state = store.getState();
-        const newToken = state.auth.token;
-        
-        if (newToken && originalRequest.headers) {
+        // Try to refresh the token using the auth API
+        const refreshResponse = await api.post('/auth/refresh');
+        const newToken = refreshResponse.data.data.accessToken;
+
+        if (newToken) {
+          // Update both Redux and in-memory token
+          setAccessToken(newToken);
+          store.dispatch({ type: 'auth/refreshToken/fulfilled', payload: refreshResponse.data });
           originalRequest.headers.Authorization = `Bearer ${newToken}`;
         }
-        
+
         return api(originalRequest);
       } catch (refreshError) {
         // Refresh failed, logout user
+        clearAccessToken();
         store.dispatch(logoutUser());
-        
+
         // Redirect to login if we're not already there
         if (window.location.pathname !== '/login') {
           window.location.href = '/login';
         }
-        
+
         return Promise.reject(refreshError);
       }
     }
@@ -78,11 +92,13 @@ api.interceptors.response.use(
 
     // Handle other errors
     const errorMessage = (error.response?.data as any)?.message || error.message || 'An error occurred';
-    
+
+    // Return detailed error information for validation errors
     return Promise.reject({
       message: errorMessage,
       status: error.response.status,
       data: error.response.data,
+      validationErrors: (error.response?.data as any)?.errors || null,
     });
   }
 );
@@ -153,18 +169,18 @@ export const apiService = {
     const downloadUrl = window.URL.createObjectURL(new Blob([response.data]));
     const link = document.createElement('a');
     link.href = downloadUrl;
-    
+
     // Get filename from response headers or use provided filename
     const contentDisposition = response.headers['content-disposition'];
     let downloadFilename = filename;
-    
+
     if (contentDisposition) {
       const filenameMatch = contentDisposition.match(/filename="?(.+)"?/);
       if (filenameMatch) {
         downloadFilename = filenameMatch[1];
       }
     }
-    
+
     link.download = downloadFilename || 'download';
     document.body.appendChild(link);
     link.click();
@@ -177,29 +193,29 @@ export const apiService = {
 export const authAPI = {
   login: (credentials: { email: string; password: string }) =>
     apiService.post('/auth/login', credentials),
-  
+
   logout: () =>
     apiService.post('/auth/logout'),
-  
+
   refresh: () =>
     apiService.post('/auth/refresh'),
-  
+
   getCurrentUser: () =>
     apiService.get('/auth/me'),
-  
+
   changePassword: (data: { currentPassword: string; newPassword: string }) =>
     apiService.put('/auth/change-password', data),
-  
+
   // OTP-related endpoints
   verifyOTP: (data: { email: string; otpCode: string }) =>
     apiService.post('/auth/verify-otp', data),
-  
+
   resendOTP: (data: { email: string }) =>
     apiService.post('/auth/resend-otp', data),
-  
+
   verifyAndLogin: (data: { email: string; otpCode: string; password?: string }) =>
     apiService.post('/auth/verify-and-login', data),
-  
+
   resendLoginOTP: (data: { email: string }) =>
     apiService.post('/auth/resend-login-otp', data),
 };
@@ -208,19 +224,19 @@ export const authAPI = {
 export const usersAPI = {
   getUsers: (params?: any) =>
     apiService.get('/users', params),
-  
+
   getUserById: (userId: string) =>
     apiService.get(`/users/${userId}`),
-  
+
   createUser: (userData: any) =>
     apiService.post('/users', userData),
-  
+
   updateUser: (userId: string, userData: any) =>
     apiService.put(`/users/${userId}`, userData),
-  
+
   deleteUser: (userId: string) =>
     apiService.delete(`/users/${userId}`),
-  
+
   bulkOperations: (data: { operation: string; userIds: string[]; data?: any }) =>
     apiService.post('/admin/users/bulk', data),
 };
@@ -232,34 +248,37 @@ export const issuesAPI = {
     console.log('📡 Frontend API: Making request to /issues/public');
     return apiService.get('/issues/public', params);
   },
-  
+
   getMyIssues: (params?: any) => {
     console.log('📡 Frontend API: getMyIssues called with params:', params);
     console.log('📡 Frontend API: Making request to /issues/my');
     return apiService.get('/issues/my', params);
   },
-  
+
   getIssueById: (issueId: string) =>
     apiService.get(`/issues/${issueId}`),
-  
-  createIssue: (formData: FormData) =>
-    apiService.upload('/issues', formData),
-  
+
+  createIssue: (issueData: any) =>
+    apiService.post('/issues', issueData),
+
   updateIssue: (issueId: string, issueData: any) =>
     apiService.put(`/issues/${issueId}`, issueData),
-  
+
   deleteIssue: (issueId: string) =>
     apiService.delete(`/issues/${issueId}`),
-  
+
   addComment: (issueId: string, comment: { content: string; isInternal: boolean }) =>
-    apiService.post(`/issues/${issueId}/comments`, comment),
-  
-  voteOnIssue: (issueId: string) =>
-    apiService.post(`/issues/${issueId}/vote`),
-  
+    apiService.post(`/issues/${issueId}/comments`, { message: comment.content }),
+
+  voteOnIssue: (issueId: string, voteType: 'upvote' | 'downvote') =>
+    apiService.post(`/issues/${issueId}/vote`, { type: voteType }),
+
+  removeVote: (issueId: string) =>
+    apiService.delete(`/issues/${issueId}/vote`),
+
   assignIssue: (issueId: string, data: { assignedTo?: string; assignedDepartment?: string }) =>
     apiService.put(`/issues/${issueId}/assign`, data),
-  
+
   updateStatus: (issueId: string, status: string) =>
     apiService.put(`/issues/${issueId}/status`, { status }),
 
@@ -271,25 +290,25 @@ export const issuesAPI = {
 export const departmentsAPI = {
   getDepartments: () =>
     apiService.get('/departments'),
-  
+
   getDepartmentById: (departmentId: string) =>
     apiService.get(`/departments/${departmentId}`),
-  
+
   createDepartment: (departmentData: any) =>
     apiService.post('/departments', departmentData),
-  
+
   updateDepartment: (departmentId: string, departmentData: any) =>
     apiService.put(`/departments/${departmentId}`, departmentData),
-  
+
   deleteDepartment: (departmentId: string) =>
     apiService.delete(`/departments/${departmentId}`),
-  
+
   addStaff: (departmentId: string, userId: string) =>
     apiService.post(`/departments/${departmentId}/staff`, { userId }),
-  
+
   removeStaff: (departmentId: string, userId: string) =>
     apiService.delete(`/departments/${departmentId}/staff/${userId}`),
-  
+
   getStatistics: (departmentId: string) =>
     apiService.get(`/departments/${departmentId}/statistics`),
 };
@@ -298,13 +317,13 @@ export const departmentsAPI = {
 export const analyticsAPI = {
   getDashboardMetrics: () =>
     apiService.get('/analytics/dashboard'),
-  
+
   getPerformanceMetrics: (params?: { startDate?: string; endDate?: string }) =>
     apiService.get('/analytics/performance', params),
-  
+
   getTrendingIssues: (params?: { period?: string; limit?: number }) =>
     apiService.get('/analytics/trending', params),
-  
+
   exportData: (params: { format: string; startDate?: string; endDate?: string }) =>
     apiService.download('/analytics/export', `analytics-export.${params.format}`),
 };
@@ -313,22 +332,22 @@ export const analyticsAPI = {
 export const notificationsAPI = {
   getNotifications: (params?: any) =>
     apiService.get('/notifications', params),
-  
+
   markAsRead: (notificationId: string) =>
     apiService.put(`/notifications/${notificationId}/read`),
-  
+
   markAllAsRead: () =>
     apiService.put('/notifications/read-all'),
-  
+
   deleteNotification: (notificationId: string) =>
     apiService.delete(`/notifications/${notificationId}`),
-  
+
   createSystemAnnouncement: (data: any) =>
     apiService.post('/notifications/system-announcement', data),
-  
+
   createCustomNotification: (data: any) =>
     apiService.post('/notifications/custom', data),
-  
+
   getStats: () =>
     apiService.get('/notifications/stats'),
 };
@@ -337,16 +356,16 @@ export const notificationsAPI = {
 export const adminAPI = {
   getSystemOverview: () =>
     apiService.get('/admin/overview'),
-  
+
   getSystemLogs: (params?: any) =>
     apiService.get('/admin/logs', params),
-  
+
   updateSystemConfig: (config: any) =>
     apiService.put('/admin/config', config),
-  
+
   generateReport: (params: { reportType: string; startDate?: string; endDate?: string; format?: string }) =>
     apiService.get('/admin/reports', params),
-  
+
   performMaintenance: (operation: string) =>
     apiService.post('/admin/maintenance', { operation }),
 };

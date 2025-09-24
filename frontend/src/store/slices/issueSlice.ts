@@ -78,6 +78,7 @@ export interface Issue {
     downvotes: string[];
   };
   voteScore?: number;
+  userVote?: 'upvote' | 'downvote' | null; // User's current vote status
   isPublic: boolean;
   tags: string[];
   createdAt: string;
@@ -90,11 +91,21 @@ export interface CreateIssueData {
   title: string;
   description: string;
   category: string;
+  priority?: 'low' | 'medium' | 'high' | 'critical';
   location: {
     address: string;
-    coordinates: [number, number];
+    city: string;
+    pincode: string;
+    coordinates: [number, number]; // [longitude, latitude] as expected by backend
+    landmark?: string;
   };
-  images?: File[];
+  media?: {
+    images: string[];
+    videos?: string[];
+    audio?: string;
+  };
+  tags?: string[];
+  isPublic?: boolean;
 }
 
 export interface UpdateIssueData {
@@ -126,6 +137,7 @@ export interface IssueState {
   totalIssues: number;
   loading: boolean;
   error: string | null;
+  validationErrors: Record<string, string> | null; // Field-specific validation errors
   filters: IssueFilters;
   pagination: {
     page: number;
@@ -144,6 +156,7 @@ const initialState: IssueState = {
   totalIssues: 0,
   loading: false,
   error: null,
+  validationErrors: null,
   filters: {},
   pagination: {
     page: 1,
@@ -241,12 +254,16 @@ export const fetchIssueById = createAsyncThunk(
 
 export const createIssue = createAsyncThunk(
   'issues/createIssue',
-  async (formData: FormData, { rejectWithValue }) => {
+  async (issueData: CreateIssueData, { rejectWithValue }) => {
     try {
-      const data = await issuesAPI.createIssue(formData);
+      const data = await issuesAPI.createIssue(issueData);
       return data;
     } catch (error: any) {
-      return rejectWithValue(error.message || 'Failed to create issue');
+      // Return detailed error information including validation errors
+      return rejectWithValue({
+        message: error.message || 'Failed to create issue',
+        validationErrors: error.validationErrors || null,
+      });
     }
   }
 );
@@ -289,24 +306,44 @@ export const addIssueComment = createAsyncThunk(
 
 export const voteOnIssue = createAsyncThunk(
   'issues/vote',
-  async (issueId: string, { rejectWithValue }) => {
+  async ({ issueId, voteType }: { issueId: string; voteType: 'upvote' | 'downvote' }, { dispatch, rejectWithValue }) => {
     try {
-      const data = await issuesAPI.voteOnIssue(issueId);
-      return data;
+      const data = await issuesAPI.voteOnIssue(issueId, voteType);
+
+      // Refetch the issue to get updated vote counts
+      const updatedIssue = await issuesAPI.getIssueById(issueId);
+
+      return { ...data, issue: updatedIssue.issue };
     } catch (error: any) {
       return rejectWithValue(error.message || 'Failed to vote on issue');
     }
   }
 );
 
+export const removeVoteFromIssue = createAsyncThunk(
+  'issues/removeVote',
+  async (issueId: string, { dispatch, rejectWithValue }) => {
+    try {
+      const data = await issuesAPI.removeVote(issueId);
+
+      // Refetch the issue to get updated vote counts
+      const updatedIssue = await issuesAPI.getIssueById(issueId);
+
+      return { ...data, issue: updatedIssue.issue };
+    } catch (error: any) {
+      return rejectWithValue(error.message || 'Failed to remove vote from issue');
+    }
+  }
+);
+
 export const assignIssue = createAsyncThunk(
   'issues/assignIssue',
-  async ({ issueId, assigneeId, priority, dueDate, notes }: { 
-    issueId: string; 
-    assigneeId?: string; 
-    priority?: string; 
-    dueDate?: string; 
-    notes?: string; 
+  async ({ issueId, assigneeId, priority, dueDate, notes }: {
+    issueId: string;
+    assigneeId?: string;
+    priority?: string;
+    dueDate?: string;
+    notes?: string;
   }, { rejectWithValue }) => {
     try {
       // First assign the issue
@@ -353,6 +390,9 @@ const issueSlice = createSlice({
     clearError: (state) => {
       state.error = null;
     },
+    clearValidationErrors: (state) => {
+      state.validationErrors = null;
+    },
     setSelectedIssue: (state, action: PayloadAction<Issue | null>) => {
       state.selectedIssue = action.payload;
     },
@@ -384,7 +424,7 @@ const issueSlice = createSlice({
         console.log('✅ Frontend fetchIssues.fulfilled - Payload keys:', Object.keys(action.payload || {}));
         console.log('✅ Frontend fetchIssues.fulfilled - Has issues:', !!action.payload?.issues);
         console.log('✅ Frontend fetchIssues.fulfilled - Issues count:', action.payload?.issues?.length || 0);
-        
+
         state.loading = false;
         state.issues = action.payload.issues.map((issue: any) => ({
           ...issue,
@@ -399,7 +439,7 @@ const issueSlice = createSlice({
           currentPage: action.payload.currentPage || action.payload.pagination?.currentPage || 1,
         };
         state.error = null;
-        
+
         console.log('✅ Frontend fetchIssues.fulfilled - Updated state.issues count:', state.issues.length);
         console.log('✅ Frontend fetchIssues.fulfilled - Updated state.totalIssues:', state.totalIssues);
       })
@@ -417,7 +457,7 @@ const issueSlice = createSlice({
       })
       .addCase(fetchMyIssues.fulfilled, (state, action) => {
         console.log('✅ Frontend fetchMyIssues.fulfilled - Action payload:', action.payload);
-        
+
         state.loading = false;
         state.issues = action.payload.issues.map((issue: any) => ({
           ...issue,
@@ -432,7 +472,7 @@ const issueSlice = createSlice({
           currentPage: action.payload.currentPage || action.payload.pagination?.currentPage || 1,
         };
         state.error = null;
-        
+
         console.log('✅ Frontend fetchMyIssues.fulfilled - Updated state.issues count:', state.issues.length);
       })
       .addCase(fetchMyIssues.rejected, (state, action) => {
@@ -455,6 +495,7 @@ const issueSlice = createSlice({
           _id: issue.id,
           commentsCount: issue.comments?.length || 0,
           upvotes: issue.votes?.upvotes?.length || 0,
+          userVote: issue.userVote || null,
         };
         state.error = null;
       })
@@ -468,6 +509,7 @@ const issueSlice = createSlice({
       .addCase(createIssue.pending, (state) => {
         state.loading = true;
         state.error = null;
+        state.validationErrors = null;
       })
       .addCase(createIssue.fulfilled, (state, action) => {
         state.loading = false;
@@ -481,10 +523,25 @@ const issueSlice = createSlice({
         state.issues.unshift(normalizedIssue);
         state.totalIssues += 1;
         state.error = null;
+        state.validationErrors = null;
       })
       .addCase(createIssue.rejected, (state, action) => {
         state.loading = false;
-        state.error = action.payload as string;
+        const payload = action.payload as any;
+        state.error = payload?.message || 'Failed to create issue';
+
+        // Handle validation errors
+        if (payload?.validationErrors) {
+          const validationErrors: Record<string, string> = {};
+          payload.validationErrors.forEach((error: any) => {
+            if (error.path) {
+              validationErrors[error.path] = error.msg;
+            }
+          });
+          state.validationErrors = validationErrors;
+        } else {
+          state.validationErrors = null;
+        }
       });
 
     // Update issue
@@ -539,7 +596,11 @@ const issueSlice = createSlice({
       .addCase(addIssueComment.fulfilled, (state, action) => {
         state.loading = false;
         if (state.selectedIssue) {
-          state.selectedIssue.comments.push(action.payload.data.comment);
+          const comment = action.payload.comment;
+          state.selectedIssue.comments.push({
+            ...comment,
+            _id: comment.id,
+          });
         }
         state.error = null;
       })
@@ -555,18 +616,113 @@ const issueSlice = createSlice({
         state.error = null;
       })
       .addCase(voteOnIssue.fulfilled, (state, action) => {
+        console.log('✅ Vote fulfilled - action.payload:', action.payload);
+        console.log('✅ Vote fulfilled - updatedIssue:', action.payload.issue);
         state.loading = false;
-        const updatedIssue = action.payload.data.issue;
-        const index = state.issues.findIndex(issue => issue._id === updatedIssue._id);
+        const updatedIssue = action.payload.issue;
+        const issueId = updatedIssue.id || updatedIssue._id;
+
+        console.log('✅ Vote fulfilled - issueId:', issueId);
+        console.log('✅ Vote fulfilled - current selectedIssue:', state.selectedIssue?._id);
+
+        // Update the issue in the issues list
+        const index = state.issues.findIndex(issue => issue._id === issueId);
         if (index !== -1) {
-          state.issues[index] = updatedIssue;
+          state.issues[index] = {
+            ...state.issues[index],
+            ...updatedIssue,
+            _id: updatedIssue.id || updatedIssue._id,
+            upvotes: updatedIssue.votes?.upvotes?.length || 0,
+            downvotes: updatedIssue.votes?.downvotes?.length || 0,
+            userVote: action.payload.userVote,
+          };
         }
-        if (state.selectedIssue && state.selectedIssue._id === updatedIssue._id) {
-          state.selectedIssue = updatedIssue;
+
+        // Update the selected issue if it's the same
+        if (state.selectedIssue && state.selectedIssue._id === issueId) {
+          console.log('✅ Vote fulfilled - updating selectedIssue');
+          console.log('✅ Vote fulfilled - updatedIssue.votes:', updatedIssue.votes);
+          console.log('✅ Vote fulfilled - action.payload.userVote:', action.payload?.userVote);
+          state.selectedIssue = {
+            ...state.selectedIssue,
+            title: updatedIssue.title,
+            description: updatedIssue.description,
+            category: updatedIssue.category,
+            priority: updatedIssue.priority,
+            status: updatedIssue.status,
+            location: updatedIssue.location,
+            media: updatedIssue.media,
+            timeline: updatedIssue.timeline,
+            comments: updatedIssue.comments,
+            _id: updatedIssue.id || updatedIssue._id,
+            upvotes: updatedIssue.votes?.upvotes?.length || 0,
+            downvotes: updatedIssue.votes?.downvotes?.length || 0,
+            userVote: action.payload?.userVote ?? null,
+          } as any;
+          console.log('✅ Vote fulfilled - new selectedIssue:', state.selectedIssue);
         }
         state.error = null;
       })
       .addCase(voteOnIssue.rejected, (state, action) => {
+        state.loading = false;
+        state.error = action.payload as string;
+      });
+
+    // Remove vote from issue
+    builder
+      .addCase(removeVoteFromIssue.pending, (state) => {
+        state.loading = true;
+        state.error = null;
+      })
+      .addCase(removeVoteFromIssue.fulfilled, (state, action) => {
+        console.log('✅ Remove vote fulfilled - action.payload:', action.payload);
+        console.log('✅ Remove vote fulfilled - updatedIssue:', action.payload.issue);
+        state.loading = false;
+        const updatedIssue = action.payload.issue;
+        const issueId = updatedIssue.id || updatedIssue._id;
+
+        console.log('✅ Remove vote fulfilled - issueId:', issueId);
+        console.log('✅ Remove vote fulfilled - current selectedIssue:', state.selectedIssue?._id);
+
+        // Update the issue in the issues list
+        const index = state.issues.findIndex(issue => issue._id === issueId);
+        if (index !== -1) {
+          state.issues[index] = {
+            ...state.issues[index],
+            ...updatedIssue,
+            _id: updatedIssue.id || updatedIssue._id,
+            upvotes: updatedIssue.votes?.upvotes?.length || 0,
+            downvotes: updatedIssue.votes?.downvotes?.length || 0,
+            userVote: action.payload.userVote,
+          };
+        }
+
+        // Update the selected issue if it's the same
+        if (state.selectedIssue && state.selectedIssue._id === issueId) {
+          console.log('✅ Remove vote fulfilled - updating selectedIssue');
+          console.log('✅ Remove vote fulfilled - updatedIssue.votes:', updatedIssue.votes);
+          console.log('✅ Remove vote fulfilled - action.payload.userVote:', action.payload?.userVote);
+          state.selectedIssue = {
+            ...state.selectedIssue,
+            title: updatedIssue.title,
+            description: updatedIssue.description,
+            category: updatedIssue.category,
+            priority: updatedIssue.priority,
+            status: updatedIssue.status,
+            location: updatedIssue.location,
+            media: updatedIssue.media,
+            timeline: updatedIssue.timeline,
+            comments: updatedIssue.comments,
+            _id: updatedIssue.id || updatedIssue._id,
+            upvotes: updatedIssue.votes?.upvotes?.length || 0,
+            downvotes: updatedIssue.votes?.downvotes?.length || 0,
+            userVote: action.payload?.userVote ?? null,
+          } as any;
+          console.log('✅ Remove vote fulfilled - new selectedIssue:', state.selectedIssue);
+        }
+        state.error = null;
+      })
+      .addCase(removeVoteFromIssue.rejected, (state, action) => {
         state.loading = false;
         state.error = action.payload as string;
       });
@@ -621,6 +777,7 @@ const issueSlice = createSlice({
 
 export const {
   clearError,
+  clearValidationErrors,
   setSelectedIssue,
   setFilters,
   clearFilters,
@@ -635,6 +792,7 @@ export const selectSelectedIssue = (state: { issues: IssueState }) => state.issu
 export const selectTotalIssues = (state: { issues: IssueState }) => state.issues.totalIssues;
 export const selectIssuesLoading = (state: { issues: IssueState }) => state.issues.loading;
 export const selectIssuesError = (state: { issues: IssueState }) => state.issues.error;
+export const selectIssuesValidationErrors = (state: { issues: IssueState }) => state.issues.validationErrors;
 export const selectIssuesPagination = (state: { issues: IssueState }) => state.issues.pagination;
 export const selectIssuesCategories = (state: { issues: IssueState }) => state.issues.categories;
 export const selectMapMode = (state: { issues: IssueState }) => state.issues.mapMode;

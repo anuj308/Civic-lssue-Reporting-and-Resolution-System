@@ -1,5 +1,5 @@
-import React, { useEffect, useState } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import React, { useEffect, useState } from "react";
+import { useParams, useNavigate } from "react-router-dom";
 import {
   Box,
   Card,
@@ -21,7 +21,7 @@ import {
   CircularProgress,
   Breadcrumbs,
   Link,
-} from '@mui/material';
+} from "@mui/material";
 import {
   ArrowBack,
   LocationOn,
@@ -34,11 +34,14 @@ import {
   Delete,
   Send,
   Close,
-} from '@mui/icons-material';
-import { useSelector, useDispatch } from 'react-redux';
-import { format } from 'date-fns';
+  Download,
+  ThumbUpAltOutlined,
+  ThumbDownAltOutlined,
+} from "@mui/icons-material";
+import { useSelector, useDispatch } from "react-redux";
+import { format } from "date-fns";
 
-import { selectUser } from '../../store/slices/authSlice';
+import { selectUser } from "../../store/slices/authSlice";
 import {
   fetchIssueById,
   updateIssue,
@@ -46,8 +49,11 @@ import {
   selectSelectedIssue,
   selectIssuesLoading,
   selectIssuesError,
-} from '../../store/slices/issueSlice';
-import { setBreadcrumbs } from '../../store/slices/uiSlice';
+  addIssueComment,
+  voteOnIssue,
+  removeVoteFromIssue,
+} from "../../store/slices/issueSlice";
+import { setBreadcrumbs } from "../../store/slices/uiSlice";
 
 const IssueDetail: React.FC = () => {
   const { id } = useParams<{ id: string }>();
@@ -60,25 +66,34 @@ const IssueDetail: React.FC = () => {
   const error = useSelector(selectIssuesError);
 
   const [commentDialogOpen, setCommentDialogOpen] = useState(false);
-  const [newComment, setNewComment] = useState('');
+  const [newComment, setNewComment] = useState("");
   const [editDialogOpen, setEditDialogOpen] = useState(false);
   const [editForm, setEditForm] = useState({
-    title: '',
-    description: '',
-    category: '',
-    priority: '',
+    title: "",
+    description: "",
+    category: "",
+    priority: "",
   });
   const [isUpdating, setIsUpdating] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [isCommenting, setIsCommenting] = useState(false);
+  const [isVoting, setIsVoting] = useState(false);
 
   useEffect(() => {
     if (id) {
       dispatch(fetchIssueById(id));
     }
-  }, [id, dispatch]);
+  }, [id]); // Remove dispatch from dependencies
 
   useEffect(() => {
     if (issue) {
+      console.log('🔄 IssueDetail - issue updated:', {
+        _id: issue._id,
+        userVote: issue.userVote,
+        upvotes: issue.upvotes,
+        downvotes: issue.downvotes,
+        voteScore: issue.voteScore
+      });
       setEditForm({
         title: issue.title,
         description: issue.description,
@@ -89,7 +104,7 @@ const IssueDetail: React.FC = () => {
   }, [issue]);
 
   const handleBack = () => {
-    navigate('/my-issues');
+    navigate("/my-issues");
   };
 
   const handleEdit = () => {
@@ -101,13 +116,15 @@ const IssueDetail: React.FC = () => {
 
     setIsUpdating(true);
     try {
-      await dispatch(updateIssue({
-        issueId: id,
-        issueData: editForm,
-      })).unwrap();
+      await dispatch(
+        updateIssue({
+          issueId: id,
+          issueData: editForm,
+        })
+      ).unwrap();
       setEditDialogOpen(false);
     } catch (error) {
-      console.error('Failed to update issue:', error);
+      console.error("Failed to update issue:", error);
     } finally {
       setIsUpdating(false);
     }
@@ -116,13 +133,13 @@ const IssueDetail: React.FC = () => {
   const handleDelete = async () => {
     if (!id) return;
 
-    if (window.confirm('Are you sure you want to delete this issue?')) {
+    if (window.confirm("Are you sure you want to delete this issue?")) {
       setIsDeleting(true);
       try {
         await dispatch(deleteIssue(id)).unwrap();
-        navigate('/my-issues');
+        navigate("/my-issues");
       } catch (error) {
-        console.error('Failed to delete issue:', error);
+        console.error("Failed to delete issue:", error);
       } finally {
         setIsDeleting(false);
       }
@@ -130,36 +147,116 @@ const IssueDetail: React.FC = () => {
   };
 
   const handleCommentSubmit = async () => {
-    if (!newComment.trim()) return;
+    if (!newComment.trim() || !id) return;
 
-    // TODO: Implement comment submission
-    setNewComment('');
-    setCommentDialogOpen(false);
+    setIsCommenting(true);
+    try {
+      await dispatch(
+        addIssueComment({
+          issueId: id,
+          content: newComment.trim(),
+          isInternal: false,
+        })
+      ).unwrap();
+      setNewComment("");
+      setCommentDialogOpen(false);
+    } catch (error) {
+      console.error("Failed to add comment:", error);
+    } finally {
+      setIsCommenting(false);
+    }
+  };
+
+  const handleVote = async (voteType: 'upvote' | 'downvote') => {
+    if (!id) return;
+
+    console.log('🚀 IssueDetail - handleVote called with:', voteType);
+    console.log('🚀 IssueDetail - current issue.userVote:', issue?.userVote);
+    console.log('🚀 IssueDetail - current issue.upvotes:', issue?.upvotes);
+    console.log('🚀 IssueDetail - current issue.downvotes:', issue?.downvotes);
+
+    setIsVoting(true);
+    try {
+      await dispatch(
+        voteOnIssue({
+          issueId: id,
+          voteType,
+        })
+      ).unwrap();
+
+      console.log('✅ IssueDetail - vote successful');
+    } catch (error) {
+      console.error("❌ IssueDetail - Failed to vote:", error);
+    } finally {
+      setIsVoting(false);
+    }
+  };
+
+  const handleRemoveVote = async () => {
+    if (!id) return;
+
+    console.log('🚀 IssueDetail - handleRemoveVote called');
+    console.log('🚀 IssueDetail - current issue.userVote:', issue?.userVote);
+
+    setIsVoting(true);
+    try {
+      await dispatch(removeVoteFromIssue(id)).unwrap();
+
+      console.log('✅ IssueDetail - remove vote successful');
+    } catch (error) {
+      console.error("❌ IssueDetail - Failed to remove vote:", error);
+    } finally {
+      setIsVoting(false);
+    }
+  };
+
+  const handleDownload = (url: string, filename: string) => {
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = filename;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
   };
 
   const getStatusColor = (status: string) => {
     switch (status) {
-      case 'pending': return 'warning';
-      case 'acknowledged': return 'info';
-      case 'in_progress': return 'primary';
-      case 'resolved': return 'success';
-      default: return 'default';
+      case "pending":
+        return "warning";
+      case "acknowledged":
+        return "info";
+      case "in_progress":
+        return "primary";
+      case "resolved":
+        return "success";
+      default:
+        return "default";
     }
   };
 
   const getPriorityColor = (priority: string) => {
     switch (priority) {
-      case 'low': return 'success';
-      case 'medium': return 'warning';
-      case 'high': return 'error';
-      case 'critical': return 'error';
-      default: return 'default';
+      case "low":
+        return "success";
+      case "medium":
+        return "warning";
+      case "high":
+        return "error";
+      case "critical":
+        return "error";
+      default:
+        return "default";
     }
   };
 
   if (isLoading) {
     return (
-      <Box display="flex" justifyContent="center" alignItems="center" minHeight="400px">
+      <Box
+        display="flex"
+        justifyContent="center"
+        alignItems="center"
+        minHeight="400px"
+      >
         <CircularProgress />
       </Box>
     );
@@ -179,7 +276,7 @@ const IssueDetail: React.FC = () => {
   }
 
   const isOwner = user?.id === issue.reportedBy._id;
-  const canEdit = isOwner && issue.status === 'pending';
+  const canEdit = isOwner && issue.status === "pending";
 
   return (
     <Box p={3}>
@@ -193,10 +290,18 @@ const IssueDetail: React.FC = () => {
             Issue Details
           </Typography>
           <Breadcrumbs>
-            <Link color="inherit" href="#" onClick={() => navigate('/dashboard')}>
+            <Link
+              color="inherit"
+              href="#"
+              onClick={() => navigate("/dashboard")}
+            >
               Dashboard
             </Link>
-            <Link color="inherit" href="#" onClick={() => navigate('/my-issues')}>
+            <Link
+              color="inherit"
+              href="#"
+              onClick={() => navigate("/my-issues")}
+            >
               My Issues
             </Link>
             <Typography color="text.primary">{issue.title}</Typography>
@@ -230,13 +335,18 @@ const IssueDetail: React.FC = () => {
         <Grid item xs={12} md={8}>
           <Card>
             <CardContent>
-              <Box display="flex" justifyContent="space-between" alignItems="flex-start" mb={2}>
+              <Box
+                display="flex"
+                justifyContent="space-between"
+                alignItems="flex-start"
+                mb={2}
+              >
                 <Typography variant="h5" gutterBottom>
                   {issue.title}
                 </Typography>
                 <Box display="flex" gap={1}>
                   <Chip
-                    label={issue.status.replace('_', ' ').toUpperCase()}
+                    label={issue.status.replace("_", " ").toUpperCase()}
                     color={getStatusColor(issue.status)}
                     size="small"
                   />
@@ -259,19 +369,44 @@ const IssueDetail: React.FC = () => {
                     Images
                   </Typography>
                   <Grid container spacing={2}>
-                    {issue.media.images.map((imageUrl: string, index: number) => (
-                      <Grid item xs={6} sm={4} key={index}>
-                        <Paper
-                          sx={{
-                            height: 120,
-                            backgroundImage: `url(${imageUrl})`,
-                            backgroundSize: 'cover',
-                            backgroundPosition: 'center',
-                            borderRadius: 1,
-                          }}
-                        />
-                      </Grid>
-                    ))}
+                    {issue.media.images.map(
+                      (imageUrl: string, index: number) => (
+                        <Grid item xs={6} sm={4} key={index}>
+                          <Box position="relative">
+                            <Paper
+                              sx={{
+                                height: 120,
+                                backgroundImage: `url(${imageUrl})`,
+                                backgroundSize: "cover",
+                                backgroundPosition: "center",
+                                borderRadius: 1,
+                                cursor: "pointer",
+                              }}
+                              onClick={() => window.open(imageUrl, '_blank')}
+                            />
+                            <IconButton
+                              size="small"
+                              sx={{
+                                position: 'absolute',
+                                top: 4,
+                                right: 4,
+                                backgroundColor: 'rgba(255, 255, 255, 0.8)',
+                                '&:hover': {
+                                  backgroundColor: 'rgba(255, 255, 255, 0.9)',
+                                },
+                              }}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                const filename = `issue-image-${index + 1}.jpg`;
+                                handleDownload(imageUrl, filename);
+                              }}
+                            >
+                              <Download fontSize="small" />
+                            </IconButton>
+                          </Box>
+                        </Grid>
+                      )
+                    )}
                   </Grid>
                 </Box>
               )}
@@ -285,7 +420,8 @@ const IssueDetail: React.FC = () => {
                   <Box display="flex" alignItems="center" gap={1}>
                     <LocationOn color="action" />
                     <Typography variant="body2">
-                      {issue.location.address || 'Location coordinates available'}
+                      {issue.location.address ||
+                        "Location coordinates available"}
                     </Typography>
                   </Box>
                 </Box>
@@ -301,14 +437,16 @@ const IssueDetail: React.FC = () => {
                     <Box display="flex" alignItems="center" gap={2} mb={1}>
                       <AccessTime fontSize="small" color="action" />
                       <Typography variant="body2">
-                        REPORTED - {format(new Date(issue.timeline.reported), 'PPp')}
+                        REPORTED -{" "}
+                        {format(new Date(issue.timeline.reported), "PPp")}
                       </Typography>
                     </Box>
                     {issue.timeline.acknowledged && (
                       <Box display="flex" alignItems="center" gap={2} mb={1}>
                         <AccessTime fontSize="small" color="action" />
                         <Typography variant="body2">
-                          ACKNOWLEDGED - {format(new Date(issue.timeline.acknowledged), 'PPp')}
+                          ACKNOWLEDGED -{" "}
+                          {format(new Date(issue.timeline.acknowledged), "PPp")}
                         </Typography>
                       </Box>
                     )}
@@ -316,7 +454,8 @@ const IssueDetail: React.FC = () => {
                       <Box display="flex" alignItems="center" gap={2} mb={1}>
                         <AccessTime fontSize="small" color="action" />
                         <Typography variant="body2">
-                          STARTED - {format(new Date(issue.timeline.started), 'PPp')}
+                          STARTED -{" "}
+                          {format(new Date(issue.timeline.started), "PPp")}
                         </Typography>
                       </Box>
                     )}
@@ -324,7 +463,8 @@ const IssueDetail: React.FC = () => {
                       <Box display="flex" alignItems="center" gap={2} mb={1}>
                         <AccessTime fontSize="small" color="action" />
                         <Typography variant="body2">
-                          RESOLVED - {format(new Date(issue.timeline.resolved), 'PPp')}
+                          RESOLVED -{" "}
+                          {format(new Date(issue.timeline.resolved), "PPp")}
                         </Typography>
                       </Box>
                     )}
@@ -332,7 +472,8 @@ const IssueDetail: React.FC = () => {
                       <Box display="flex" alignItems="center" gap={2} mb={1}>
                         <AccessTime fontSize="small" color="action" />
                         <Typography variant="body2">
-                          CLOSED - {format(new Date(issue.timeline.closed), 'PPp')}
+                          CLOSED -{" "}
+                          {format(new Date(issue.timeline.closed), "PPp")}
                         </Typography>
                       </Box>
                     )}
@@ -345,7 +486,12 @@ const IssueDetail: React.FC = () => {
           {/* Comments Section */}
           <Card sx={{ mt: 3 }}>
             <CardContent>
-              <Box display="flex" justifyContent="space-between" alignItems="center" mb={2}>
+              <Box
+                display="flex"
+                justifyContent="space-between"
+                alignItems="center"
+                mb={2}
+              >
                 <Typography variant="h6">
                   Comments ({issue.comments?.length || 0})
                 </Typography>
@@ -380,7 +526,7 @@ const IssueDetail: React.FC = () => {
                           )}
                         </Typography>
                         <Typography variant="caption" color="text.secondary">
-                          {format(new Date(comment.timestamp), 'PPp')}
+                          {format(new Date(comment.timestamp), "PPp")}
                         </Typography>
                       </Box>
                     </Box>
@@ -391,7 +537,12 @@ const IssueDetail: React.FC = () => {
                   </Box>
                 ))
               ) : (
-                <Typography variant="body2" color="text.secondary" textAlign="center" py={4}>
+                <Typography
+                  variant="body2"
+                  color="text.secondary"
+                  textAlign="center"
+                  py={4}
+                >
                   No comments yet. Be the first to comment!
                 </Typography>
               )}
@@ -424,7 +575,7 @@ const IssueDetail: React.FC = () => {
                   Category
                 </Typography>
                 <Typography variant="body2" sx={{ mt: 0.5 }}>
-                  {issue.category.replace('_', ' ').toUpperCase()}
+                  {issue.category.replace("_", " ").toUpperCase()}
                 </Typography>
               </Box>
 
@@ -433,7 +584,7 @@ const IssueDetail: React.FC = () => {
                   Created
                 </Typography>
                 <Typography variant="body2" sx={{ mt: 0.5 }}>
-                  {format(new Date(issue.createdAt), 'PPp')}
+                  {format(new Date(issue.createdAt), "PPp")}
                 </Typography>
               </Box>
 
@@ -442,31 +593,63 @@ const IssueDetail: React.FC = () => {
                   Last Updated
                 </Typography>
                 <Typography variant="body2" sx={{ mt: 0.5 }}>
-                  {format(new Date(issue.updatedAt), 'PPp')}
+                  {format(new Date(issue.updatedAt), "PPp")}
                 </Typography>
               </Box>
 
               {/* Votes */}
               <Box>
-                <Typography variant="subtitle2" color="text.secondary" gutterBottom>
+                <Typography
+                  variant="subtitle2"
+                  color="text.secondary"
+                  gutterBottom
+                >
                   Community Feedback
                 </Typography>
                 <Box display="flex" gap={2}>
                   <Button
                     size="small"
-                    startIcon={<ThumbUp />}
-                    variant="outlined"
+                    startIcon={
+                      issue.userVote === 'upvote' ? (
+                        <ThumbUp color="success" />
+                      ) : (
+                        <ThumbUpAltOutlined />
+                      )
+                    }
+                    variant={issue.userVote === 'upvote' ? "contained" : "outlined"}
                     color="success"
+                    onClick={() => {
+                      if (issue.userVote === 'upvote') {
+                        handleRemoveVote();
+                      } else {
+                        handleVote('upvote');
+                      }
+                    }}
+                    disabled={isVoting}
                   >
                     {issue.upvotes || 0}
                   </Button>
                   <Button
                     size="small"
-                    startIcon={<ThumbDown />}
-                    variant="outlined"
+                    startIcon={
+                      issue.userVote === 'downvote' ? (
+                        <ThumbDown color="error" />
+                      ) : (
+                        <ThumbDownAltOutlined />
+                      )
+                    }
+                    variant={issue.userVote === 'downvote' ? "contained" : "outlined"}
                     color="error"
+                    onClick={() => {
+                      if (issue.userVote === 'downvote') {
+                        handleRemoveVote();
+                      } else {
+                        handleVote('downvote');
+                      }
+                    }}
+                    disabled={isVoting}
                   >
-                    {issue.votes?.downvotes?.length || 0}
+                    {issue.downvotes || 0}
                   </Button>
                 </Box>
               </Box>
@@ -476,7 +659,12 @@ const IssueDetail: React.FC = () => {
       </Grid>
 
       {/* Comment Dialog */}
-      <Dialog open={commentDialogOpen} onClose={() => setCommentDialogOpen(false)} maxWidth="sm" fullWidth>
+      <Dialog
+        open={commentDialogOpen}
+        onClose={() => setCommentDialogOpen(false)}
+        maxWidth="sm"
+        fullWidth
+      >
         <DialogTitle>Add Comment</DialogTitle>
         <DialogContent>
           <TextField
@@ -496,22 +684,29 @@ const IssueDetail: React.FC = () => {
             onClick={handleCommentSubmit}
             variant="contained"
             startIcon={<Send />}
-            disabled={!newComment.trim()}
+            disabled={!newComment.trim() || isCommenting}
           >
-            Post Comment
+            {isCommenting ? "Posting..." : "Post Comment"}
           </Button>
         </DialogActions>
       </Dialog>
 
       {/* Edit Dialog */}
-      <Dialog open={editDialogOpen} onClose={() => setEditDialogOpen(false)} maxWidth="sm" fullWidth>
+      <Dialog
+        open={editDialogOpen}
+        onClose={() => setEditDialogOpen(false)}
+        maxWidth="sm"
+        fullWidth
+      >
         <DialogTitle>Edit Issue</DialogTitle>
         <DialogContent>
           <TextField
             fullWidth
             label="Title"
             value={editForm.title}
-            onChange={(e) => setEditForm(prev => ({ ...prev, title: e.target.value }))}
+            onChange={(e) =>
+              setEditForm((prev) => ({ ...prev, title: e.target.value }))
+            }
             sx={{ mt: 2 }}
           />
           <TextField
@@ -520,7 +715,9 @@ const IssueDetail: React.FC = () => {
             rows={4}
             label="Description"
             value={editForm.description}
-            onChange={(e) => setEditForm(prev => ({ ...prev, description: e.target.value }))}
+            onChange={(e) =>
+              setEditForm((prev) => ({ ...prev, description: e.target.value }))
+            }
             sx={{ mt: 2 }}
           />
           <TextField
@@ -528,12 +725,21 @@ const IssueDetail: React.FC = () => {
             fullWidth
             label="Category"
             value={editForm.category}
-            onChange={(e) => setEditForm(prev => ({ ...prev, category: e.target.value }))}
+            onChange={(e) =>
+              setEditForm((prev) => ({ ...prev, category: e.target.value }))
+            }
             sx={{ mt: 2 }}
           >
-            {['pothole', 'streetlight', 'garbage', 'water', 'electricity', 'other'].map((option) => (
+            {[
+              "pothole",
+              "streetlight",
+              "garbage",
+              "water",
+              "electricity",
+              "other",
+            ].map((option) => (
               <option key={option} value={option}>
-                {option.replace('_', ' ').toUpperCase()}
+                {option.replace("_", " ").toUpperCase()}
               </option>
             ))}
           </TextField>
@@ -542,10 +748,12 @@ const IssueDetail: React.FC = () => {
             fullWidth
             label="Priority"
             value={editForm.priority}
-            onChange={(e) => setEditForm(prev => ({ ...prev, priority: e.target.value }))}
+            onChange={(e) =>
+              setEditForm((prev) => ({ ...prev, priority: e.target.value }))
+            }
             sx={{ mt: 2 }}
           >
-            {['low', 'medium', 'high', 'critical'].map((option) => (
+            {["low", "medium", "high", "critical"].map((option) => (
               <option key={option} value={option}>
                 {option.toUpperCase()}
               </option>
@@ -559,7 +767,7 @@ const IssueDetail: React.FC = () => {
             variant="contained"
             disabled={isUpdating}
           >
-            {isUpdating ? <CircularProgress size={20} /> : 'Update'}
+            {isUpdating ? <CircularProgress size={20} /> : "Update"}
           </Button>
         </DialogActions>
       </Dialog>

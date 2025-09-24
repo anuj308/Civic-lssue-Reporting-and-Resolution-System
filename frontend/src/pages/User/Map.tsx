@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState } from "react";
 import {
   Box,
   Card,
@@ -18,7 +18,7 @@ import {
   Divider,
   CircularProgress,
   Alert,
-} from '@mui/material';
+} from "@mui/material";
 import {
   Map as MapIcon,
   LocationOn,
@@ -26,28 +26,33 @@ import {
   FilterList,
   MyLocation,
   Refresh,
-} from '@mui/icons-material';
-import { useSelector, useDispatch } from 'react-redux';
-import { GoogleMap, useLoadScript, Marker, InfoWindow } from '@react-google-maps/api';
+} from "@mui/icons-material";
+import { useSelector, useDispatch } from "react-redux";
+import {
+  GoogleMap,
+  useLoadScript,
+  Marker,
+  InfoWindow,
+} from "@react-google-maps/api";
 
-import { selectUser } from '../../store/slices/authSlice';
-import { 
-  selectIssues, 
-  selectIssuesLoading, 
-  selectIssuesError, 
-  fetchIssues, 
-  Issue 
-} from '../../store/slices/issueSlice';
-import { setBreadcrumbs } from '../../store/slices/uiSlice';
+import { selectUser } from "../../store/slices/authSlice";
+import {
+  selectIssues,
+  selectIssuesLoading,
+  selectIssuesError,
+  fetchIssues,
+  Issue,
+} from "../../store/slices/issueSlice";
+import { setBreadcrumbs } from "../../store/slices/uiSlice";
 
 const containerStyle = {
-  width: '100%',
-  height: '600px',
+  width: "100%",
+  height: "600px",
 };
 
 const defaultCenter = {
   lat: 40.7128,
-  lng: -74.0060, // Default to New York City
+  lng: -74.006, // Default to New York City
 };
 
 const Map: React.FC = () => {
@@ -60,30 +65,37 @@ const Map: React.FC = () => {
   const [selectedIssue, setSelectedIssue] = useState<Issue | null>(null);
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [mapCenter, setMapCenter] = useState(defaultCenter);
-  const [userLocation, setUserLocation] = useState<{ lat: number; lng: number } | null>(null);
+  const [userLocation, setUserLocation] = useState<{
+    lat: number;
+    lng: number;
+  } | null>(null);
   const [filters, setFilters] = useState({
-    status: '',
-    category: '',
-    priority: '',
+    status: "",
+    category: "",
+    priority: "",
   });
 
   const { isLoaded, loadError } = useLoadScript({
-    googleMapsApiKey: import.meta.env.VITE_GOOGLE_MAPS_API_KEY || '',
+    googleMapsApiKey: import.meta.env.VITE_GOOGLE_MAPS_API_KEY || "",
   });
 
   useEffect(() => {
-    dispatch(setBreadcrumbs([
-      { label: 'Dashboard', path: '/dashboard' },
-      { label: 'Issue Map', path: '/map' },
-    ]));
+    dispatch(
+      setBreadcrumbs([
+        { label: "Dashboard", path: "/dashboard" },
+        { label: "Issue Map", path: "/map" },
+      ])
+    );
   }, [dispatch]);
 
   useEffect(() => {
     // Fetch issues when component mounts or filters change
-    dispatch(fetchIssues({
-      reportedBy: user?.id,
-      ...filters,
-    }));
+    dispatch(
+      fetchIssues({
+        reportedBy: user?.id,
+        ...filters,
+      })
+    );
   }, [dispatch, user?.id, filters]);
 
   useEffect(() => {
@@ -96,7 +108,7 @@ const Map: React.FC = () => {
           setMapCenter({ lat: latitude, lng: longitude });
         },
         (error) => {
-          console.error('Error getting location:', error);
+          console.error("Error getting location:", error);
         }
       );
     }
@@ -114,39 +126,52 @@ const Map: React.FC = () => {
   };
 
   const handleRefresh = () => {
-    dispatch(fetchIssues({
-      reportedBy: user?.id,
-      ...filters,
-    }));
+    dispatch(
+      fetchIssues({
+        reportedBy: user?.id,
+        ...filters,
+      })
+    );
   };
 
   const getStatusColor = (status: string) => {
     switch (status) {
-      case 'pending': return '#ff9800';
-      case 'acknowledged': return '#2196f3';
-      case 'in_progress': return '#9c27b0';
-      case 'resolved': return '#4caf50';
-      default: return '#757575';
+      case "pending":
+        return "#ff9800";
+      case "acknowledged":
+        return "#2196f3";
+      case "in_progress":
+        return "#9c27b0";
+      case "resolved":
+        return "#4caf50";
+      default:
+        return "#757575";
     }
   };
 
   const getPriorityColor = (priority: string) => {
     switch (priority) {
-      case 'low': return '#4caf50';
-      case 'medium': return '#ff9800';
-      case 'high': return '#f44336';
-      case 'critical': return '#d32f2f';
-      default: return '#757575';
+      case "low":
+        return "#4caf50";
+      case "medium":
+        return "#ff9800";
+      case "high":
+        return "#f44336";
+      case "critical":
+        return "#d32f2f";
+      default:
+        return "#757575";
     }
   };
 
-  const filteredIssues = issues?.filter((issue: Issue) => {
-    if (!issue.location?.coordinates) return false;
-    if (filters.status && issue.status !== filters.status) return false;
-    if (filters.category && issue.category !== filters.category) return false;
-    if (filters.priority && issue.priority !== filters.priority) return false;
-    return true;
-  }) || [];
+  const filteredIssues =
+    issues?.filter((issue: Issue) => {
+      if (!issue.location?.coordinates) return false;
+      if (filters.status && issue.status !== filters.status) return false;
+      if (filters.category && issue.category !== filters.category) return false;
+      if (filters.priority && issue.priority !== filters.priority) return false;
+      return true;
+    }) || [];
 
   if (loadError) {
     return (
@@ -160,7 +185,12 @@ const Map: React.FC = () => {
 
   if (!isLoaded) {
     return (
-      <Box display="flex" justifyContent="center" alignItems="center" minHeight="400px">
+      <Box
+        display="flex"
+        justifyContent="center"
+        alignItems="center"
+        minHeight="400px"
+      >
         <CircularProgress />
       </Box>
     );
@@ -169,7 +199,12 @@ const Map: React.FC = () => {
   return (
     <Box p={3}>
       {/* Header */}
-      <Box display="flex" justifyContent="space-between" alignItems="center" mb={3}>
+      <Box
+        display="flex"
+        justifyContent="space-between"
+        alignItems="center"
+        mb={3}
+      >
         <Box>
           <Typography variant="h4" gutterBottom>
             Issue Map
@@ -213,12 +248,14 @@ const Map: React.FC = () => {
                 </Typography>
                 <select
                   value={filters.status}
-                  onChange={(e) => setFilters(prev => ({ ...prev, status: e.target.value }))}
+                  onChange={(e) =>
+                    setFilters((prev) => ({ ...prev, status: e.target.value }))
+                  }
                   style={{
-                    padding: '8px 12px',
-                    border: '1px solid #ccc',
-                    borderRadius: '4px',
-                    minWidth: '120px',
+                    padding: "8px 12px",
+                    border: "1px solid #ccc",
+                    borderRadius: "4px",
+                    minWidth: "120px",
                   }}
                 >
                   <option value="">All Status</option>
@@ -235,12 +272,17 @@ const Map: React.FC = () => {
                 </Typography>
                 <select
                   value={filters.category}
-                  onChange={(e) => setFilters(prev => ({ ...prev, category: e.target.value }))}
+                  onChange={(e) =>
+                    setFilters((prev) => ({
+                      ...prev,
+                      category: e.target.value,
+                    }))
+                  }
                   style={{
-                    padding: '8px 12px',
-                    border: '1px solid #ccc',
-                    borderRadius: '4px',
-                    minWidth: '120px',
+                    padding: "8px 12px",
+                    border: "1px solid #ccc",
+                    borderRadius: "4px",
+                    minWidth: "120px",
                   }}
                 >
                   <option value="">All Categories</option>
@@ -259,12 +301,17 @@ const Map: React.FC = () => {
                 </Typography>
                 <select
                   value={filters.priority}
-                  onChange={(e) => setFilters(prev => ({ ...prev, priority: e.target.value }))}
+                  onChange={(e) =>
+                    setFilters((prev) => ({
+                      ...prev,
+                      priority: e.target.value,
+                    }))
+                  }
                   style={{
-                    padding: '8px 12px',
-                    border: '1px solid #ccc',
-                    borderRadius: '4px',
-                    minWidth: '120px',
+                    padding: "8px 12px",
+                    border: "1px solid #ccc",
+                    borderRadius: "4px",
+                    minWidth: "120px",
                   }}
                 >
                   <option value="">All Priorities</option>
@@ -298,7 +345,9 @@ const Map: React.FC = () => {
               <Marker
                 position={userLocation}
                 icon={{
-                  url: 'data:image/svg+xml;charset=UTF-8,' + encodeURIComponent(`
+                  url:
+                    "data:image/svg+xml;charset=UTF-8," +
+                    encodeURIComponent(`
                     <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
                       <circle cx="12" cy="12" r="8" fill="#2196f3" stroke="white" stroke-width="2"/>
                       <circle cx="12" cy="12" r="3" fill="white"/>
@@ -350,14 +399,22 @@ const Map: React.FC = () => {
                   </Typography>
                   <Box display="flex" gap={1} mb={1}>
                     <Chip
-                      label={selectedIssue.status.replace('_', ' ')}
+                      label={selectedIssue.status.replace("_", " ")}
                       size="small"
-                      sx={{ backgroundColor: getStatusColor(selectedIssue.status), color: 'white' }}
+                      sx={{
+                        backgroundColor: getStatusColor(selectedIssue.status),
+                        color: "white",
+                      }}
                     />
                     <Chip
                       label={selectedIssue.priority}
                       size="small"
-                      sx={{ backgroundColor: getPriorityColor(selectedIssue.priority), color: 'white' }}
+                      sx={{
+                        backgroundColor: getPriorityColor(
+                          selectedIssue.priority
+                        ),
+                        color: "white",
+                      }}
                     />
                   </Box>
                   <Typography variant="caption" color="text.secondary">
@@ -373,7 +430,7 @@ const Map: React.FC = () => {
       {/* Statistics */}
       <Grid container spacing={3} sx={{ mt: 2 }}>
         <Grid item xs={12} sm={6} md={3}>
-          <Paper sx={{ p: 2, textAlign: 'center' }}>
+          <Paper sx={{ p: 2, textAlign: "center" }}>
             <Typography variant="h4" color="primary">
               {filteredIssues.length}
             </Typography>
@@ -383,9 +440,13 @@ const Map: React.FC = () => {
           </Paper>
         </Grid>
         <Grid item xs={12} sm={6} md={3}>
-          <Paper sx={{ p: 2, textAlign: 'center' }}>
+          <Paper sx={{ p: 2, textAlign: "center" }}>
             <Typography variant="h4" color="warning.main">
-              {filteredIssues.filter((issue: Issue) => issue.status === 'pending').length}
+              {
+                filteredIssues.filter(
+                  (issue: Issue) => issue.status === "pending"
+                ).length
+              }
             </Typography>
             <Typography variant="body2" color="text.secondary">
               Pending
@@ -393,9 +454,13 @@ const Map: React.FC = () => {
           </Paper>
         </Grid>
         <Grid item xs={12} sm={6} md={3}>
-          <Paper sx={{ p: 2, textAlign: 'center' }}>
+          <Paper sx={{ p: 2, textAlign: "center" }}>
             <Typography variant="h4" color="info.main">
-              {filteredIssues.filter((issue: Issue) => issue.status === 'in_progress').length}
+              {
+                filteredIssues.filter(
+                  (issue: Issue) => issue.status === "in_progress"
+                ).length
+              }
             </Typography>
             <Typography variant="body2" color="text.secondary">
               In Progress
@@ -403,9 +468,13 @@ const Map: React.FC = () => {
           </Paper>
         </Grid>
         <Grid item xs={12} sm={6} md={3}>
-          <Paper sx={{ p: 2, textAlign: 'center' }}>
+          <Paper sx={{ p: 2, textAlign: "center" }}>
             <Typography variant="h4" color="success.main">
-              {filteredIssues.filter((issue: Issue) => issue.status === 'resolved').length}
+              {
+                filteredIssues.filter(
+                  (issue: Issue) => issue.status === "resolved"
+                ).length
+              }
             </Typography>
             <Typography variant="body2" color="text.secondary">
               Resolved
@@ -420,13 +489,18 @@ const Map: React.FC = () => {
         open={drawerOpen}
         onClose={() => setDrawerOpen(false)}
         sx={{
-          '& .MuiDrawer-paper': {
-            width: { xs: '100%', sm: 400 },
+          "& .MuiDrawer-paper": {
+            width: { xs: "100%", sm: 400 },
           },
         }}
       >
         <Box sx={{ p: 2 }}>
-          <Box display="flex" justifyContent="space-between" alignItems="center" mb={2}>
+          <Box
+            display="flex"
+            justifyContent="space-between"
+            alignItems="center"
+            mb={2}
+          >
             <Typography variant="h6">Issue Details</Typography>
             <IconButton onClick={() => setDrawerOpen(false)}>
               <Close />
@@ -441,14 +515,20 @@ const Map: React.FC = () => {
 
               <Box display="flex" gap={1} mb={2}>
                 <Chip
-                  label={selectedIssue.status.replace('_', ' ')}
+                  label={selectedIssue.status.replace("_", " ")}
                   size="small"
-                  sx={{ backgroundColor: getStatusColor(selectedIssue.status), color: 'white' }}
+                  sx={{
+                    backgroundColor: getStatusColor(selectedIssue.status),
+                    color: "white",
+                  }}
                 />
                 <Chip
                   label={selectedIssue.priority}
                   size="small"
-                  sx={{ backgroundColor: getPriorityColor(selectedIssue.priority), color: 'white' }}
+                  sx={{
+                    backgroundColor: getPriorityColor(selectedIssue.priority),
+                    color: "white",
+                  }}
                 />
                 <Chip
                   label={selectedIssue.category}
@@ -464,7 +544,8 @@ const Map: React.FC = () => {
               <Box display="flex" alignItems="center" gap={1} mb={2}>
                 <LocationOn fontSize="small" color="action" />
                 <Typography variant="body2">
-                  {selectedIssue.location.address || 'Location coordinates available'}
+                  {selectedIssue.location.address ||
+                    "Location coordinates available"}
                 </Typography>
               </Box>
 
@@ -473,28 +554,29 @@ const Map: React.FC = () => {
               </Typography>
 
               {/* Issue Images */}
-              {selectedIssue.media?.images && selectedIssue.media.images.length > 0 && (
-                <Box mt={2}>
-                  <Typography variant="subtitle2" gutterBottom>
-                    Images
-                  </Typography>
-                  <Grid container spacing={1}>
-                    {selectedIssue.media.images.map((imageUrl, index) => (
-                      <Grid item xs={6} key={index}>
-                        <Paper
-                          sx={{
-                            height: 80,
-                            backgroundImage: `url(${imageUrl})`,
-                            backgroundSize: 'cover',
-                            backgroundPosition: 'center',
-                            borderRadius: 1,
-                          }}
-                        />
-                      </Grid>
-                    ))}
-                  </Grid>
-                </Box>
-              )}
+              {selectedIssue.media?.images &&
+                selectedIssue.media.images.length > 0 && (
+                  <Box mt={2}>
+                    <Typography variant="subtitle2" gutterBottom>
+                      Images
+                    </Typography>
+                    <Grid container spacing={1}>
+                      {selectedIssue.media.images.map((imageUrl, index) => (
+                        <Grid item xs={6} key={index}>
+                          <Paper
+                            sx={{
+                              height: 80,
+                              backgroundImage: `url(${imageUrl})`,
+                              backgroundSize: "cover",
+                              backgroundPosition: "center",
+                              borderRadius: 1,
+                            }}
+                          />
+                        </Grid>
+                      ))}
+                    </Grid>
+                  </Box>
+                )}
             </Box>
           )}
         </Box>

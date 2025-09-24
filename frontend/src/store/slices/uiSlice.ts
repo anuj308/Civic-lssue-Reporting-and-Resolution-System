@@ -150,10 +150,10 @@ const uiSlice = createSlice({
           density: 'standard',
         };
       }
-      
+
       const selectedRows = state.tables[table].selectedRows;
       const index = selectedRows.indexOf(rowId);
-      
+
       if (index === -1) {
         selectedRows.push(rowId);
       } else {
@@ -212,14 +212,14 @@ export const selectSidebarOpen = (state: { ui: UIState }) => state.ui.sidebarOpe
 export const selectSidebarWidth = (state: { ui: UIState }) => state.ui.sidebarWidth;
 export const selectTheme = (state: { ui: UIState }) => state.ui.theme;
 export const selectGlobalLoading = (state: { ui: UIState }) => state.ui.loading.global;
-export const selectComponentLoading = (component: string) => (state: { ui: UIState }) => 
+export const selectComponentLoading = (component: string) => (state: { ui: UIState }) =>
   state.ui.loading.components[component] || false;
-export const selectModal = (modal: string) => (state: { ui: UIState }) => 
+export const selectModal = (modal: string) => (state: { ui: UIState }) =>
   state.ui.modals[modal] || { open: false };
 export const selectBreadcrumbs = (state: { ui: UIState }) => state.ui.breadcrumbs;
 export const selectPageTitle = (state: { ui: UIState }) => state.ui.pageTitle;
 export const selectFiltersCollapsed = (state: { ui: UIState }) => state.ui.filters.collapsed;
-export const selectTableConfig = (table: string) => (state: { ui: UIState }) => 
+export const selectTableConfig = (table: string) => (state: { ui: UIState }) =>
   state.ui.tables[table] || { selectedRows: [], density: 'standard' };
 export const selectNotificationSettings = (state: { ui: UIState }) => state.ui.notifications;
 export const selectPreferences = (state: { ui: UIState }) => state.ui.preferences;

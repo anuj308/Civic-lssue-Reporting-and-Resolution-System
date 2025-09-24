@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import React, { useEffect } from "react";
 import {
   Box,
   Grid,
@@ -17,7 +17,7 @@ import {
   LinearProgress,
   Paper,
   useTheme,
-} from '@mui/material';
+} from "@mui/material";
 import {
   TrendingUp,
   TrendingDown,
@@ -31,20 +31,17 @@ import {
   Refresh,
   MoreVert,
   Assignment,
-} from '@mui/icons-material';
-import { useDispatch, useSelector } from 'react-redux';
-import { AppDispatch } from '../../store/store';
+} from "@mui/icons-material";
+import { useDispatch, useSelector } from "react-redux";
+import { AppDispatch } from "../../store/store";
 import {
   fetchDashboardMetrics,
   selectDashboardMetrics,
   selectAnalyticsLoading,
   selectAnalyticsError,
-} from '../../store/slices/analyticsSlice';
-import {
-  setBreadcrumbs,
-  setPageTitle,
-} from '../../store/slices/uiSlice';
-import { Line, Doughnut, Bar } from 'react-chartjs-2';
+} from "../../store/slices/analyticsSlice";
+import { setBreadcrumbs, setPageTitle } from "../../store/slices/uiSlice";
+import { Line, Doughnut, Bar } from "react-chartjs-2";
 import {
   Chart as ChartJS,
   CategoryScale,
@@ -56,7 +53,7 @@ import {
   Legend,
   ArcElement,
   BarElement,
-} from 'chart.js';
+} from "chart.js";
 
 // Register Chart.js components
 ChartJS.register(
@@ -77,7 +74,7 @@ interface MetricCardProps {
   change?: number;
   changeLabel?: string;
   icon: React.ReactNode;
-  color: 'primary' | 'secondary' | 'success' | 'error' | 'warning' | 'info';
+  color: "primary" | "secondary" | "success" | "error" | "warning" | "info";
   isLoading?: boolean;
 }
 
@@ -91,9 +88,9 @@ const MetricCard: React.FC<MetricCardProps> = ({
   isLoading = false,
 }) => {
   const theme = useTheme();
-  
+
   const formatValue = (val: string | number) => {
-    if (typeof val === 'number') {
+    if (typeof val === "number") {
       return val.toLocaleString();
     }
     return val;
@@ -103,38 +100,59 @@ const MetricCard: React.FC<MetricCardProps> = ({
   const isNegativeChange = change && change < 0;
 
   return (
-    <Card sx={{ height: '100%' }}>
+    <Card sx={{ height: "100%" }}>
       <CardContent>
-        <Box sx={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between' }}>
+        <Box
+          sx={{
+            display: "flex",
+            alignItems: "flex-start",
+            justifyContent: "space-between",
+          }}
+        >
           <Box sx={{ flexGrow: 1 }}>
             <Typography color="text.secondary" gutterBottom variant="body2">
               {title}
             </Typography>
-            
+
             {isLoading ? (
               <Box sx={{ my: 2 }}>
                 <LinearProgress />
               </Box>
             ) : (
-              <Typography variant="h4" component="div" fontWeight="bold" sx={{ mb: 1 }}>
+              <Typography
+                variant="h4"
+                component="div"
+                fontWeight="bold"
+                sx={{ mb: 1 }}
+              >
                 {formatValue(value)}
               </Typography>
             )}
-            
+
             {change !== undefined && changeLabel && (
-              <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                {isPositiveChange && <TrendingUp color="success" fontSize="small" />}
-                {isNegativeChange && <TrendingDown color="error" fontSize="small" />}
+              <Box sx={{ display: "flex", alignItems: "center", gap: 0.5 }}>
+                {isPositiveChange && (
+                  <TrendingUp color="success" fontSize="small" />
+                )}
+                {isNegativeChange && (
+                  <TrendingDown color="error" fontSize="small" />
+                )}
                 <Typography
                   variant="body2"
-                  color={isPositiveChange ? 'success.main' : isNegativeChange ? 'error.main' : 'text.secondary'}
+                  color={
+                    isPositiveChange
+                      ? "success.main"
+                      : isNegativeChange
+                        ? "error.main"
+                        : "text.secondary"
+                  }
                 >
                   {Math.abs(change)}% {changeLabel}
                 </Typography>
               </Box>
             )}
           </Box>
-          
+
           <Avatar
             sx={{
               bgcolor: `${color}.main`,
@@ -153,17 +171,15 @@ const MetricCard: React.FC<MetricCardProps> = ({
 const Dashboard: React.FC = () => {
   const theme = useTheme();
   const dispatch = useDispatch<AppDispatch>();
-  
+
   const dashboardMetrics = useSelector(selectDashboardMetrics);
   const loading = useSelector(selectAnalyticsLoading);
   const error = useSelector(selectAnalyticsError);
 
   useEffect(() => {
-    dispatch(setPageTitle('Dashboard'));
-    dispatch(setBreadcrumbs([
-      { label: 'Dashboard', path: '/dashboard' }
-    ]));
-    
+    dispatch(setPageTitle("Dashboard"));
+    dispatch(setBreadcrumbs([{ label: "Dashboard", path: "/dashboard" }]));
+
     // Fetch dashboard data
     dispatch(fetchDashboardMetrics());
   }, [dispatch]);
@@ -174,17 +190,17 @@ const Dashboard: React.FC = () => {
 
   // Chart data
   const issuesTrendData = {
-    labels: ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun'],
+    labels: ["Jan", "Feb", "Mar", "Apr", "May", "Jun"],
     datasets: [
       {
-        label: 'Reported',
+        label: "Reported",
         data: [65, 59, 80, 81, 56, 55],
         borderColor: theme.palette.primary.main,
         backgroundColor: `${theme.palette.primary.main}20`,
         tension: 0.4,
       },
       {
-        label: 'Resolved',
+        label: "Resolved",
         data: [28, 48, 40, 19, 86, 27],
         borderColor: theme.palette.success.main,
         backgroundColor: `${theme.palette.success.main}20`,
@@ -194,7 +210,7 @@ const Dashboard: React.FC = () => {
   };
 
   const statusDistributionData = {
-    labels: ['Pending', 'In Progress', 'Resolved', 'Closed'],
+    labels: ["Pending", "In Progress", "Resolved", "Closed"],
     datasets: [
       {
         data: [30, 25, 35, 10],
@@ -210,10 +226,10 @@ const Dashboard: React.FC = () => {
   };
 
   const departmentPerformanceData = {
-    labels: ['Public Works', 'Health', 'Transportation', 'Safety', 'Parks'],
+    labels: ["Public Works", "Health", "Transportation", "Safety", "Parks"],
     datasets: [
       {
-        label: 'Resolution Rate (%)',
+        label: "Resolution Rate (%)",
         data: [85, 92, 78, 88, 90],
         backgroundColor: theme.palette.primary.main,
         borderRadius: 4,
@@ -226,18 +242,22 @@ const Dashboard: React.FC = () => {
     maintainAspectRatio: false,
     plugins: {
       legend: {
-        position: 'top' as const,
+        position: "top" as const,
       },
     },
   };
 
   if (error) {
     return (
-      <Box sx={{ p: 3, textAlign: 'center' }}>
+      <Box sx={{ p: 3, textAlign: "center" }}>
         <Typography color="error" variant="h6" gutterBottom>
           Error loading dashboard data
         </Typography>
-        <Button variant="contained" onClick={handleRefresh} startIcon={<Refresh />}>
+        <Button
+          variant="contained"
+          onClick={handleRefresh}
+          startIcon={<Refresh />}
+        >
           Retry
         </Button>
       </Box>
@@ -247,7 +267,14 @@ const Dashboard: React.FC = () => {
   return (
     <Box sx={{ flexGrow: 1 }}>
       {/* Header */}
-      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
+      <Box
+        sx={{
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "center",
+          mb: 3,
+        }}
+      >
         <Typography variant="h4" fontWeight="bold">
           Dashboard Overview
         </Typography>
@@ -274,7 +301,7 @@ const Dashboard: React.FC = () => {
             isLoading={loading}
           />
         </Grid>
-        
+
         <Grid item xs={12} sm={6} md={3}>
           <MetricCard
             title="Active Users"
@@ -286,7 +313,7 @@ const Dashboard: React.FC = () => {
             isLoading={loading}
           />
         </Grid>
-        
+
         <Grid item xs={12} sm={6} md={3}>
           <MetricCard
             title="Pending Issues"
@@ -298,7 +325,7 @@ const Dashboard: React.FC = () => {
             isLoading={loading}
           />
         </Grid>
-        
+
         <Grid item xs={12} sm={6} md={3}>
           <MetricCard
             title="Resolution Rate"
@@ -318,7 +345,14 @@ const Dashboard: React.FC = () => {
         <Grid item xs={12} lg={8}>
           <Card>
             <CardContent>
-              <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+              <Box
+                sx={{
+                  display: "flex",
+                  justifyContent: "space-between",
+                  alignItems: "center",
+                  mb: 2,
+                }}
+              >
                 <Typography variant="h6" fontWeight="bold">
                   Issues Trend
                 </Typography>
@@ -341,7 +375,10 @@ const Dashboard: React.FC = () => {
                 Issue Status Distribution
               </Typography>
               <Box sx={{ height: 300 }}>
-                <Doughnut data={statusDistributionData} options={chartOptions} />
+                <Doughnut
+                  data={statusDistributionData}
+                  options={chartOptions}
+                />
               </Box>
             </CardContent>
           </Card>
@@ -374,7 +411,7 @@ const Dashboard: React.FC = () => {
               <List>
                 <ListItem>
                   <ListItemAvatar>
-                    <Avatar sx={{ bgcolor: 'primary.main' }}>
+                    <Avatar sx={{ bgcolor: "primary.main" }}>
                       <Assignment />
                     </Avatar>
                   </ListItemAvatar>
@@ -383,12 +420,12 @@ const Dashboard: React.FC = () => {
                     secondary="Pothole on Main Street"
                   />
                 </ListItem>
-                
+
                 <Divider variant="inset" component="li" />
-                
+
                 <ListItem>
                   <ListItemAvatar>
-                    <Avatar sx={{ bgcolor: 'success.main' }}>
+                    <Avatar sx={{ bgcolor: "success.main" }}>
                       <CheckCircle />
                     </Avatar>
                   </ListItemAvatar>
@@ -397,12 +434,12 @@ const Dashboard: React.FC = () => {
                     secondary="Street light repair completed"
                   />
                 </ListItem>
-                
+
                 <Divider variant="inset" component="li" />
-                
+
                 <ListItem>
                   <ListItemAvatar>
-                    <Avatar sx={{ bgcolor: 'info.main' }}>
+                    <Avatar sx={{ bgcolor: "info.main" }}>
                       <People />
                     </Avatar>
                   </ListItemAvatar>

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState } from "react";
 import {
   Box,
   Card,
@@ -11,32 +11,35 @@ import {
   IconButton,
   Link,
   Divider,
-} from '@mui/material';
+} from "@mui/material";
 import {
   Visibility,
   VisibilityOff,
   Email,
   Lock,
   AccountCircle,
-} from '@mui/icons-material';
-import { useForm, Controller } from 'react-hook-form';
-import { yupResolver } from '@hookform/resolvers/yup';
-import * as yup from 'yup';
-import { useDispatch, useSelector } from 'react-redux';
-import { useNavigate, useLocation, Link as RouterLink } from 'react-router-dom';
-import { loginUser, selectAuth, clearError, clearVerificationState } from '../../store/slices/authSlice';
-import { AppDispatch } from '../../store/store';
-import { showToast } from '../../utils/toast';
+} from "@mui/icons-material";
+import { useForm, Controller } from "react-hook-form";
+import { yupResolver } from "@hookform/resolvers/yup";
+import * as yup from "yup";
+import { useDispatch, useSelector } from "react-redux";
+import { useNavigate, useLocation, Link as RouterLink } from "react-router-dom";
+import {
+  loginUser,
+  selectAuth,
+  clearError,
+  clearVerificationState,
+} from "../../store/slices/authSlice";
+import { AppDispatch } from "../../store/store";
+import { showToast } from "../../utils/toast";
 
 // Validation schema
 const loginSchema = yup.object({
   email: yup
     .string()
-    .email('Please enter a valid email address')
-    .required('Email is required'),
-  password: yup
-    .string()
-    .required('Password is required'),
+    .email("Please enter a valid email address")
+    .required("Email is required"),
+  password: yup.string().required("Password is required"),
 });
 
 interface LoginFormData {
@@ -49,8 +52,15 @@ const Login: React.FC = () => {
   const dispatch = useDispatch<AppDispatch>();
   const navigate = useNavigate();
   const location = useLocation();
-  
-  const { loading, error, isAuthenticated, needsVerification, verificationEmail, verificationPassword } = useSelector(selectAuth);
+
+  const {
+    loading,
+    error,
+    isAuthenticated,
+    needsVerification,
+    verificationEmail,
+    verificationPassword,
+  } = useSelector(selectAuth);
 
   const {
     control,
@@ -60,15 +70,18 @@ const Login: React.FC = () => {
   } = useForm<LoginFormData>({
     resolver: yupResolver(loginSchema),
     defaultValues: {
-      email: '',
-      password: '',
+      email: "",
+      password: "",
     },
   });
 
   // Redirect if already authenticated
   React.useEffect(() => {
     if (isAuthenticated) {
-      const from = (typeof location.state?.from === 'string' ? location.state.from : '/dashboard');
+      const from =
+        typeof location.state?.from === "string"
+          ? location.state.from
+          : "/dashboard";
       navigate(from, { replace: true });
     }
   }, [isAuthenticated, navigate, location.state?.from]);
@@ -76,11 +89,11 @@ const Login: React.FC = () => {
   // Handle email verification required
   React.useEffect(() => {
     if (needsVerification && verificationEmail) {
-      navigate('/verify-otp', {
+      navigate("/verify-otp", {
         state: {
           email: verificationEmail,
           isLoginVerification: true,
-          password: verificationPassword || '',
+          password: verificationPassword || "",
         },
         replace: true,
       });
@@ -105,7 +118,7 @@ const Login: React.FC = () => {
       // Navigation will be handled by the useEffect above
     } catch (error) {
       // Error will be handled by Redux state
-      console.error('Login failed:', error);
+      console.error("Login failed:", error);
     }
   };
 
@@ -120,41 +133,46 @@ const Login: React.FC = () => {
   return (
     <Box
       sx={{
-        minHeight: '100vh',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+        minHeight: "100vh",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        background: "linear-gradient(135deg, #667eea 0%, #764ba2 100%)",
         padding: 3,
       }}
     >
       <Card
         sx={{
-          width: '100%',
+          width: "100%",
           maxWidth: 480,
-          boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)',
+          boxShadow: "0 25px 50px -12px rgba(0, 0, 0, 0.25)",
           borderRadius: 2,
         }}
       >
         <CardContent sx={{ p: 4 }}>
           {/* Header */}
-          <Box sx={{ textAlign: 'center', mb: 4 }}>
+          <Box sx={{ textAlign: "center", mb: 4 }}>
             <Box
               sx={{
-                display: 'inline-flex',
-                alignItems: 'center',
-                justifyContent: 'center',
+                display: "inline-flex",
+                alignItems: "center",
+                justifyContent: "center",
                 width: 64,
                 height: 64,
-                borderRadius: '50%',
-                backgroundColor: 'primary.main',
-                color: 'white',
+                borderRadius: "50%",
+                backgroundColor: "primary.main",
+                color: "white",
                 mb: 2,
               }}
             >
               <AccountCircle sx={{ fontSize: 32 }} />
             </Box>
-            <Typography variant="h4" component="h1" gutterBottom fontWeight="bold">
+            <Typography
+              variant="h4"
+              component="h1"
+              gutterBottom
+              fontWeight="bold"
+            >
               Welcome Back
             </Typography>
             <Typography variant="body1" color="text.secondary">
@@ -197,7 +215,7 @@ const Login: React.FC = () => {
                   {...field}
                   fullWidth
                   label="Password"
-                  type={showPassword ? 'text' : 'password'}
+                  type={showPassword ? "text" : "password"}
                   autoComplete="current-password"
                   error={!!errors.password}
                   helperText={errors.password?.message}
@@ -234,7 +252,7 @@ const Login: React.FC = () => {
               disabled={loading}
               sx={{
                 py: 1.5,
-                fontSize: '1.1rem',
+                fontSize: "1.1rem",
                 fontWeight: 600,
                 mb: 3,
               }}
@@ -242,7 +260,7 @@ const Login: React.FC = () => {
               {loading ? (
                 <CircularProgress size={24} color="inherit" />
               ) : (
-                'Sign In'
+                "Sign In"
               )}
             </Button>
           </Box>
@@ -254,9 +272,9 @@ const Login: React.FC = () => {
           </Divider>
 
           {/* Register Link */}
-          <Box sx={{ textAlign: 'center', mb: 2 }}>
+          <Box sx={{ textAlign: "center", mb: 2 }}>
             <Typography variant="body2" color="text.secondary">
-              Don't have an account?{' '}
+              Don't have an account?{" "}
               <Link component={RouterLink} to="/register" color="primary">
                 Create one here
               </Link>
@@ -264,12 +282,13 @@ const Login: React.FC = () => {
           </Box>
 
           {/* Footer Info */}
-          <Box sx={{ textAlign: 'center' }}>
+          <Box sx={{ textAlign: "center" }}>
             <Typography variant="body2" color="text.secondary" paragraph>
-              Report civic issues, track progress, and engage with your community.
+              Report civic issues, track progress, and engage with your
+              community.
             </Typography>
             <Typography variant="body2" color="text.secondary">
-              Need help? Contact{' '}
+              Need help? Contact{" "}
               <Link href="mailto:support@civicissues.com" color="primary">
                 support@civicissues.com
               </Link>

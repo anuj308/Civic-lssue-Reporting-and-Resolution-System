@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState } from "react";
 import {
   Box,
   Grid,
@@ -18,7 +18,7 @@ import {
   Alert,
   Skeleton,
   IconButton,
-} from '@mui/material';
+} from "@mui/material";
 import {
   Add,
   ReportProblem,
@@ -30,21 +30,18 @@ import {
   Visibility,
   ThumbUp,
   Comment,
-} from '@mui/icons-material';
-import { useDispatch, useSelector } from 'react-redux';
-import { useNavigate, Navigate } from 'react-router-dom';
-import { AppDispatch } from '../../store/store';
+} from "@mui/icons-material";
+import { useDispatch, useSelector } from "react-redux";
+import { useNavigate, Navigate } from "react-router-dom";
+import { AppDispatch } from "../../store/store";
 import {
-  fetchIssues,
+  fetchMyIssues,
   selectIssues,
   selectIssuesLoading,
   selectIssuesError,
-} from '../../store/slices/issueSlice';
-import { selectCurrentUser } from '../../store/slices/authSlice';
-import {
-  setBreadcrumbs,
-  setPageTitle,
-} from '../../store/slices/uiSlice';
+} from "../../store/slices/issueSlice";
+import { selectCurrentUser } from "../../store/slices/authSlice";
+import { setBreadcrumbs, setPageTitle } from "../../store/slices/uiSlice";
 
 interface IssueCardProps {
   issue: any;
@@ -56,42 +53,52 @@ const IssueCard: React.FC<IssueCardProps> = ({ issue, onViewDetails }) => {
 
   const getStatusColor = (status: string) => {
     switch (status) {
-      case 'pending':
-        return 'warning';
-      case 'acknowledged':
-        return 'info';
-      case 'in_progress':
-        return 'primary';
-      case 'resolved':
-        return 'success';
-      case 'closed':
-        return 'default';
+      case "pending":
+        return "warning";
+      case "acknowledged":
+        return "info";
+      case "in_progress":
+        return "primary";
+      case "resolved":
+        return "success";
+      case "closed":
+        return "default";
       default:
-        return 'default';
+        return "default";
     }
   };
 
   const getStatusLabel = (status: string) => {
     switch (status) {
-      case 'pending':
-        return 'Pending';
-      case 'acknowledged':
-        return 'Acknowledged';
-      case 'in_progress':
-        return 'In Progress';
-      case 'resolved':
-        return 'Resolved';
-      case 'closed':
-        return 'Closed';
+      case "pending":
+        return "Pending";
+      case "acknowledged":
+        return "Acknowledged";
+      case "in_progress":
+        return "In Progress";
+      case "resolved":
+        return "Resolved";
+      case "closed":
+        return "Closed";
       default:
         return status;
     }
   };
 
   return (
-    <Card sx={{ mb: 2, cursor: 'pointer' }} onClick={() => onViewDetails(issue._id)}>
+    <Card
+      sx={{ mb: 2, cursor: "pointer" }}
+      onClick={() => onViewDetails(issue._id)}
+    >
       <CardContent>
-        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 1 }}>
+        <Box
+          sx={{
+            display: "flex",
+            justifyContent: "space-between",
+            alignItems: "flex-start",
+            mb: 1,
+          }}
+        >
           <Typography variant="h6" component="div" sx={{ flexGrow: 1, mr: 2 }}>
             {issue.title}
           </Typography>
@@ -108,23 +115,29 @@ const IssueCard: React.FC<IssueCardProps> = ({ issue, onViewDetails }) => {
             : issue.description}
         </Typography>
 
-        <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 1 }}>
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+        <Box sx={{ display: "flex", alignItems: "center", gap: 2, mb: 1 }}>
+          <Box sx={{ display: "flex", alignItems: "center", gap: 0.5 }}>
             <LocationOn fontSize="small" color="action" />
             <Typography variant="body2" color="text.secondary">
-              {issue.location?.address || 'Location not specified'}
+              {issue.location?.address || "Location not specified"}
             </Typography>
           </Box>
         </Box>
 
-        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <Box
+          sx={{
+            display: "flex",
+            justifyContent: "space-between",
+            alignItems: "center",
+          }}
+        >
           <Typography variant="caption" color="text.secondary">
             Reported {new Date(issue.createdAt).toLocaleDateString()}
           </Typography>
 
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+          <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
             {issue.upvotes > 0 && (
-              <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+              <Box sx={{ display: "flex", alignItems: "center", gap: 0.5 }}>
                 <ThumbUp fontSize="small" color="action" />
                 <Typography variant="caption" color="text.secondary">
                   {issue.upvotes}
@@ -133,7 +146,7 @@ const IssueCard: React.FC<IssueCardProps> = ({ issue, onViewDetails }) => {
             )}
 
             {issue.commentsCount > 0 && (
-              <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+              <Box sx={{ display: "flex", alignItems: "center", gap: 0.5 }}>
                 <Comment fontSize="small" color="action" />
                 <Typography variant="caption" color="text.secondary">
                   {issue.commentsCount}
@@ -151,9 +164,11 @@ const UserDashboard: React.FC = () => {
   const dispatch = useDispatch<AppDispatch>();
   const navigate = useNavigate();
   const currentUser = useSelector(selectCurrentUser);
-  
+
   // Check if user is admin/staff - redirect to admin dashboard
-  const isAdmin = currentUser?.role && ['admin', 'department_head', 'department_staff'].includes(currentUser.role);
+  const isAdmin =
+    currentUser?.role &&
+    ["admin", "department_head", "department_staff"].includes(currentUser.role);
   if (isAdmin) {
     return <Navigate to="/dashboard" replace />;
   }
@@ -169,10 +184,8 @@ const UserDashboard: React.FC = () => {
   });
 
   useEffect(() => {
-    dispatch(setPageTitle('My Dashboard'));
-    dispatch(setBreadcrumbs([
-      { label: 'Dashboard', path: '/dashboard' }
-    ]));
+    dispatch(setPageTitle("My Dashboard"));
+    dispatch(setBreadcrumbs([{ label: "Dashboard", path: "/dashboard" }]));
 
     // Fetch user's issues
     loadUserIssues();
@@ -181,41 +194,45 @@ const UserDashboard: React.FC = () => {
   useEffect(() => {
     // Calculate stats from issues
     if (issues) {
-      const userIssues = issues.filter((issue: any) => issue.reportedBy === currentUser?._id);
       setStats({
-        total: userIssues.length,
-        pending: userIssues.filter((issue: any) => issue.status === 'pending').length,
-        inProgress: userIssues.filter((issue: any) => issue.status === 'in_progress' || issue.status === 'acknowledged').length,
-        resolved: userIssues.filter((issue: any) => issue.status === 'resolved').length,
+        total: issues.length,
+        pending: issues.filter((issue: any) => issue.status === "pending")
+          .length,
+        inProgress: issues.filter(
+          (issue: any) =>
+            issue.status === "in_progress" || issue.status === "acknowledged"
+        ).length,
+        resolved: issues.filter((issue: any) => issue.status === "resolved")
+          .length,
       });
     }
   }, [issues, currentUser]);
 
   const loadUserIssues = () => {
-    dispatch(fetchIssues({
-      reportedBy: currentUser?._id,
-      limit: 10,
-      sort: '-createdAt'
-    }));
+    dispatch(
+      fetchMyIssues({
+        limit: 10,
+      })
+    );
   };
 
   const handleReportIssue = () => {
-    navigate('/report-issue');
+    navigate("/report-issue");
   };
 
   const handleViewIssue = (issueId: string) => {
-    navigate(`/issues/${issueId}`);
+    navigate(`/issue/${issueId}`);
   };
 
   const handleViewAllIssues = () => {
-    navigate('/my-issues');
+    navigate("/my-issues");
   };
 
   const handleRefresh = () => {
     loadUserIssues();
   };
 
-  const userIssues = issues?.filter((issue: any) => issue.reportedBy === currentUser?._id) || [];
+  const userIssues = issues || [];
   const recentIssues = userIssues.slice(0, 3);
 
   if (error) {
@@ -224,7 +241,11 @@ const UserDashboard: React.FC = () => {
         <Alert severity="error" sx={{ mb: 2 }}>
           {error}
         </Alert>
-        <Button variant="contained" onClick={handleRefresh} startIcon={<Refresh />}>
+        <Button
+          variant="contained"
+          onClick={handleRefresh}
+          startIcon={<Refresh />}
+        >
           Retry
         </Button>
       </Box>
@@ -232,11 +253,11 @@ const UserDashboard: React.FC = () => {
   }
 
   return (
-    <Box sx={{ flexGrow: 1, position: 'relative' }}>
+    <Box sx={{ flexGrow: 1, position: "relative" }}>
       {/* Welcome Header */}
       <Box sx={{ mb: 3 }}>
         <Typography variant="h4" fontWeight="bold" gutterBottom>
-          Welcome back, {currentUser?.name || 'User'}!
+          Welcome back, {currentUser?.name || "User"}!
         </Typography>
         <Typography variant="body1" color="text.secondary">
           Here's an overview of your reported issues and quick actions.
@@ -248,9 +269,19 @@ const UserDashboard: React.FC = () => {
         <Grid item xs={12} sm={6} md={3}>
           <Card>
             <CardContent>
-              <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+              <Box
+                sx={{
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "space-between",
+                }}
+              >
                 <Box>
-                  <Typography color="text.secondary" gutterBottom variant="body2">
+                  <Typography
+                    color="text.secondary"
+                    gutterBottom
+                    variant="body2"
+                  >
                     Total Issues
                   </Typography>
                   {loading ? (
@@ -261,7 +292,7 @@ const UserDashboard: React.FC = () => {
                     </Typography>
                   )}
                 </Box>
-                <Avatar sx={{ bgcolor: 'primary.main' }}>
+                <Avatar sx={{ bgcolor: "primary.main" }}>
                   <ReportProblem />
                 </Avatar>
               </Box>
@@ -272,9 +303,19 @@ const UserDashboard: React.FC = () => {
         <Grid item xs={12} sm={6} md={3}>
           <Card>
             <CardContent>
-              <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+              <Box
+                sx={{
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "space-between",
+                }}
+              >
                 <Box>
-                  <Typography color="text.secondary" gutterBottom variant="body2">
+                  <Typography
+                    color="text.secondary"
+                    gutterBottom
+                    variant="body2"
+                  >
                     Pending
                   </Typography>
                   {loading ? (
@@ -285,7 +326,7 @@ const UserDashboard: React.FC = () => {
                     </Typography>
                   )}
                 </Box>
-                <Avatar sx={{ bgcolor: 'warning.main' }}>
+                <Avatar sx={{ bgcolor: "warning.main" }}>
                   <Schedule />
                 </Avatar>
               </Box>
@@ -296,9 +337,19 @@ const UserDashboard: React.FC = () => {
         <Grid item xs={12} sm={6} md={3}>
           <Card>
             <CardContent>
-              <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+              <Box
+                sx={{
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "space-between",
+                }}
+              >
                 <Box>
-                  <Typography color="text.secondary" gutterBottom variant="body2">
+                  <Typography
+                    color="text.secondary"
+                    gutterBottom
+                    variant="body2"
+                  >
                     In Progress
                   </Typography>
                   {loading ? (
@@ -309,7 +360,7 @@ const UserDashboard: React.FC = () => {
                     </Typography>
                   )}
                 </Box>
-                <Avatar sx={{ bgcolor: 'info.main' }}>
+                <Avatar sx={{ bgcolor: "info.main" }}>
                   <TrendingUp />
                 </Avatar>
               </Box>
@@ -320,9 +371,19 @@ const UserDashboard: React.FC = () => {
         <Grid item xs={12} sm={6} md={3}>
           <Card>
             <CardContent>
-              <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+              <Box
+                sx={{
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "space-between",
+                }}
+              >
                 <Box>
-                  <Typography color="text.secondary" gutterBottom variant="body2">
+                  <Typography
+                    color="text.secondary"
+                    gutterBottom
+                    variant="body2"
+                  >
                     Resolved
                   </Typography>
                   {loading ? (
@@ -333,7 +394,7 @@ const UserDashboard: React.FC = () => {
                     </Typography>
                   )}
                 </Box>
-                <Avatar sx={{ bgcolor: 'success.main' }}>
+                <Avatar sx={{ bgcolor: "success.main" }}>
                   <CheckCircle />
                 </Avatar>
               </Box>
@@ -350,7 +411,7 @@ const UserDashboard: React.FC = () => {
               <Typography variant="h6" fontWeight="bold" gutterBottom>
                 Quick Actions
               </Typography>
-              <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+              <Box sx={{ display: "flex", flexDirection: "column", gap: 2 }}>
                 <Button
                   variant="contained"
                   startIcon={<Add />}
@@ -377,11 +438,22 @@ const UserDashboard: React.FC = () => {
         <Grid item xs={12} md={6}>
           <Card>
             <CardContent>
-              <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+              <Box
+                sx={{
+                  display: "flex",
+                  justifyContent: "space-between",
+                  alignItems: "center",
+                  mb: 2,
+                }}
+              >
                 <Typography variant="h6" fontWeight="bold">
                   Recent Issues
                 </Typography>
-                <IconButton size="small" onClick={handleRefresh} disabled={loading}>
+                <IconButton
+                  size="small"
+                  onClick={handleRefresh}
+                  disabled={loading}
+                >
                   <Refresh />
                 </IconButton>
               </Box>
@@ -390,7 +462,11 @@ const UserDashboard: React.FC = () => {
                 <Box>
                   {[1, 2, 3].map((i) => (
                     <Box key={i} sx={{ mb: 2 }}>
-                      <Skeleton variant="rectangular" height={100} sx={{ mb: 1 }} />
+                      <Skeleton
+                        variant="rectangular"
+                        height={100}
+                        sx={{ mb: 1 }}
+                      />
                       <Skeleton width="60%" />
                     </Box>
                   ))}
@@ -416,9 +492,15 @@ const UserDashboard: React.FC = () => {
                   )}
                 </Box>
               ) : (
-                <Box sx={{ textAlign: 'center', py: 4 }}>
-                  <ReportProblem sx={{ fontSize: 48, color: 'text.secondary', mb: 2 }} />
-                  <Typography variant="body1" color="text.secondary" gutterBottom>
+                <Box sx={{ textAlign: "center", py: 4 }}>
+                  <ReportProblem
+                    sx={{ fontSize: 48, color: "text.secondary", mb: 2 }}
+                  />
+                  <Typography
+                    variant="body1"
+                    color="text.secondary"
+                    gutterBottom
+                  >
                     No issues reported yet
                   </Typography>
                   <Button variant="contained" onClick={handleReportIssue}>
@@ -437,7 +519,7 @@ const UserDashboard: React.FC = () => {
         aria-label="report issue"
         onClick={handleReportIssue}
         sx={{
-          position: 'fixed',
+          position: "fixed",
           bottom: 24,
           right: 24,
         }}

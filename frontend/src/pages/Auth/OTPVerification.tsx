@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef } from "react";
 import {
   Box,
   Card,
@@ -8,27 +8,31 @@ import {
   Typography,
   CircularProgress,
   IconButton,
-} from '@mui/material';
+} from "@mui/material";
+import { ArrowBack, Email, Refresh } from "@mui/icons-material";
+import { useForm, Controller } from "react-hook-form";
+import { yupResolver } from "@hookform/resolvers/yup";
+import * as yup from "yup";
+import { useDispatch, useSelector } from "react-redux";
+import { useNavigate, useLocation, Link as RouterLink } from "react-router-dom";
 import {
-  ArrowBack,
-  Email,
-  Refresh,
-} from '@mui/icons-material';
-import { useForm, Controller } from 'react-hook-form';
-import { yupResolver } from '@hookform/resolvers/yup';
-import * as yup from 'yup';
-import { useDispatch, useSelector } from 'react-redux';
-import { useNavigate, useLocation, Link as RouterLink } from 'react-router-dom';
-import { verifyOTP, resendOTP, verifyAndLogin, resendLoginOTP, selectAuth, clearError, clearVerificationState } from '../../store/slices/authSlice';
-import { AppDispatch } from '../../store/store';
-import { showToast } from '../../utils/toast';
+  verifyOTP,
+  resendOTP,
+  verifyAndLogin,
+  resendLoginOTP,
+  selectAuth,
+  clearError,
+  clearVerificationState,
+} from "../../store/slices/authSlice";
+import { AppDispatch } from "../../store/store";
+import { showToast } from "../../utils/toast";
 
 // Validation schema
 const otpSchema = yup.object({
   otp: yup
     .string()
-    .matches(/^\d{6}$/, 'OTP must be exactly 6 digits')
-    .required('OTP is required'),
+    .matches(/^\d{6}$/, "OTP must be exactly 6 digits")
+    .required("OTP is required"),
 });
 
 interface OTPFormData {
@@ -54,12 +58,17 @@ const OTPVerification: React.FC = () => {
 
   // Get data from navigation state or localStorage
   const state = location.state as LocationState;
-  const storedState = localStorage.getItem('otpVerificationState');
+  const storedState = localStorage.getItem("otpVerificationState");
   const parsedStoredState = storedState ? JSON.parse(storedState) : null;
-  
-  const { email, isLoginVerification = false, password, from } = state || parsedStoredState || {};
 
-  console.log('OTPVerification component loaded with state:', {
+  const {
+    email,
+    isLoginVerification = false,
+    password,
+    from,
+  } = state || parsedStoredState || {};
+
+  console.log("OTPVerification component loaded with state:", {
     email,
     isLoginVerification,
     password: !!password,
@@ -71,7 +80,7 @@ const OTPVerification: React.FC = () => {
   // Store state in localStorage as backup
   React.useEffect(() => {
     if (state) {
-      localStorage.setItem('otpVerificationState', JSON.stringify(state));
+      localStorage.setItem("otpVerificationState", JSON.stringify(state));
     }
   }, [state]);
 
@@ -84,16 +93,16 @@ const OTPVerification: React.FC = () => {
   } = useForm<OTPFormData>({
     resolver: yupResolver(otpSchema),
     defaultValues: {
-      otp: '',
+      otp: "",
     },
   });
 
-  const otpValue = watch('otp');
+  const otpValue = watch("otp");
 
   // Redirect if no email provided
   useEffect(() => {
     if (!email) {
-      navigate('/login', { replace: true });
+      navigate("/login", { replace: true });
     }
   }, [email, navigate]);
 
@@ -102,10 +111,10 @@ const OTPVerification: React.FC = () => {
     if (isAuthenticated && !loading) {
       // Navigation will be handled by toast success in reducer
       setTimeout(() => {
-        const redirectTo = from || '/dashboard';
+        const redirectTo = from || "/dashboard";
         navigate(redirectTo, { replace: true });
         // Clean up stored state on successful navigation
-        localStorage.removeItem('otpVerificationState');
+        localStorage.removeItem("otpVerificationState");
       }, 1500);
     }
   }, [isAuthenticated, loading, navigate, from]);
@@ -127,21 +136,22 @@ const OTPVerification: React.FC = () => {
     return () => {
       dispatch(clearError());
       // Clean up stored state
-      localStorage.removeItem('otpVerificationState');
+      localStorage.removeItem("otpVerificationState");
     };
   }, [dispatch]);
 
   const formatTime = (seconds: number) => {
     const mins = Math.floor(seconds / 60);
     const secs = seconds % 60;
-    return `${mins}:${secs.toString().padStart(2, '0')}`;
+    return `${mins}:${secs.toString().padStart(2, "0")}`;
   };
 
   const maskEmail = (email: string) => {
-    const [local, domain] = email.split('@');
-    const maskedLocal = local.length > 2
-      ? local.substring(0, 2) + '*'.repeat(local.length - 2)
-      : local;
+    const [local, domain] = email.split("@");
+    const maskedLocal =
+      local.length > 2
+        ? local.substring(0, 2) + "*".repeat(local.length - 2)
+        : local;
     return `${maskedLocal}@${domain}`;
   };
 
@@ -153,7 +163,7 @@ const OTPVerification: React.FC = () => {
           verifyAndLogin({
             email,
             otpCode: data.otp,
-            password: password || '',
+            password: password || "",
           })
         ).unwrap();
       } else {
@@ -167,7 +177,7 @@ const OTPVerification: React.FC = () => {
       }
     } catch (error) {
       // Error will be handled by Redux state
-      console.error('OTP verification failed:', error);
+      console.error("OTP verification failed:", error);
     }
   };
 
@@ -193,24 +203,23 @@ const OTPVerification: React.FC = () => {
 
       setTimer(60);
       setCanResend(false);
-      setValue('otp', ''); // Clear OTP field
-
+      setValue("otp", ""); // Clear OTP field
     } catch (error) {
-      console.error('Failed to resend OTP:', error);
+      console.error("Failed to resend OTP:", error);
     }
   };
 
   const handleBack = () => {
-    console.log('handleBack called, isLoginVerification:', isLoginVerification);
-    const targetPath = isLoginVerification ? '/login' : '/register';
-    console.log('Navigating to:', targetPath);
-    
+    console.log("handleBack called, isLoginVerification:", isLoginVerification);
+    const targetPath = isLoginVerification ? "/login" : "/register";
+    console.log("Navigating to:", targetPath);
+
     // Clear verification state to prevent auto-redirect
     dispatch(clearVerificationState());
-    
+
     // Clean up stored state before navigating back
-    localStorage.removeItem('otpVerificationState');
-    
+    localStorage.removeItem("otpVerificationState");
+
     // Use window.location for forced navigation
     window.location.href = targetPath;
   };
@@ -226,32 +235,32 @@ const OTPVerification: React.FC = () => {
   return (
     <Box
       sx={{
-        minHeight: '100vh',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+        minHeight: "100vh",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        background: "linear-gradient(135deg, #667eea 0%, #764ba2 100%)",
         padding: 3,
       }}
     >
       <Card
         sx={{
-          width: '100%',
+          width: "100%",
           maxWidth: 480,
-          boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)',
+          boxShadow: "0 25px 50px -12px rgba(0, 0, 0, 0.25)",
           borderRadius: 2,
         }}
       >
         <CardContent sx={{ p: 4 }}>
           {/* Header */}
-          <Box sx={{ textAlign: 'center', mb: 4, position: 'relative' }}>
+          <Box sx={{ textAlign: "center", mb: 4, position: "relative" }}>
             <IconButton
               onClick={handleBack}
               sx={{
-                position: 'absolute',
+                position: "absolute",
                 left: 0,
                 top: 0,
-                color: 'text.secondary',
+                color: "text.secondary",
               }}
             >
               <ArrowBack />
@@ -259,28 +268,34 @@ const OTPVerification: React.FC = () => {
 
             <Box
               sx={{
-                display: 'inline-flex',
-                alignItems: 'center',
-                justifyContent: 'center',
+                display: "inline-flex",
+                alignItems: "center",
+                justifyContent: "center",
                 width: 64,
                 height: 64,
-                borderRadius: '50%',
-                backgroundColor: 'primary.main',
-                color: 'white',
+                borderRadius: "50%",
+                backgroundColor: "primary.main",
+                color: "white",
                 mb: 2,
-                mx: 'auto',
+                mx: "auto",
               }}
             >
               <Email sx={{ fontSize: 32 }} />
             </Box>
-            <Typography variant="h4" component="h1" gutterBottom fontWeight="bold">
-              {isLoginVerification ? 'Verify Email to Login' : 'Verify Your Account'}
+            <Typography
+              variant="h4"
+              component="h1"
+              gutterBottom
+              fontWeight="bold"
+            >
+              {isLoginVerification
+                ? "Verify Email to Login"
+                : "Verify Your Account"}
             </Typography>
             <Typography variant="body1" color="text.secondary">
               {isLoginVerification
                 ? `Please verify your email to continue logging in.`
-                : `We've sent a 6-digit verification code to`
-              }
+                : `We've sent a 6-digit verification code to`}
             </Typography>
             <Typography variant="body1" color="primary" fontWeight="medium">
               {maskEmail(email)}
@@ -305,15 +320,15 @@ const OTPVerification: React.FC = () => {
                   disabled={loading}
                   inputProps={{
                     maxLength: 6,
-                    pattern: '[0-9]*',
+                    pattern: "[0-9]*",
                   }}
                   sx={{
                     mb: 3,
-                    '& .MuiInputBase-input': {
-                      textAlign: 'center',
-                      fontSize: '1.5rem',
-                      fontWeight: 'bold',
-                      letterSpacing: '0.5rem',
+                    "& .MuiInputBase-input": {
+                      textAlign: "center",
+                      fontSize: "1.5rem",
+                      fontWeight: "bold",
+                      letterSpacing: "0.5rem",
                     },
                   }}
                 />
@@ -328,35 +343,41 @@ const OTPVerification: React.FC = () => {
               disabled={loading || otpValue.length !== 6}
               sx={{
                 py: 1.5,
-                fontSize: '1.1rem',
+                fontSize: "1.1rem",
                 fontWeight: 600,
                 mb: 3,
               }}
             >
               {loading ? (
                 <CircularProgress size={24} color="inherit" />
+              ) : isLoginVerification ? (
+                "Verify & Login"
               ) : (
-                isLoginVerification ? 'Verify & Login' : 'Verify Account'
+                "Verify Account"
               )}
             </Button>
           </Box>
 
           {/* Resend Section */}
-          <Box sx={{ textAlign: 'center' }}>
+          <Box sx={{ textAlign: "center" }}>
             {!canResend ? (
               <Typography variant="body2" color="text.secondary">
                 Resend code in {formatTime(timer)}
               </Typography>
             ) : (
               <Box>
-                <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
+                <Typography
+                  variant="body2"
+                  color="text.secondary"
+                  sx={{ mb: 1 }}
+                >
                   Didn't receive the code?
                 </Typography>
                 <Button
                   onClick={handleResendOTP}
                   disabled={loading}
                   startIcon={<Refresh />}
-                  sx={{ textTransform: 'none' }}
+                  sx={{ textTransform: "none" }}
                 >
                   Resend Code
                 </Button>
@@ -365,22 +386,22 @@ const OTPVerification: React.FC = () => {
           </Box>
 
           {/* Help Text */}
-          <Box sx={{ textAlign: 'center', mt: 3 }}>
+          <Box sx={{ textAlign: "center", mt: 3 }}>
             <Typography variant="body2" color="text.secondary">
-              Having trouble? Check your spam folder or{' '}
+              Having trouble? Check your spam folder or{" "}
               <Button
                 onClick={handleBack}
                 sx={{
-                  textTransform: 'none',
-                  fontSize: 'inherit',
-                  fontWeight: 'inherit',
+                  textTransform: "none",
+                  fontSize: "inherit",
+                  fontWeight: "inherit",
                   p: 0,
-                  minHeight: 'auto',
-                  color: 'primary.main',
-                  textDecoration: 'underline',
-                  '&:hover': {
-                    textDecoration: 'underline',
-                    backgroundColor: 'transparent',
+                  minHeight: "auto",
+                  color: "primary.main",
+                  textDecoration: "underline",
+                  "&:hover": {
+                    textDecoration: "underline",
+                    backgroundColor: "transparent",
                   },
                 }}
               >

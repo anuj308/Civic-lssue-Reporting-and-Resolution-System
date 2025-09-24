@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState } from "react";
 import {
   Box,
   Card,
@@ -11,7 +11,7 @@ import {
   IconButton,
   Link,
   Divider,
-} from '@mui/material';
+} from "@mui/material";
 import {
   Visibility,
   VisibilityOff,
@@ -19,15 +19,22 @@ import {
   Lock,
   Person,
   Phone,
-} from '@mui/icons-material';
-import { useForm, Controller } from 'react-hook-form';
-import { yupResolver } from '@hookform/resolvers/yup';
-import * as yup from 'yup';
-import { useDispatch, useSelector } from 'react-redux';
-import { useNavigate, Link as RouterLink } from 'react-router-dom';
+} from "@mui/icons-material";
+import { useForm, Controller } from "react-hook-form";
+import { yupResolver } from "@hookform/resolvers/yup";
+import * as yup from "yup";
+import { useDispatch, useSelector } from "react-redux";
+import { useNavigate, Link as RouterLink } from "react-router-dom";
 
-import { registerUser, selectAuth, clearError, clearFieldError, selectFieldErrors, clearVerificationState } from '../../store/slices/authSlice';
-import { showToast } from '../../utils/toast';
+import {
+  registerUser,
+  selectAuth,
+  clearError,
+  clearFieldError,
+  selectFieldErrors,
+  clearVerificationState,
+} from "../../store/slices/authSlice";
+import { showToast } from "../../utils/toast";
 
 interface RegisterFormData {
   firstName: string;
@@ -43,35 +50,35 @@ const registerSchema = yup.object({
   firstName: yup
     .string()
     .trim()
-    .min(2, 'First name must be at least 2 characters')
-    .max(50, 'First name must be less than 50 characters')
-    .required('First name is required'),
+    .min(2, "First name must be at least 2 characters")
+    .max(50, "First name must be less than 50 characters")
+    .required("First name is required"),
   lastName: yup
     .string()
     .trim()
-    .min(2, 'Last name must be at least 2 characters')
-    .max(50, 'Last name must be less than 50 characters')
-    .required('Last name is required'),
+    .min(2, "Last name must be at least 2 characters")
+    .max(50, "Last name must be less than 50 characters")
+    .required("Last name is required"),
   email: yup
     .string()
-    .email('Please enter a valid email address')
-    .required('Email is required'),
+    .email("Please enter a valid email address")
+    .required("Email is required"),
   phoneNumber: yup
     .string()
-    .matches(/^\+?[1-9]\d{1,14}$/, 'Please enter a valid phone number')
+    .matches(/^\+?[1-9]\d{1,14}$/, "Please enter a valid phone number")
     .optional(),
   password: yup
     .string()
-    .min(8, 'Password must be at least 8 characters')
+    .min(8, "Password must be at least 8 characters")
     .matches(
       /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])/,
-      'Password must contain at least one uppercase letter, one lowercase letter, one number, and one special character (@$!%*?&)'
+      "Password must contain at least one uppercase letter, one lowercase letter, one number, and one special character (@$!%*?&)"
     )
-    .required('Password is required'),
+    .required("Password is required"),
   confirmPassword: yup
     .string()
-    .required('Please confirm your password')
-    .test('passwords-match', 'Passwords must match', function(value) {
+    .required("Please confirm your password")
+    .test("passwords-match", "Passwords must match", function (value) {
       return this.parent.password === value;
     }),
 });
@@ -92,12 +99,12 @@ const Register: React.FC = () => {
   } = useForm<RegisterFormData>({
     resolver: yupResolver(registerSchema),
     defaultValues: {
-      firstName: '',
-      lastName: '',
-      email: '',
-      phoneNumber: '',
-      password: '',
-      confirmPassword: '',
+      firstName: "",
+      lastName: "",
+      email: "",
+      phoneNumber: "",
+      password: "",
+      confirmPassword: "",
     },
   });
 
@@ -118,9 +125,9 @@ const Register: React.FC = () => {
       // Remove confirmPassword before sending to API
       const { confirmPassword, ...registerData } = data;
       await dispatch(registerUser(registerData)).unwrap();
-      
+
       // Navigate to OTP verification with email
-      navigate('/verify-otp', {
+      navigate("/verify-otp", {
         state: {
           email: data.email,
           isLoginVerification: false,
@@ -128,7 +135,7 @@ const Register: React.FC = () => {
       });
     } catch (error) {
       // Error will be handled by Redux state
-      console.error('Registration failed:', error);
+      console.error("Registration failed:", error);
     }
   };
 
@@ -154,41 +161,46 @@ const Register: React.FC = () => {
   return (
     <Box
       sx={{
-        minHeight: '100vh',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+        minHeight: "100vh",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        background: "linear-gradient(135deg, #667eea 0%, #764ba2 100%)",
         padding: 3,
       }}
     >
       <Card
         sx={{
-          width: '100%',
+          width: "100%",
           maxWidth: 480,
-          boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)',
+          boxShadow: "0 25px 50px -12px rgba(0, 0, 0, 0.25)",
           borderRadius: 2,
         }}
       >
         <CardContent sx={{ p: 4 }}>
           {/* Header */}
-          <Box sx={{ textAlign: 'center', mb: 4 }}>
+          <Box sx={{ textAlign: "center", mb: 4 }}>
             <Box
               sx={{
-                display: 'inline-flex',
-                alignItems: 'center',
-                justifyContent: 'center',
+                display: "inline-flex",
+                alignItems: "center",
+                justifyContent: "center",
                 width: 64,
                 height: 64,
-                borderRadius: '50%',
-                backgroundColor: 'primary.main',
-                color: 'white',
+                borderRadius: "50%",
+                backgroundColor: "primary.main",
+                color: "white",
                 mb: 2,
               }}
             >
               <Person sx={{ fontSize: 32 }} />
             </Box>
-            <Typography variant="h4" component="h1" gutterBottom fontWeight="bold">
+            <Typography
+              variant="h4"
+              component="h1"
+              gutterBottom
+              fontWeight="bold"
+            >
               Create Account
             </Typography>
             <Typography variant="body1" color="text.secondary">
@@ -198,7 +210,7 @@ const Register: React.FC = () => {
 
           {/* Register Form */}
           <Box component="form" onSubmit={handleSubmit(onSubmit)} noValidate>
-            <Box sx={{ display: 'flex', gap: 2, mb: 3 }}>
+            <Box sx={{ display: "flex", gap: 2, mb: 3 }}>
               <Controller
                 name="firstName"
                 control={control}
@@ -209,9 +221,11 @@ const Register: React.FC = () => {
                     label="First Name"
                     autoComplete="given-name"
                     error={!!errors.firstName || !!fieldErrors.firstName}
-                    helperText={errors.firstName?.message || fieldErrors.firstName}
+                    helperText={
+                      errors.firstName?.message || fieldErrors.firstName
+                    }
                     disabled={loading}
-                    onFocus={() => handleFieldFocus('firstName')}
+                    onFocus={() => handleFieldFocus("firstName")}
                   />
                 )}
               />
@@ -225,9 +239,11 @@ const Register: React.FC = () => {
                     label="Last Name"
                     autoComplete="family-name"
                     error={!!errors.lastName || !!fieldErrors.lastName}
-                    helperText={errors.lastName?.message || fieldErrors.lastName}
+                    helperText={
+                      errors.lastName?.message || fieldErrors.lastName
+                    }
                     disabled={loading}
-                    onFocus={() => handleFieldFocus('lastName')}
+                    onFocus={() => handleFieldFocus("lastName")}
                   />
                 )}
               />
@@ -254,7 +270,7 @@ const Register: React.FC = () => {
                     ),
                   }}
                   sx={{ mb: 3 }}
-                  onFocus={() => handleFieldFocus('email')}
+                  onFocus={() => handleFieldFocus("email")}
                 />
               )}
             />
@@ -270,7 +286,9 @@ const Register: React.FC = () => {
                   type="tel"
                   autoComplete="tel"
                   error={!!errors.phoneNumber || !!fieldErrors.phoneNumber}
-                  helperText={errors.phoneNumber?.message || fieldErrors.phoneNumber}
+                  helperText={
+                    errors.phoneNumber?.message || fieldErrors.phoneNumber
+                  }
                   disabled={loading}
                   InputProps={{
                     startAdornment: (
@@ -280,7 +298,7 @@ const Register: React.FC = () => {
                     ),
                   }}
                   sx={{ mb: 3 }}
-                  onFocus={() => handleFieldFocus('phoneNumber')}
+                  onFocus={() => handleFieldFocus("phoneNumber")}
                 />
               )}
             />
@@ -293,7 +311,7 @@ const Register: React.FC = () => {
                   {...field}
                   fullWidth
                   label="Password"
-                  type={showPassword ? 'text' : 'password'}
+                  type={showPassword ? "text" : "password"}
                   autoComplete="new-password"
                   error={!!errors.password || !!fieldErrors.password}
                   helperText={errors.password?.message || fieldErrors.password}
@@ -318,7 +336,7 @@ const Register: React.FC = () => {
                     ),
                   }}
                   sx={{ mb: 3 }}
-                  onFocus={() => handleFieldFocus('password')}
+                  onFocus={() => handleFieldFocus("password")}
                 />
               )}
             />
@@ -331,7 +349,7 @@ const Register: React.FC = () => {
                   {...field}
                   fullWidth
                   label="Confirm Password"
-                  type={showConfirmPassword ? 'text' : 'password'}
+                  type={showConfirmPassword ? "text" : "password"}
                   autoComplete="new-password"
                   error={!!errors.confirmPassword}
                   helperText={errors.confirmPassword?.message}
@@ -350,13 +368,17 @@ const Register: React.FC = () => {
                           edge="end"
                           disabled={loading}
                         >
-                          {showConfirmPassword ? <VisibilityOff /> : <Visibility />}
+                          {showConfirmPassword ? (
+                            <VisibilityOff />
+                          ) : (
+                            <Visibility />
+                          )}
                         </IconButton>
                       </InputAdornment>
                     ),
                   }}
                   sx={{ mb: 3 }}
-                  onFocus={() => handleFieldFocus('confirmPassword')}
+                  onFocus={() => handleFieldFocus("confirmPassword")}
                 />
               )}
             />
@@ -369,7 +391,7 @@ const Register: React.FC = () => {
               disabled={loading}
               sx={{
                 py: 1.5,
-                fontSize: '1.1rem',
+                fontSize: "1.1rem",
                 fontWeight: 600,
                 mb: 3,
               }}
@@ -377,7 +399,7 @@ const Register: React.FC = () => {
               {loading ? (
                 <CircularProgress size={24} color="inherit" />
               ) : (
-                'Create Account'
+                "Create Account"
               )}
             </Button>
           </Box>
@@ -389,8 +411,8 @@ const Register: React.FC = () => {
           </Divider>
 
           {/* Login Link */}
-          <Box sx={{ textAlign: 'center' }}>
-            <RouterLink to="/login" style={{ textDecoration: 'none' }}>
+          <Box sx={{ textAlign: "center" }}>
+            <RouterLink to="/login" style={{ textDecoration: "none" }}>
               <Button variant="outlined" fullWidth>
                 Sign In Instead
               </Button>
@@ -398,13 +420,13 @@ const Register: React.FC = () => {
           </Box>
 
           {/* Footer Info */}
-          <Box sx={{ textAlign: 'center', mt: 3 }}>
+          <Box sx={{ textAlign: "center", mt: 3 }}>
             <Typography variant="body2" color="text.secondary">
-              By creating an account, you agree to our{' '}
+              By creating an account, you agree to our{" "}
               <Link href="#" color="primary">
                 Terms of Service
-              </Link>{' '}
-              and{' '}
+              </Link>{" "}
+              and{" "}
               <Link href="#" color="primary">
                 Privacy Policy
               </Link>

@@ -1,5 +1,6 @@
 import { createSlice, createAsyncThunk, PayloadAction } from '@reduxjs/toolkit';
 import { showToast } from '../../utils/toast';
+import { setAccessToken, clearAccessToken } from '../../services/api';
 
 // Types
 export interface User {
@@ -17,7 +18,6 @@ export interface User {
 
 export interface AuthState {
   user: User | null;
-  token: string | null;
   isAuthenticated: boolean;
   loading: boolean;
   error: string | null;
@@ -30,7 +30,6 @@ export interface AuthState {
 // Initial state
 const initialState: AuthState = {
   user: null,
-  token: null,
   isAuthenticated: false,
   loading: false,
   error: null,
@@ -329,13 +328,14 @@ const authSlice = createSlice({
         state.loading = false;
         state.isAuthenticated = true;
         state.user = action.payload.data.user;
-        state.token = action.payload.data.token;
+        // Store access token in memory instead of Redux
+        setAccessToken(action.payload.data.accessToken);
         state.error = null;
       })
       .addCase(loginUser.rejected, (state, action) => {
         state.loading = false;
         const payload = action.payload as any;
-        
+
         // Check if email verification is required
         if (payload?.needsVerification) {
           state.needsVerification = true;
@@ -370,7 +370,7 @@ const authSlice = createSlice({
       .addCase(registerUser.rejected, (state, action) => {
         state.loading = false;
         const payload = action.payload as any;
-        
+
         if (payload?.fieldErrors) {
           // Handle field-specific validation errors
           state.fieldErrors = payload.fieldErrors;
@@ -380,7 +380,7 @@ const authSlice = createSlice({
           state.error = payload as string;
           state.fieldErrors = {};
         }
-        
+
         // Show error toast for registration failures (only for non-field errors)
         if (!payload?.fieldErrors) {
           showToast.handleValidationErrors({ response: { data: { message: payload } } });
@@ -396,7 +396,8 @@ const authSlice = createSlice({
         state.loading = false;
         state.isAuthenticated = false;
         state.user = null;
-        state.token = null;
+        // Clear access token from memory
+        clearAccessToken();
         state.error = null;
       })
       .addCase(logoutUser.rejected, (state, action) => {
@@ -405,7 +406,7 @@ const authSlice = createSlice({
         // Still logout on error
         state.isAuthenticated = false;
         state.user = null;
-        state.token = null;
+        clearAccessToken();
       });
 
     // Refresh token
@@ -417,7 +418,8 @@ const authSlice = createSlice({
         state.loading = false;
         state.isAuthenticated = true;
         state.user = action.payload.data.user;
-        state.token = action.payload.data.token;
+        // Store refreshed access token in memory
+        setAccessToken(action.payload.data.accessToken);
         state.error = null;
       })
       .addCase(refreshToken.rejected, (state, action) => {
@@ -425,7 +427,7 @@ const authSlice = createSlice({
         state.error = action.payload as string;
         state.isAuthenticated = false;
         state.user = null;
-        state.token = null;
+        clearAccessToken();
       });
 
     // Get current user
@@ -444,7 +446,7 @@ const authSlice = createSlice({
         state.error = action.payload as string;
         state.isAuthenticated = false;
         state.user = null;
-        state.token = null;
+        clearAccessToken();
       });
 
     // Verify OTP
@@ -457,7 +459,8 @@ const authSlice = createSlice({
         state.loading = false;
         state.isAuthenticated = true;
         state.user = action.payload.data.user;
-        state.token = action.payload.data.token;
+        // Store access token in memory
+        setAccessToken(action.payload.data.accessToken);
         state.error = null;
         showToast.success('Account verified successfully! Welcome aboard!');
       })
@@ -494,7 +497,8 @@ const authSlice = createSlice({
         state.loading = false;
         state.isAuthenticated = true;
         state.user = action.payload.data.user;
-        state.token = action.payload.data.token;
+        // Store access token in memory
+        setAccessToken(action.payload.data.accessToken);
         state.error = null;
         showToast.success('Email verified! Login successful!');
       })

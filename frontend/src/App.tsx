@@ -1,40 +1,42 @@
-import React from 'react';
-import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
-import { ThemeProvider } from '@mui/material/styles';
-import { CssBaseline } from '@mui/material';
-import { Provider } from 'react-redux';
-import { PersistGate } from 'redux-persist/integration/react';
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { ReactQueryDevtools } from '@tanstack/react-query-devtools';
-import { ToastContainer } from 'react-toastify';
-import 'react-toastify/dist/ReactToastify.css';
-import { useSelector } from 'react-redux';
+import React, { Suspense } from "react";
+import {
+  BrowserRouter as Router,
+  Routes,
+  Route,
+  Navigate,
+} from "react-router-dom";
+import { ThemeProvider } from "@mui/material/styles";
+import { CssBaseline, Box, CircularProgress, Typography } from "@mui/material";
+import { Provider } from "react-redux";
+import { PersistGate } from "redux-persist/integration/react";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { ReactQueryDevtools } from "@tanstack/react-query-devtools";
+import { ToastContainer } from "react-toastify";
+import "react-toastify/dist/ReactToastify.css";
+import { useSelector } from "react-redux";
 
-import { store, persistor } from './store/store';
-import theme from './theme/theme';
-import { selectUser } from './store/slices/authSlice';
+import { store, persistor } from "./store/store";
+import theme from "./theme/theme";
+import { selectUser } from "./store/slices/authSlice";
 
 // Auth Components
-import Login from './pages/Auth/Login';
-import Register from './pages/Auth/Register';
-import OTPVerification from './pages/Auth/OTPVerification';
-import ProtectedRoute from './components/Auth/ProtectedRoute';
+import Login from "./pages/Auth/Login";
+import Register from "./pages/Auth/Register";
+import OTPVerification from "./pages/Auth/OTPVerification";
+import ProtectedRoute from "./components/Auth/ProtectedRoute";
 
 // Layout Components
-import Layout from './components/Layout/Layout';
+import Layout from "./components/Layout/Layout";
 
-// Page Components
-import Dashboard from './pages/Dashboard/Dashboard';
-import UserManagement from './pages/Users/UserManagement';
-import IssueManagement from './pages/Issues/IssueManagement';
-
-// User Pages
-import UserDashboard from './pages/User/UserDashboard';
-import MyIssues from './pages/User/MyIssues';
-import ReportIssue from './pages/User/ReportIssue';
-import IssueDetail from './pages/User/IssueDetail';
-import Map from './pages/User/Map';
-import Profile from './pages/User/Profile';
+// Lazy load page components for code splitting
+const UserManagement = React.lazy(() => import("./pages/Users/UserManagement"));
+const IssueManagement = React.lazy(() => import("./pages/Issues/IssueManagement"));
+const UserDashboard = React.lazy(() => import("./pages/User/UserDashboard"));
+const MyIssues = React.lazy(() => import("./pages/User/MyIssues"));
+const ReportIssue = React.lazy(() => import("./pages/User/ReportIssue"));
+const IssueDetail = React.lazy(() => import("./pages/User/IssueDetail"));
+const Map = React.lazy(() => import("./pages/User/Map"));
+const Profile = React.lazy(() => import("./pages/User/Profile"));
 
 // Create a client for React Query
 const queryClient = new QueryClient({
@@ -54,7 +56,7 @@ const AppRoutes: React.FC = () => {
       <Route path="/login" element={<Login />} />
       <Route path="/register" element={<Register />} />
       <Route path="/verify-otp" element={<OTPVerification />} />
-      
+
       {/* Protected Routes with Layout */}
       <Route
         path="/"
@@ -73,11 +75,11 @@ const AppRoutes: React.FC = () => {
         <Route path="profile" element={<Profile />} />
         <Route path="users" element={<UserManagement />} />
         <Route path="issues" element={<IssueManagement />} />
-        
+
         {/* Default redirect */}
         <Route index element={<Navigate to="dashboard" replace />} />
       </Route>
-      
+
       {/* Catch all - redirect to dashboard */}
       <Route path="*" element={<Navigate to="/dashboard" replace />} />
     </Routes>
@@ -93,7 +95,29 @@ const App: React.FC = () => {
       }}
     >
       <Provider store={store}>
-        <PersistGate loading={<div>Loading...</div>} persistor={persistor}>
+        <PersistGate
+          loading={
+            <Box
+              sx={{
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'center',
+                justifyContent: 'center',
+                minHeight: '100vh',
+                gap: 2,
+              }}
+            >
+              <CircularProgress size={40} />
+              <Typography variant="body2" color="text.secondary">
+                Loading application...
+              </Typography>
+            </Box>
+          }
+          persistor={persistor}
+          onBeforeLift={() => {
+            console.log('Redux state rehydrated successfully');
+          }}
+        >
           <QueryClientProvider client={queryClient}>
             <ThemeProvider theme={theme}>
               <CssBaseline />
@@ -110,7 +134,7 @@ const App: React.FC = () => {
                 theme="colored"
               />
               <AppRoutes />
-              {process.env.NODE_ENV === 'development' && (
+              {process.env.NODE_ENV === "development" && (
                 <ReactQueryDevtools initialIsOpen={false} />
               )}
             </ThemeProvider>
@@ -121,4 +145,30 @@ const App: React.FC = () => {
   );
 };
 
-export default App;
+const AppWithSuspense: React.FC = () => {
+  return (
+    <Suspense
+      fallback={
+        <Box
+          sx={{
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            justifyContent: 'center',
+            minHeight: '100vh',
+            gap: 2,
+          }}
+        >
+          <CircularProgress size={40} />
+          <Typography variant="body2" color="text.secondary">
+            Loading page...
+          </Typography>
+        </Box>
+      }
+    >
+      <App />
+    </Suspense>
+  );
+};
+
+export default AppWithSuspense;

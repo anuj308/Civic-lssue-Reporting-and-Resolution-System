@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState } from "react";
 import {
   Box,
   Typography,
@@ -23,7 +23,7 @@ import {
   Alert,
   Skeleton,
   useTheme,
-} from '@mui/material';
+} from "@mui/material";
 import {
   Search,
   FilterList,
@@ -33,22 +33,19 @@ import {
   Comment,
   Visibility,
   Add,
-} from '@mui/icons-material';
-import { useDispatch, useSelector } from 'react-redux';
-import { useNavigate } from 'react-router-dom';
-import { AppDispatch } from '../../store/store';
+} from "@mui/icons-material";
+import { useDispatch, useSelector } from "react-redux";
+import { useNavigate } from "react-router-dom";
+import { AppDispatch } from "../../store/store";
 import {
   fetchMyIssues,
   selectIssues,
   selectIssuesLoading,
   selectIssuesError,
   selectIssuesPagination,
-} from '../../store/slices/issueSlice';
-import { selectCurrentUser } from '../../store/slices/authSlice';
-import {
-  setBreadcrumbs,
-  setPageTitle,
-} from '../../store/slices/uiSlice';
+} from "../../store/slices/issueSlice";
+import { selectCurrentUser } from "../../store/slices/authSlice";
+import { setBreadcrumbs, setPageTitle } from "../../store/slices/uiSlice";
 
 interface IssueCardProps {
   issue: any;
@@ -60,33 +57,33 @@ const IssueCard: React.FC<IssueCardProps> = ({ issue, onViewDetails }) => {
 
   const getStatusColor = (status: string) => {
     switch (status) {
-      case 'pending':
-        return 'warning';
-      case 'acknowledged':
-        return 'info';
-      case 'in_progress':
-        return 'primary';
-      case 'resolved':
-        return 'success';
-      case 'closed':
-        return 'default';
+      case "pending":
+        return "warning";
+      case "acknowledged":
+        return "info";
+      case "in_progress":
+        return "primary";
+      case "resolved":
+        return "success";
+      case "closed":
+        return "default";
       default:
-        return 'default';
+        return "default";
     }
   };
 
   const getStatusLabel = (status: string) => {
     switch (status) {
-      case 'pending':
-        return 'Pending';
-      case 'acknowledged':
-        return 'Acknowledged';
-      case 'in_progress':
-        return 'In Progress';
-      case 'resolved':
-        return 'Resolved';
-      case 'closed':
-        return 'Closed';
+      case "pending":
+        return "Pending";
+      case "acknowledged":
+        return "Acknowledged";
+      case "in_progress":
+        return "In Progress";
+      case "resolved":
+        return "Resolved";
+      case "closed":
+        return "Closed";
       default:
         return status;
     }
@@ -94,42 +91,52 @@ const IssueCard: React.FC<IssueCardProps> = ({ issue, onViewDetails }) => {
 
   const getPriorityColor = (priority: string) => {
     switch (priority) {
-      case 'low':
-        return 'success';
-      case 'medium':
-        return 'warning';
-      case 'high':
-        return 'error';
-      case 'critical':
-        return 'error';
+      case "low":
+        return "success";
+      case "medium":
+        return "warning";
+      case "high":
+        return "error";
+      case "critical":
+        return "error";
       default:
-        return 'default';
+        return "default";
     }
   };
 
   const getPriorityLabel = (priority: string) => {
     switch (priority) {
-      case 'low':
-        return 'Low';
-      case 'medium':
-        return 'Medium';
-      case 'high':
-        return 'High';
-      case 'critical':
-        return 'Critical';
+      case "low":
+        return "Low";
+      case "medium":
+        return "Medium";
+      case "high":
+        return "High";
+      case "critical":
+        return "Critical";
       default:
         return priority;
     }
   };
 
   return (
-    <Card sx={{ mb: 2, cursor: 'pointer', '&:hover': { boxShadow: 3 } }} onClick={() => onViewDetails(issue._id)}>
+    <Card
+      sx={{ mb: 2, cursor: "pointer", "&:hover": { boxShadow: 3 } }}
+      onClick={() => onViewDetails(issue._id)}
+    >
       <CardContent>
-        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 1 }}>
+        <Box
+          sx={{
+            display: "flex",
+            justifyContent: "space-between",
+            alignItems: "flex-start",
+            mb: 1,
+          }}
+        >
           <Typography variant="h6" component="div" sx={{ flexGrow: 1, mr: 2 }}>
             {issue.title}
           </Typography>
-          <Box sx={{ display: 'flex', gap: 1 }}>
+          <Box sx={{ display: "flex", gap: 1 }}>
             <Chip
               label={getStatusLabel(issue.status)}
               color={getStatusColor(issue.status) as any}
@@ -152,23 +159,29 @@ const IssueCard: React.FC<IssueCardProps> = ({ issue, onViewDetails }) => {
             : issue.description}
         </Typography>
 
-        <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 1 }}>
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+        <Box sx={{ display: "flex", alignItems: "center", gap: 2, mb: 1 }}>
+          <Box sx={{ display: "flex", alignItems: "center", gap: 0.5 }}>
             <LocationOn fontSize="small" color="action" />
             <Typography variant="body2" color="text.secondary">
-              {issue.location?.address || 'Location not specified'}
+              {issue.location?.address || "Location not specified"}
             </Typography>
           </Box>
         </Box>
 
-        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <Box
+          sx={{
+            display: "flex",
+            justifyContent: "space-between",
+            alignItems: "center",
+          }}
+        >
           <Typography variant="caption" color="text.secondary">
             Reported {new Date(issue.createdAt).toLocaleDateString()}
           </Typography>
 
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+          <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
             {issue.upvotes > 0 && (
-              <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+              <Box sx={{ display: "flex", alignItems: "center", gap: 0.5 }}>
                 <ThumbUp fontSize="small" color="action" />
                 <Typography variant="caption" color="text.secondary">
                   {issue.upvotes}
@@ -177,7 +190,7 @@ const IssueCard: React.FC<IssueCardProps> = ({ issue, onViewDetails }) => {
             )}
 
             {issue.commentsCount > 0 && (
-              <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+              <Box sx={{ display: "flex", alignItems: "center", gap: 0.5 }}>
                 <Comment fontSize="small" color="action" />
                 <Typography variant="caption" color="text.secondary">
                   {issue.commentsCount}
@@ -202,18 +215,20 @@ const MyIssues: React.FC = () => {
   const error = useSelector(selectIssuesError);
   const pagination = useSelector(selectIssuesPagination);
 
-  const [searchTerm, setSearchTerm] = useState('');
-  const [statusFilter, setStatusFilter] = useState('');
-  const [priorityFilter, setPriorityFilter] = useState('');
+  const [searchTerm, setSearchTerm] = useState("");
+  const [statusFilter, setStatusFilter] = useState("");
+  const [priorityFilter, setPriorityFilter] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
   const [showFilters, setShowFilters] = useState(false);
 
   useEffect(() => {
-    dispatch(setPageTitle('My Issues'));
-    dispatch(setBreadcrumbs([
-      { label: 'Dashboard', path: '/dashboard' },
-      { label: 'My Issues', path: '/my-issues' }
-    ]));
+    dispatch(setPageTitle("My Issues"));
+    dispatch(
+      setBreadcrumbs([
+        { label: "Dashboard", path: "/dashboard" },
+        { label: "My Issues", path: "/my-issues" },
+      ])
+    );
 
     loadIssues();
   }, [dispatch, currentPage, statusFilter, priorityFilter]);
@@ -222,7 +237,7 @@ const MyIssues: React.FC = () => {
     const params: any = {
       page: currentPage,
       limit: 10,
-      sort: '-createdAt'
+      sort: "-createdAt",
     };
 
     if (statusFilter) params.status = statusFilter;
@@ -237,7 +252,10 @@ const MyIssues: React.FC = () => {
     loadIssues();
   };
 
-  const handlePageChange = (event: React.ChangeEvent<unknown>, value: number) => {
+  const handlePageChange = (
+    event: React.ChangeEvent<unknown>,
+    value: number
+  ) => {
     setCurrentPage(value);
   };
 
@@ -246,7 +264,7 @@ const MyIssues: React.FC = () => {
   };
 
   const handleReportIssue = () => {
-    navigate('/report-issue');
+    navigate("/report-issue");
   };
 
   const handleRefresh = () => {
@@ -254,9 +272,9 @@ const MyIssues: React.FC = () => {
   };
 
   const handleClearFilters = () => {
-    setSearchTerm('');
-    setStatusFilter('');
-    setPriorityFilter('');
+    setSearchTerm("");
+    setStatusFilter("");
+    setPriorityFilter("");
     setCurrentPage(1);
     loadIssues();
   };
@@ -266,7 +284,14 @@ const MyIssues: React.FC = () => {
   return (
     <Box sx={{ flexGrow: 1 }}>
       {/* Header */}
-      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
+      <Box
+        sx={{
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "center",
+          mb: 3,
+        }}
+      >
         <Box>
           <Typography variant="h4" fontWeight="bold" gutterBottom>
             My Issues
@@ -294,7 +319,7 @@ const MyIssues: React.FC = () => {
                 placeholder="Search issues..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                onKeyPress={(e) => e.key === 'Enter' && handleSearch()}
+                onKeyPress={(e) => e.key === "Enter" && handleSearch()}
                 InputProps={{
                   startAdornment: (
                     <InputAdornment position="start">
@@ -341,7 +366,7 @@ const MyIssues: React.FC = () => {
             </Grid>
 
             <Grid item xs={12} md={4}>
-              <Box sx={{ display: 'flex', gap: 1 }}>
+              <Box sx={{ display: "flex", gap: 1 }}>
                 <Button
                   variant="outlined"
                   onClick={handleSearch}
@@ -379,10 +404,27 @@ const MyIssues: React.FC = () => {
             {[1, 2, 3, 4, 5].map((i) => (
               <Card key={i} sx={{ mb: 2 }}>
                 <CardContent>
-                  <Skeleton variant="text" height={28} width="60%" sx={{ mb: 1 }} />
-                  <Skeleton variant="text" height={20} width="100%" sx={{ mb: 1 }} />
-                  <Skeleton variant="text" height={20} width="40%" sx={{ mb: 1 }} />
-                  <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
+                  <Skeleton
+                    variant="text"
+                    height={28}
+                    width="60%"
+                    sx={{ mb: 1 }}
+                  />
+                  <Skeleton
+                    variant="text"
+                    height={20}
+                    width="100%"
+                    sx={{ mb: 1 }}
+                  />
+                  <Skeleton
+                    variant="text"
+                    height={20}
+                    width="40%"
+                    sx={{ mb: 1 }}
+                  />
+                  <Box
+                    sx={{ display: "flex", justifyContent: "space-between" }}
+                  >
                     <Skeleton variant="text" height={16} width="30%" />
                     <Skeleton variant="text" height={16} width="20%" />
                   </Box>
@@ -393,7 +435,8 @@ const MyIssues: React.FC = () => {
         ) : userIssues.length > 0 ? (
           <Box>
             <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-              Showing {userIssues.length} issue{userIssues.length !== 1 ? 's' : ''}
+              Showing {userIssues.length} issue
+              {userIssues.length !== 1 ? "s" : ""}
             </Typography>
 
             {userIssues.map((issue: any) => (
@@ -405,14 +448,14 @@ const MyIssues: React.FC = () => {
             ))}
           </Box>
         ) : (
-          <Box sx={{ textAlign: 'center', py: 8 }}>
+          <Box sx={{ textAlign: "center", py: 8 }}>
             <Typography variant="h6" color="text.secondary" gutterBottom>
               No issues found
             </Typography>
             <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
               {searchTerm || statusFilter || priorityFilter
-                ? 'Try adjusting your search or filters'
-                : 'You haven\'t reported any issues yet'}
+                ? "Try adjusting your search or filters"
+                : "You haven't reported any issues yet"}
             </Typography>
             <Button variant="contained" onClick={handleReportIssue}>
               Report Your First Issue
@@ -423,7 +466,7 @@ const MyIssues: React.FC = () => {
 
       {/* Pagination */}
       {pagination && pagination.totalPages > 1 && (
-        <Box sx={{ display: 'flex', justifyContent: 'center', mt: 3 }}>
+        <Box sx={{ display: "flex", justifyContent: "center", mt: 3 }}>
           <Pagination
             count={pagination.totalPages}
             page={currentPage}

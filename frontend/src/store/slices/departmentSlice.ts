@@ -370,7 +370,7 @@ const departmentSlice = createSlice({
       .addCase(removeDepartmentStaff.fulfilled, (state, action) => {
         state.loading = false;
         const { departmentId, userId } = action.payload;
-        
+
         // Update departments array
         const deptIndex = state.departments.findIndex(dept => dept.id === departmentId);
         if (deptIndex !== -1) {
@@ -378,14 +378,14 @@ const departmentSlice = createSlice({
             staff => staff.id !== userId
           );
         }
-        
+
         // Update selected department
         if (state.selectedDepartment && state.selectedDepartment.id === departmentId) {
           state.selectedDepartment.staff = state.selectedDepartment.staff.filter(
             staff => staff.id !== userId
           );
         }
-        
+
         state.error = null;
       })
       .addCase(removeDepartmentStaff.rejected, (state, action) => {

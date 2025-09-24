@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState } from "react";
 import {
   Box,
   Card,
@@ -37,7 +37,7 @@ import {
   Divider,
   Rating,
   useTheme,
-} from '@mui/material';
+} from "@mui/material";
 import {
   Add,
   MoreVert,
@@ -60,9 +60,9 @@ import {
   Error,
   Info,
   Refresh,
-} from '@mui/icons-material';
-import { useDispatch, useSelector } from 'react-redux';
-import { AppDispatch } from '../../store/store';
+} from "@mui/icons-material";
+import { useDispatch, useSelector } from "react-redux";
+import { AppDispatch } from "../../store/store";
 import {
   fetchIssues,
   updateIssue,
@@ -73,19 +73,22 @@ import {
   selectIssuesError,
   selectIssuesPagination,
   selectIssuesCategories,
-} from '../../store/slices/issueSlice';
-import {
-  setBreadcrumbs,
-  setPageTitle,
-} from '../../store/slices/uiSlice';
+} from "../../store/slices/issueSlice";
+import { setBreadcrumbs, setPageTitle } from "../../store/slices/uiSlice";
 
 interface Issue {
   _id: string;
   title: string;
   description: string;
   category: string;
-  priority: 'low' | 'medium' | 'high' | 'critical';
-  status: 'pending' | 'acknowledged' | 'in_progress' | 'resolved' | 'closed' | 'rejected';
+  priority: "low" | "medium" | "high" | "critical";
+  status:
+    | "pending"
+    | "acknowledged"
+    | "in_progress"
+    | "resolved"
+    | "closed"
+    | "rejected";
   location: {
     address: string;
     coordinates: [number, number];
@@ -138,7 +141,7 @@ interface Issue {
 const IssueManagement: React.FC = () => {
   const theme = useTheme();
   const dispatch = useDispatch<AppDispatch>();
-  
+
   const issues = useSelector(selectIssues);
   const loading = useSelector(selectIssuesLoading);
   const error = useSelector(selectIssuesError);
@@ -147,45 +150,47 @@ const IssueManagement: React.FC = () => {
 
   const [page, setPage] = useState(0);
   const [rowsPerPage, setRowsPerPage] = useState(25);
-  const [searchTerm, setSearchTerm] = useState('');
+  const [searchTerm, setSearchTerm] = useState("");
   const [categoryFilter, setCategoryFilter] = useState<string[]>([]);
   const [statusFilter, setStatusFilter] = useState<string[]>([]);
   const [priorityFilter, setPriorityFilter] = useState<string[]>([]);
-  
+
   // Dialog states
   const [viewDialogOpen, setViewDialogOpen] = useState(false);
   const [assignDialogOpen, setAssignDialogOpen] = useState(false);
   const [selectedIssue, setSelectedIssue] = useState<Issue | null>(null);
   const [selectedIssues, setSelectedIssues] = useState<string[]>([]);
-  
+
   // Menu states
   const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);
   const [menuIssueId, setMenuIssueId] = useState<string | null>(null);
-  
+
   // Assignment form
   const [assignmentData, setAssignmentData] = useState({
-    assigneeId: '',
-    priority: '',
-    dueDate: '',
-    notes: '',
+    assigneeId: "",
+    priority: "",
+    dueDate: "",
+    notes: "",
   });
-  
+
   // Notification states
   const [snackbar, setSnackbar] = useState({
     open: false,
-    message: '',
-    severity: 'success' as 'success' | 'error' | 'warning' | 'info',
+    message: "",
+    severity: "success" as "success" | "error" | "warning" | "info",
   });
 
   useEffect(() => {
-    console.log('🔄 IssueManagement: Component mounted, setting up page');
-    dispatch(setPageTitle('Issue Management'));
-    dispatch(setBreadcrumbs([
-      { label: 'Dashboard', path: '/dashboard' },
-      { label: 'Issues', path: '/issues' }
-    ]));
-    
-    console.log('📡 IssueManagement: Dispatching fetchIssues with params:', {
+    console.log("🔄 IssueManagement: Component mounted, setting up page");
+    dispatch(setPageTitle("Issue Management"));
+    dispatch(
+      setBreadcrumbs([
+        { label: "Dashboard", path: "/dashboard" },
+        { label: "Issues", path: "/issues" },
+      ])
+    );
+
+    console.log("📡 IssueManagement: Dispatching fetchIssues with params:", {
       page: page + 1,
       limit: rowsPerPage,
       search: searchTerm,
@@ -193,18 +198,31 @@ const IssueManagement: React.FC = () => {
       status: statusFilter,
       priority: priorityFilter,
     });
-    
-    dispatch(fetchIssues({
-      page: page + 1,
-      limit: rowsPerPage,
-      search: searchTerm,
-      category: categoryFilter,
-      status: statusFilter,
-      priority: priorityFilter,
-    }));
-  }, [dispatch, page, rowsPerPage, searchTerm, categoryFilter, statusFilter, priorityFilter]);
 
-  const handleMenuOpen = (event: React.MouseEvent<HTMLElement>, issueId: string) => {
+    dispatch(
+      fetchIssues({
+        page: page + 1,
+        limit: rowsPerPage,
+        search: searchTerm,
+        category: categoryFilter,
+        status: statusFilter,
+        priority: priorityFilter,
+      })
+    );
+  }, [
+    dispatch,
+    page,
+    rowsPerPage,
+    searchTerm,
+    categoryFilter,
+    statusFilter,
+    priorityFilter,
+  ]);
+
+  const handleMenuOpen = (
+    event: React.MouseEvent<HTMLElement>,
+    issueId: string
+  ) => {
     setAnchorEl(event.currentTarget);
     setMenuIssueId(issueId);
   };
@@ -223,10 +241,10 @@ const IssueManagement: React.FC = () => {
   const handleAssignIssue = (issue: Issue) => {
     setSelectedIssue(issue);
     setAssignmentData({
-      assigneeId: issue.assignedTo?._id || '',
+      assigneeId: issue.assignedTo?._id || "",
       priority: issue.priority,
-      dueDate: '',
-      notes: '',
+      dueDate: "",
+      notes: "",
     });
     setAssignDialogOpen(true);
     handleMenuClose();
@@ -234,20 +252,22 @@ const IssueManagement: React.FC = () => {
 
   const handleStatusUpdate = async (issueId: string, status: string) => {
     try {
-      await dispatch(updateIssue({
-        issueId,
-        issueData: { status },
-      })).unwrap();
+      await dispatch(
+        updateIssue({
+          issueId,
+          issueData: { status },
+        })
+      ).unwrap();
       setSnackbar({
         open: true,
-        message: 'Issue status updated successfully',
-        severity: 'success',
+        message: "Issue status updated successfully",
+        severity: "success",
       });
     } catch (error) {
       setSnackbar({
         open: true,
-        message: 'Failed to update issue status',
-        severity: 'error',
+        message: "Failed to update issue status",
+        severity: "error",
       });
     }
     handleMenuClose();
@@ -256,24 +276,26 @@ const IssueManagement: React.FC = () => {
   const handleAssignmentSubmit = async () => {
     if (selectedIssue) {
       try {
-        await dispatch(assignIssue({
-          issueId: selectedIssue._id,
-          assigneeId: assignmentData.assigneeId,
-          priority: assignmentData.priority,
-          dueDate: assignmentData.dueDate,
-          notes: assignmentData.notes,
-        })).unwrap();
+        await dispatch(
+          assignIssue({
+            issueId: selectedIssue._id,
+            assigneeId: assignmentData.assigneeId,
+            priority: assignmentData.priority,
+            dueDate: assignmentData.dueDate,
+            notes: assignmentData.notes,
+          })
+        ).unwrap();
         setSnackbar({
           open: true,
-          message: 'Issue assigned successfully',
-          severity: 'success',
+          message: "Issue assigned successfully",
+          severity: "success",
         });
         setAssignDialogOpen(false);
       } catch (error) {
         setSnackbar({
           open: true,
-          message: 'Failed to assign issue',
-          severity: 'error',
+          message: "Failed to assign issue",
+          severity: "error",
         });
       }
     }
@@ -281,56 +303,77 @@ const IssueManagement: React.FC = () => {
 
   const handleBulkStatusUpdate = async (status: string) => {
     try {
-      await dispatch(bulkUpdateIssues({
-        issueIds: selectedIssues,
-        updates: { status },
-      })).unwrap();
+      await dispatch(
+        bulkUpdateIssues({
+          issueIds: selectedIssues,
+          updates: { status },
+        })
+      ).unwrap();
       setSnackbar({
         open: true,
         message: `${selectedIssues.length} issues updated successfully`,
-        severity: 'success',
+        severity: "success",
       });
       setSelectedIssues([]);
     } catch (error) {
       setSnackbar({
         open: true,
-        message: 'Bulk update failed',
-        severity: 'error',
+        message: "Bulk update failed",
+        severity: "error",
       });
     }
   };
 
   const getPriorityColor = (priority: string) => {
     switch (priority) {
-      case 'critical': return 'error';
-      case 'high': return 'warning';
-      case 'medium': return 'info';
-      case 'low': return 'default';
-      default: return 'default';
+      case "critical":
+        return "error";
+      case "high":
+        return "warning";
+      case "medium":
+        return "info";
+      case "low":
+        return "default";
+      default:
+        return "default";
     }
   };
 
   const getStatusColor = (status: string) => {
     switch (status) {
-      case 'pending': return 'default';
-      case 'acknowledged': return 'info';
-      case 'in_progress': return 'warning';
-      case 'resolved': return 'success';
-      case 'closed': return 'default';
-      case 'rejected': return 'error';
-      default: return 'default';
+      case "pending":
+        return "default";
+      case "acknowledged":
+        return "info";
+      case "in_progress":
+        return "warning";
+      case "resolved":
+        return "success";
+      case "closed":
+        return "default";
+      case "rejected":
+        return "error";
+      default:
+        return "default";
     }
   };
 
   const getStatusIcon = (status: string) => {
     switch (status) {
-      case 'pending': return <Schedule />;
-      case 'acknowledged': return <Info />;
-      case 'in_progress': return <Warning />;
-      case 'resolved': return <CheckCircle />;
-      case 'closed': return <Info />;
-      case 'rejected': return <Error />;
-      default: return <Info />;
+      case "pending":
+        return <Schedule />;
+      case "acknowledged":
+        return <Info />;
+      case "in_progress":
+        return <Warning />;
+      case "resolved":
+        return <CheckCircle />;
+      case "closed":
+        return <Info />;
+      case "rejected":
+        return <Error />;
+      default:
+        return <Info />;
     }
   };
 
@@ -366,7 +409,7 @@ const IssueManagement: React.FC = () => {
     } else if (selectedIndex > 0) {
       newSelected = newSelected.concat(
         selectedIssues.slice(0, selectedIndex),
-        selectedIssues.slice(selectedIndex + 1),
+        selectedIssues.slice(selectedIndex + 1)
       );
     }
 
@@ -384,7 +427,14 @@ const IssueManagement: React.FC = () => {
 
       {/* Loading State */}
       {loading && issues.length === 0 && (
-        <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: 400 }}>
+        <Box
+          sx={{
+            display: "flex",
+            justifyContent: "center",
+            alignItems: "center",
+            minHeight: 400,
+          }}
+        >
           <Typography variant="h6" color="text.secondary">
             Loading issues...
           </Typography>
@@ -393,27 +443,43 @@ const IssueManagement: React.FC = () => {
 
       {/* No Issues State */}
       {!loading && !error && issues.length === 0 && (
-        <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: 400 }}>
-          <Box sx={{ textAlign: 'center' }}>
+        <Box
+          sx={{
+            display: "flex",
+            justifyContent: "center",
+            alignItems: "center",
+            minHeight: 400,
+          }}
+        >
+          <Box sx={{ textAlign: "center" }}>
             <Typography variant="h6" color="text.secondary" gutterBottom>
               No issues found
             </Typography>
             <Typography variant="body2" color="text.secondary">
-              {searchTerm || categoryFilter.length > 0 || statusFilter.length > 0 || priorityFilter.length > 0
-                ? 'Try adjusting your filters or search terms'
-                : 'Issues reported by citizens will appear here'
-              }
+              {searchTerm ||
+              categoryFilter.length > 0 ||
+              statusFilter.length > 0 ||
+              priorityFilter.length > 0
+                ? "Try adjusting your filters or search terms"
+                : "Issues reported by citizens will appear here"}
             </Typography>
           </Box>
         </Box>
       )}
 
       {/* Header */}
-      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
+      <Box
+        sx={{
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "center",
+          mb: 3,
+        }}
+      >
         <Typography variant="h4" fontWeight="bold">
           Issue Management
         </Typography>
-        <Box sx={{ display: 'flex', gap: 1 }}>
+        <Box sx={{ display: "flex", gap: 1 }}>
           <Button
             variant="outlined"
             startIcon={<Download />}
@@ -422,10 +488,7 @@ const IssueManagement: React.FC = () => {
           >
             Export
           </Button>
-          <Button
-            variant="contained"
-            startIcon={<Add />}
-          >
+          <Button variant="contained" startIcon={<Add />}>
             Create Issue
           </Button>
         </Box>
@@ -434,19 +497,30 @@ const IssueManagement: React.FC = () => {
       {/* Filters and Search */}
       <Card sx={{ mb: 3 }}>
         <CardContent>
-          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+          <Box
+            sx={{
+              display: "flex",
+              justifyContent: "space-between",
+              alignItems: "center",
+              mb: 2,
+            }}
+          >
             <Typography variant="h6">Filters</Typography>
             <Button
               size="small"
               startIcon={<Refresh />}
-              onClick={() => dispatch(fetchIssues({
-                page: page + 1,
-                limit: rowsPerPage,
-                search: searchTerm,
-                category: categoryFilter,
-                status: statusFilter,
-                priority: priorityFilter,
-              }))}
+              onClick={() =>
+                dispatch(
+                  fetchIssues({
+                    page: page + 1,
+                    limit: rowsPerPage,
+                    search: searchTerm,
+                    category: categoryFilter,
+                    status: statusFilter,
+                    priority: priorityFilter,
+                  })
+                )
+              }
               disabled={loading}
             >
               Refresh
@@ -461,33 +535,39 @@ const IssueManagement: React.FC = () => {
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
                 InputProps={{
-                  startAdornment: <Search sx={{ mr: 1, color: 'text.secondary' }} />,
+                  startAdornment: (
+                    <Search sx={{ mr: 1, color: "text.secondary" }} />
+                  ),
                 }}
                 fullWidth
                 disabled={loading}
               />
             </Grid>
-            
+
             <Grid item xs={12} md={2}>
               <FormControl size="small" fullWidth disabled={loading}>
                 <InputLabel>Category</InputLabel>
                 <Select
                   multiple
                   value={categoryFilter}
-                  onChange={(e) => setCategoryFilter(e.target.value as string[])}
+                  onChange={(e) =>
+                    setCategoryFilter(e.target.value as string[])
+                  }
                   input={<OutlinedInput label="Category" />}
-                  renderValue={(selected) => selected.join(', ')}
+                  renderValue={(selected) => selected.join(", ")}
                 >
                   {categories.map((category) => (
                     <MenuItem key={category} value={category}>
-                      <Checkbox checked={categoryFilter.indexOf(category) > -1} />
-                      <ListItemText primary={category.replace('_', ' ')} />
+                      <Checkbox
+                        checked={categoryFilter.indexOf(category) > -1}
+                      />
+                      <ListItemText primary={category.replace("_", " ")} />
                     </MenuItem>
                   ))}
                 </Select>
               </FormControl>
             </Grid>
-            
+
             <Grid item xs={12} md={2}>
               <FormControl size="small" fullWidth disabled={loading}>
                 <InputLabel>Status</InputLabel>
@@ -496,31 +576,42 @@ const IssueManagement: React.FC = () => {
                   value={statusFilter}
                   onChange={(e) => setStatusFilter(e.target.value as string[])}
                   input={<OutlinedInput label="Status" />}
-                  renderValue={(selected) => selected.join(', ')}
+                  renderValue={(selected) => selected.join(", ")}
                 >
-                  {['pending', 'acknowledged', 'in_progress', 'resolved', 'closed', 'rejected'].map((status) => (
+                  {[
+                    "pending",
+                    "acknowledged",
+                    "in_progress",
+                    "resolved",
+                    "closed",
+                    "rejected",
+                  ].map((status) => (
                     <MenuItem key={status} value={status}>
                       <Checkbox checked={statusFilter.indexOf(status) > -1} />
-                      <ListItemText primary={status.replace('_', ' ')} />
+                      <ListItemText primary={status.replace("_", " ")} />
                     </MenuItem>
                   ))}
                 </Select>
               </FormControl>
             </Grid>
-            
+
             <Grid item xs={12} md={2}>
               <FormControl size="small" fullWidth disabled={loading}>
                 <InputLabel>Priority</InputLabel>
                 <Select
                   multiple
                   value={priorityFilter}
-                  onChange={(e) => setPriorityFilter(e.target.value as string[])}
+                  onChange={(e) =>
+                    setPriorityFilter(e.target.value as string[])
+                  }
                   input={<OutlinedInput label="Priority" />}
-                  renderValue={(selected) => selected.join(', ')}
+                  renderValue={(selected) => selected.join(", ")}
                 >
-                  {['low', 'medium', 'high', 'critical'].map((priority) => (
+                  {["low", "medium", "high", "critical"].map((priority) => (
                     <MenuItem key={priority} value={priority}>
-                      <Checkbox checked={priorityFilter.indexOf(priority) > -1} />
+                      <Checkbox
+                        checked={priorityFilter.indexOf(priority) > -1}
+                      />
                       <ListItemText primary={priority} />
                     </MenuItem>
                   ))}
@@ -537,19 +628,23 @@ const IssueManagement: React.FC = () => {
           sx={{
             pl: { sm: 2 },
             pr: { xs: 1, sm: 1 },
-            bgcolor: 'primary.main',
-            color: 'primary.contrastText',
+            bgcolor: "primary.main",
+            color: "primary.contrastText",
             borderRadius: 1,
             mb: 2,
           }}
         >
-          <Typography sx={{ flex: '1 1 100%' }} variant="subtitle1" component="div">
+          <Typography
+            sx={{ flex: "1 1 100%" }}
+            variant="subtitle1"
+            component="div"
+          >
             {selectedIssues.length} issue(s) selected
           </Typography>
           <Tooltip title="Mark Acknowledged">
             <IconButton
               color="inherit"
-              onClick={() => handleBulkStatusUpdate('acknowledged')}
+              onClick={() => handleBulkStatusUpdate("acknowledged")}
               disabled={loading}
             >
               <Info />
@@ -558,7 +653,7 @@ const IssueManagement: React.FC = () => {
           <Tooltip title="Mark In Progress">
             <IconButton
               color="inherit"
-              onClick={() => handleBulkStatusUpdate('in_progress')}
+              onClick={() => handleBulkStatusUpdate("in_progress")}
               disabled={loading}
             >
               <Warning />
@@ -567,7 +662,7 @@ const IssueManagement: React.FC = () => {
           <Tooltip title="Mark Resolved">
             <IconButton
               color="inherit"
-              onClick={() => handleBulkStatusUpdate('resolved')}
+              onClick={() => handleBulkStatusUpdate("resolved")}
               disabled={loading}
             >
               <CheckCircle />
@@ -584,8 +679,14 @@ const IssueManagement: React.FC = () => {
               <TableRow>
                 <TableCell padding="checkbox">
                   <Checkbox
-                    indeterminate={selectedIssues.length > 0 && selectedIssues.length < issues.length}
-                    checked={issues.length > 0 && selectedIssues.length === issues.length}
+                    indeterminate={
+                      selectedIssues.length > 0 &&
+                      selectedIssues.length < issues.length
+                    }
+                    checked={
+                      issues.length > 0 &&
+                      selectedIssues.length === issues.length
+                    }
                     onChange={handleSelectAllClick}
                     disabled={loading}
                   />
@@ -608,25 +709,79 @@ const IssueManagement: React.FC = () => {
                       <Checkbox disabled />
                     </TableCell>
                     <TableCell>
-                      <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
-                        <Box sx={{ height: 20, bgcolor: 'grey.300', borderRadius: 1 }} />
-                        <Box sx={{ height: 16, width: '60%', bgcolor: 'grey.200', borderRadius: 1 }} />
+                      <Box
+                        sx={{
+                          display: "flex",
+                          flexDirection: "column",
+                          gap: 1,
+                        }}
+                      >
+                        <Box
+                          sx={{
+                            height: 20,
+                            bgcolor: "grey.300",
+                            borderRadius: 1,
+                          }}
+                        />
+                        <Box
+                          sx={{
+                            height: 16,
+                            width: "60%",
+                            bgcolor: "grey.200",
+                            borderRadius: 1,
+                          }}
+                        />
                       </Box>
                     </TableCell>
                     <TableCell>
-                      <Box sx={{ height: 24, width: 60, bgcolor: 'grey.300', borderRadius: 12 }} />
+                      <Box
+                        sx={{
+                          height: 24,
+                          width: 60,
+                          bgcolor: "grey.300",
+                          borderRadius: 12,
+                        }}
+                      />
                     </TableCell>
                     <TableCell>
-                      <Box sx={{ height: 24, width: 80, bgcolor: 'grey.300', borderRadius: 12 }} />
+                      <Box
+                        sx={{
+                          height: 24,
+                          width: 80,
+                          bgcolor: "grey.300",
+                          borderRadius: 12,
+                        }}
+                      />
                     </TableCell>
                     <TableCell>
-                      <Box sx={{ height: 40, width: 120, bgcolor: 'grey.300', borderRadius: 1 }} />
+                      <Box
+                        sx={{
+                          height: 40,
+                          width: 120,
+                          bgcolor: "grey.300",
+                          borderRadius: 1,
+                        }}
+                      />
                     </TableCell>
                     <TableCell>
-                      <Box sx={{ height: 20, width: 100, bgcolor: 'grey.300', borderRadius: 1 }} />
+                      <Box
+                        sx={{
+                          height: 20,
+                          width: 100,
+                          bgcolor: "grey.300",
+                          borderRadius: 1,
+                        }}
+                      />
                     </TableCell>
                     <TableCell>
-                      <Box sx={{ height: 20, width: 80, bgcolor: 'grey.300', borderRadius: 1 }} />
+                      <Box
+                        sx={{
+                          height: 20,
+                          width: 80,
+                          bgcolor: "grey.300",
+                          borderRadius: 1,
+                        }}
+                      />
                     </TableCell>
                     <TableCell align="right">
                       <IconButton disabled>
@@ -637,7 +792,7 @@ const IssueManagement: React.FC = () => {
                 ))
               ) : issues.length === 0 && !loading ? (
                 <TableRow>
-                  <TableCell colSpan={8} sx={{ textAlign: 'center', py: 6 }}>
+                  <TableCell colSpan={8} sx={{ textAlign: "center", py: 6 }}>
                     <Typography variant="body1" color="text.secondary">
                       No issues found matching your criteria
                     </Typography>
@@ -646,33 +801,54 @@ const IssueManagement: React.FC = () => {
               ) : (
                 issues.map((issue) => {
                   const isItemSelected = isSelected(issue._id);
-                  
+
                   return (
                     <TableRow
                       key={issue._id}
                       hover
                       selected={isItemSelected}
                       onClick={() => handleIssueSelect(issue._id)}
-                      sx={{ cursor: 'pointer' }}
+                      sx={{ cursor: "pointer" }}
                     >
                       <TableCell padding="checkbox">
                         <Checkbox checked={isItemSelected} disabled={loading} />
                       </TableCell>
-                      
+
                       <TableCell>
                         <Box>
-                          <Typography variant="subtitle2" fontWeight="medium" noWrap>
+                          <Typography
+                            variant="subtitle2"
+                            fontWeight="medium"
+                            noWrap
+                          >
                             {issue.title}
                           </Typography>
-                          <Typography variant="body2" color="text.secondary" noWrap>
+                          <Typography
+                            variant="body2"
+                            color="text.secondary"
+                            noWrap
+                          >
                             {issue.category}
                           </Typography>
-                          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mt: 1 }}>
+                          <Box
+                            sx={{
+                              display: "flex",
+                              alignItems: "center",
+                              gap: 1,
+                              mt: 1,
+                            }}
+                          >
                             {issue.media.images.length > 0 && (
                               <AttachFile fontSize="small" color="action" />
                             )}
                             {issue.comments.length > 0 && (
-                              <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                              <Box
+                                sx={{
+                                  display: "flex",
+                                  alignItems: "center",
+                                  gap: 0.5,
+                                }}
+                              >
                                 <Comment fontSize="small" color="action" />
                                 <Typography variant="caption">
                                   {issue.comments.length}
@@ -682,7 +858,7 @@ const IssueManagement: React.FC = () => {
                           </Box>
                         </Box>
                       </TableCell>
-                      
+
                       <TableCell>
                         <Chip
                           label={issue.priority}
@@ -690,28 +866,43 @@ const IssueManagement: React.FC = () => {
                           size="small"
                         />
                       </TableCell>
-                      
+
                       <TableCell>
                         <Chip
-                          label={issue.status.replace('_', ' ')}
+                          label={issue.status.replace("_", " ")}
                           color={getStatusColor(issue.status) as any}
                           size="small"
                           icon={getStatusIcon(issue.status)}
                         />
                       </TableCell>
-                      
+
                       <TableCell>
                         {issue.assignedTo ? (
-                          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                            <Avatar sx={{ width: 24, height: 24, fontSize: '0.75rem' }}>
+                          <Box
+                            sx={{
+                              display: "flex",
+                              alignItems: "center",
+                              gap: 1,
+                            }}
+                          >
+                            <Avatar
+                              sx={{
+                                width: 24,
+                                height: 24,
+                                fontSize: "0.75rem",
+                              }}
+                            >
                               {issue.assignedTo.name.charAt(0)}
                             </Avatar>
                             <Box>
                               <Typography variant="body2" fontWeight="medium">
                                 {issue.assignedTo.name}
                               </Typography>
-                              <Typography variant="caption" color="text.secondary">
-                                {issue.assignedDepartment?.name || 'Department'}
+                              <Typography
+                                variant="caption"
+                                color="text.secondary"
+                              >
+                                {issue.assignedDepartment?.name || "Department"}
                               </Typography>
                             </Box>
                           </Box>
@@ -721,16 +912,26 @@ const IssueManagement: React.FC = () => {
                           </Typography>
                         )}
                       </TableCell>
-                      
+
                       <TableCell>
-                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                        <Box
+                          sx={{
+                            display: "flex",
+                            alignItems: "center",
+                            gap: 0.5,
+                          }}
+                        >
                           <LocationOn fontSize="small" color="action" />
-                          <Typography variant="body2" noWrap sx={{ maxWidth: 150 }}>
+                          <Typography
+                            variant="body2"
+                            noWrap
+                            sx={{ maxWidth: 150 }}
+                          >
                             {issue.location.address}
                           </Typography>
                         </Box>
                       </TableCell>
-                      
+
                       <TableCell>
                         <Box>
                           <Typography variant="body2">
@@ -741,7 +942,7 @@ const IssueManagement: React.FC = () => {
                           </Typography>
                         </Box>
                       </TableCell>
-                      
+
                       <TableCell align="right">
                         <IconButton
                           size="small"
@@ -761,7 +962,7 @@ const IssueManagement: React.FC = () => {
             </TableBody>
           </Table>
         </TableContainer>
-        
+
         <TablePagination
           rowsPerPageOptions={[10, 25, 50, 100]}
           component="div"
@@ -784,7 +985,7 @@ const IssueManagement: React.FC = () => {
       >
         <MenuItem
           onClick={() => {
-            const issue = issues.find(i => i._id === menuIssueId);
+            const issue = issues.find((i) => i._id === menuIssueId);
             if (issue) handleViewIssue(issue);
           }}
         >
@@ -793,7 +994,7 @@ const IssueManagement: React.FC = () => {
         </MenuItem>
         <MenuItem
           onClick={() => {
-            const issue = issues.find(i => i._id === menuIssueId);
+            const issue = issues.find((i) => i._id === menuIssueId);
             if (issue) handleAssignIssue(issue);
           }}
         >
@@ -801,23 +1002,27 @@ const IssueManagement: React.FC = () => {
           Assign
         </MenuItem>
         <Divider />
-        <MenuItem onClick={() => handleStatusUpdate(menuIssueId!, 'acknowledged')}>
+        <MenuItem
+          onClick={() => handleStatusUpdate(menuIssueId!, "acknowledged")}
+        >
           <Info sx={{ mr: 1 }} />
           Mark Acknowledged
         </MenuItem>
-        <MenuItem onClick={() => handleStatusUpdate(menuIssueId!, 'in_progress')}>
+        <MenuItem
+          onClick={() => handleStatusUpdate(menuIssueId!, "in_progress")}
+        >
           <Warning sx={{ mr: 1 }} />
           Mark In Progress
         </MenuItem>
-        <MenuItem onClick={() => handleStatusUpdate(menuIssueId!, 'resolved')}>
+        <MenuItem onClick={() => handleStatusUpdate(menuIssueId!, "resolved")}>
           <CheckCircle sx={{ mr: 1 }} />
           Mark Resolved
         </MenuItem>
-        <MenuItem onClick={() => handleStatusUpdate(menuIssueId!, 'closed')}>
+        <MenuItem onClick={() => handleStatusUpdate(menuIssueId!, "closed")}>
           <Info sx={{ mr: 1 }} />
           Mark Closed
         </MenuItem>
-        <MenuItem onClick={() => handleStatusUpdate(menuIssueId!, 'rejected')}>
+        <MenuItem onClick={() => handleStatusUpdate(menuIssueId!, "rejected")}>
           <Error sx={{ mr: 1 }} />
           Mark Rejected
         </MenuItem>
@@ -830,9 +1035,7 @@ const IssueManagement: React.FC = () => {
         maxWidth="md"
         fullWidth
       >
-        <DialogTitle>
-          Issue Details
-        </DialogTitle>
+        <DialogTitle>Issue Details</DialogTitle>
         <DialogContent>
           {selectedIssue && (
             <Box sx={{ mt: 2 }}>
@@ -845,53 +1048,106 @@ const IssueManagement: React.FC = () => {
                     {selectedIssue.description}
                   </Typography>
                 </Grid>
-                
+
                 <Grid item xs={12} md={6}>
                   <Paper sx={{ p: 2 }}>
-                    <Typography variant="subtitle1" fontWeight="bold" gutterBottom>
+                    <Typography
+                      variant="subtitle1"
+                      fontWeight="bold"
+                      gutterBottom
+                    >
                       Issue Information
                     </Typography>
-                    <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
-                      <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
-                        <Typography variant="body2" color="text.secondary">Category:</Typography>
-                        <Typography variant="body2">{selectedIssue.category}</Typography>
+                    <Box
+                      sx={{ display: "flex", flexDirection: "column", gap: 1 }}
+                    >
+                      <Box
+                        sx={{
+                          display: "flex",
+                          justifyContent: "space-between",
+                        }}
+                      >
+                        <Typography variant="body2" color="text.secondary">
+                          Category:
+                        </Typography>
+                        <Typography variant="body2">
+                          {selectedIssue.category}
+                        </Typography>
                       </Box>
-                      <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
-                        <Typography variant="body2" color="text.secondary">Priority:</Typography>
+                      <Box
+                        sx={{
+                          display: "flex",
+                          justifyContent: "space-between",
+                        }}
+                      >
+                        <Typography variant="body2" color="text.secondary">
+                          Priority:
+                        </Typography>
                         <Chip
                           label={selectedIssue.priority}
-                          color={getPriorityColor(selectedIssue.priority) as any}
+                          color={
+                            getPriorityColor(selectedIssue.priority) as any
+                          }
                           size="small"
                         />
                       </Box>
-                      <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
-                        <Typography variant="body2" color="text.secondary">Status:</Typography>
+                      <Box
+                        sx={{
+                          display: "flex",
+                          justifyContent: "space-between",
+                        }}
+                      >
+                        <Typography variant="body2" color="text.secondary">
+                          Status:
+                        </Typography>
                         <Chip
-                          label={selectedIssue.status.replace('_', ' ')}
+                          label={selectedIssue.status.replace("_", " ")}
                           color={getStatusColor(selectedIssue.status) as any}
                           size="small"
                         />
                       </Box>
-                      <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
-                        <Typography variant="body2" color="text.secondary">Reported:</Typography>
-                        <Typography variant="body2">{formatDateTime(selectedIssue.createdAt)}</Typography>
+                      <Box
+                        sx={{
+                          display: "flex",
+                          justifyContent: "space-between",
+                        }}
+                      >
+                        <Typography variant="body2" color="text.secondary">
+                          Reported:
+                        </Typography>
+                        <Typography variant="body2">
+                          {formatDateTime(selectedIssue.createdAt)}
+                        </Typography>
                       </Box>
                       {selectedIssue.resolvedAt && (
-                        <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
-                          <Typography variant="body2" color="text.secondary">Resolved:</Typography>
-                          <Typography variant="body2">{formatDateTime(selectedIssue.resolvedAt)}</Typography>
+                        <Box
+                          sx={{
+                            display: "flex",
+                            justifyContent: "space-between",
+                          }}
+                        >
+                          <Typography variant="body2" color="text.secondary">
+                            Resolved:
+                          </Typography>
+                          <Typography variant="body2">
+                            {formatDateTime(selectedIssue.resolvedAt)}
+                          </Typography>
                         </Box>
                       )}
                     </Box>
                   </Paper>
                 </Grid>
-                
+
                 <Grid item xs={12} md={6}>
                   <Paper sx={{ p: 2 }}>
-                    <Typography variant="subtitle1" fontWeight="bold" gutterBottom>
+                    <Typography
+                      variant="subtitle1"
+                      fontWeight="bold"
+                      gutterBottom
+                    >
                       Location
                     </Typography>
-                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                    <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
                       <LocationOn color="primary" />
                       <Typography variant="body2">
                         {selectedIssue.location.address}
@@ -899,14 +1155,25 @@ const IssueManagement: React.FC = () => {
                     </Box>
                   </Paper>
                 </Grid>
-                
+
                 {selectedIssue.rating && (
                   <Grid item xs={12}>
                     <Paper sx={{ p: 2 }}>
-                      <Typography variant="subtitle1" fontWeight="bold" gutterBottom>
+                      <Typography
+                        variant="subtitle1"
+                        fontWeight="bold"
+                        gutterBottom
+                      >
                         Citizen Feedback
                       </Typography>
-                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 1 }}>
+                      <Box
+                        sx={{
+                          display: "flex",
+                          alignItems: "center",
+                          gap: 2,
+                          mb: 1,
+                        }}
+                      >
                         <Rating value={selectedIssue.rating} readOnly />
                         <Typography variant="body2">
                           {selectedIssue.rating}/5 stars
@@ -925,9 +1192,7 @@ const IssueManagement: React.FC = () => {
           )}
         </DialogContent>
         <DialogActions>
-          <Button onClick={() => setViewDialogOpen(false)}>
-            Close
-          </Button>
+          <Button onClick={() => setViewDialogOpen(false)}>Close</Button>
         </DialogActions>
       </Dialog>
 
@@ -938,29 +1203,39 @@ const IssueManagement: React.FC = () => {
         maxWidth="sm"
         fullWidth
       >
-        <DialogTitle>
-          Assign Issue
-        </DialogTitle>
+        <DialogTitle>Assign Issue</DialogTitle>
         <DialogContent>
-          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2, mt: 2 }}>
+          <Box sx={{ display: "flex", flexDirection: "column", gap: 2, mt: 2 }}>
             <FormControl fullWidth>
               <InputLabel>Assign To</InputLabel>
               <Select
                 value={assignmentData.assigneeId}
-                onChange={(e) => setAssignmentData({ ...assignmentData, assigneeId: e.target.value })}
+                onChange={(e) =>
+                  setAssignmentData({
+                    ...assignmentData,
+                    assigneeId: e.target.value,
+                  })
+                }
                 label="Assign To"
               >
                 <MenuItem value="staff1">John Smith - Public Works</MenuItem>
                 <MenuItem value="staff2">Jane Doe - Health Department</MenuItem>
-                <MenuItem value="staff3">Mike Johnson - Transportation</MenuItem>
+                <MenuItem value="staff3">
+                  Mike Johnson - Transportation
+                </MenuItem>
               </Select>
             </FormControl>
-            
+
             <FormControl fullWidth>
               <InputLabel>Priority</InputLabel>
               <Select
                 value={assignmentData.priority}
-                onChange={(e) => setAssignmentData({ ...assignmentData, priority: e.target.value })}
+                onChange={(e) =>
+                  setAssignmentData({
+                    ...assignmentData,
+                    priority: e.target.value,
+                  })
+                }
                 label="Priority"
               >
                 <MenuItem value="low">Low</MenuItem>
@@ -969,33 +1244,38 @@ const IssueManagement: React.FC = () => {
                 <MenuItem value="critical">Critical</MenuItem>
               </Select>
             </FormControl>
-            
+
             <TextField
               label="Due Date"
               type="date"
               value={assignmentData.dueDate}
-              onChange={(e) => setAssignmentData({ ...assignmentData, dueDate: e.target.value })}
+              onChange={(e) =>
+                setAssignmentData({
+                  ...assignmentData,
+                  dueDate: e.target.value,
+                })
+              }
               fullWidth
               InputLabelProps={{
                 shrink: true,
               }}
             />
-            
+
             <TextField
               label="Assignment Notes"
               multiline
               rows={3}
               value={assignmentData.notes}
-              onChange={(e) => setAssignmentData({ ...assignmentData, notes: e.target.value })}
+              onChange={(e) =>
+                setAssignmentData({ ...assignmentData, notes: e.target.value })
+              }
               fullWidth
               placeholder="Add any specific instructions or notes for the assignee..."
             />
           </Box>
         </DialogContent>
         <DialogActions>
-          <Button onClick={() => setAssignDialogOpen(false)}>
-            Cancel
-          </Button>
+          <Button onClick={() => setAssignDialogOpen(false)}>Cancel</Button>
           <Button variant="contained" onClick={handleAssignmentSubmit}>
             Assign
           </Button>
@@ -1011,7 +1291,7 @@ const IssueManagement: React.FC = () => {
         <Alert
           onClose={() => setSnackbar({ ...snackbar, open: false })}
           severity={snackbar.severity}
-          sx={{ width: '100%' }}
+          sx={{ width: "100%" }}
         >
           {snackbar.message}
         </Alert>

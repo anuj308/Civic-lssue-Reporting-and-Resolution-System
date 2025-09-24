@@ -16,5 +16,21 @@ export default defineConfig({
   },
   build: {
     outDir: 'build',
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          // React core
+          'react-vendor': ['react', 'react-dom', 'react-router-dom'],
+          // UI library
+          'mui-vendor': ['@mui/material', '@mui/icons-material', '@emotion/react', '@emotion/styled'],
+          // State management
+          'redux-vendor': ['@reduxjs/toolkit', 'react-redux', 'redux-persist'],
+          // API and utilities
+          'api-vendor': ['@tanstack/react-query', 'axios', 'react-toastify'],
+          // Form handling
+          'form-vendor': ['react-hook-form', '@hookform/resolvers', 'yup'],
+        },
+      },
+    },
   },
 })
