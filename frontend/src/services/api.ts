@@ -98,7 +98,14 @@ interface ApiResponse<T = any> {
 export const apiService = {
   // GET request
   get: async <T = any>(url: string, params?: any): Promise<T> => {
+    console.log('🌐 Frontend apiService.get - Requesting:', url, 'with params:', params);
     const response = await api.get<ApiResponse<T>>(url, { params });
+    console.log('📥 Frontend apiService.get - Raw response:', {
+      status: response.status,
+      statusText: response.statusText,
+      data: response.data
+    });
+    console.log('📦 Frontend apiService.get - Returning response.data.data:', response.data.data);
     return response.data.data;
   },
 
@@ -220,8 +227,17 @@ export const usersAPI = {
 
 // Issues API
 export const issuesAPI = {
-  getIssues: (params?: any) =>
-    apiService.get('/issues', params),
+  getIssues: (params?: any) => {
+    console.log('📡 Frontend API: getIssues called with params:', params);
+    console.log('📡 Frontend API: Making request to /issues/public');
+    return apiService.get('/issues/public', params);
+  },
+  
+  getMyIssues: (params?: any) => {
+    console.log('📡 Frontend API: getMyIssues called with params:', params);
+    console.log('📡 Frontend API: Making request to /issues/my');
+    return apiService.get('/issues/my', params);
+  },
   
   getIssueById: (issueId: string) =>
     apiService.get(`/issues/${issueId}`),
@@ -246,6 +262,9 @@ export const issuesAPI = {
   
   updateStatus: (issueId: string, status: string) =>
     apiService.put(`/issues/${issueId}/status`, { status }),
+
+  bulkUpdateIssues: (data: { issueIds: string[]; updates: any }) =>
+    apiService.put('/issues/bulk-update', data),
 };
 
 // Departments API

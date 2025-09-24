@@ -86,7 +86,7 @@ const HomeScreen: React.FC = () => {
 
   const getPriorityColor = (priority: string) => {
     switch (priority) {
-      case 'urgent':
+      case 'critical':
         return theme.colors.error;
       case 'high':
         return theme.colors.warning;

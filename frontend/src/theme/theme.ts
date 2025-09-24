@@ -298,7 +298,7 @@ declare module '@mui/material/styles' {
       low: string;
       medium: string;
       high: string;
-      urgent: string;
+      critical: string;
     };
   }
 
@@ -314,7 +314,7 @@ declare module '@mui/material/styles' {
       low?: string;
       medium?: string;
       high?: string;
-      urgent?: string;
+      critical?: string;
     };
   }
 }
@@ -333,7 +333,7 @@ export const adminTheme = createTheme({
     low: '#10b981', // Green
     medium: '#f59e0b', // Amber
     high: '#ef4444', // Red
-    urgent: '#dc2626', // Dark red
+    critical: '#dc2626', // Dark red
   },
 });
 

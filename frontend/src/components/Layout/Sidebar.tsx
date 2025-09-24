@@ -431,6 +431,9 @@ const Sidebar: React.FC<SidebarProps> = ({
           backgroundColor: 'background.paper',
           borderRight: '1px solid',
           borderColor: 'divider',
+          position: 'fixed', // Make it overlay on desktop
+          height: '100vh',
+          zIndex: theme.zIndex.drawer,
         },
       }}
     >

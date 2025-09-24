@@ -41,8 +41,10 @@ const Layout: React.FC = () => {
           flexDirection: 'column',
           minHeight: '100vh',
           backgroundColor: 'background.default',
-          marginLeft: isMobile ? 0 : sidebarOpen ? 0 : `-${SIDEBAR_WIDTH - SIDEBAR_COLLAPSED_WIDTH}px`,
-          transition: theme.transitions.create(['margin'], {
+          marginLeft: 0,
+          width: '100%',
+          paddingLeft: isMobile ? 0 : sidebarOpen ? `${SIDEBAR_WIDTH}px` : `${SIDEBAR_COLLAPSED_WIDTH}px`,
+          transition: theme.transitions.create('padding-left', {
             easing: theme.transitions.easing.sharp,
             duration: theme.transitions.duration.leavingScreen,
           }),

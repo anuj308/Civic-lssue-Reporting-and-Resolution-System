@@ -278,7 +278,7 @@ class IssueController {
    */
   static async getPublicIssues(req, res) {
     try {
-      const { page = 1, limit = 10, status, category, priority, sortBy = 'createdAt', order = 'desc' } = req.query;
+      const { page = 1, limit = 10, status, category, priority, search, sortBy = 'createdAt', order = 'desc' } = req.query;
       
       const filters = { isPublic: true };
       
@@ -286,6 +286,15 @@ class IssueController {
       if (status) filters.status = status;
       if (category) filters.category = category;
       if (priority) filters.priority = priority;
+      
+      // Add search filter if provided
+      if (search && search.trim()) {
+        const searchRegex = new RegExp(search.trim(), 'i'); // Case-insensitive search
+        filters.$or = [
+          { title: searchRegex },
+          { description: searchRegex }
+        ];
+      }
 
       const sortOrder = order === 'desc' ? -1 : 1;
       const sortOptions = {};

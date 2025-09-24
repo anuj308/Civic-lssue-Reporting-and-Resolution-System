@@ -59,6 +59,7 @@ import {
   Warning,
   Error,
   Info,
+  Refresh,
 } from '@mui/icons-material';
 import { useDispatch, useSelector } from 'react-redux';
 import { AppDispatch } from '../../store/store';
@@ -71,6 +72,7 @@ import {
   selectIssuesLoading,
   selectIssuesError,
   selectIssuesPagination,
+  selectIssuesCategories,
 } from '../../store/slices/issueSlice';
 import {
   setBreadcrumbs,
@@ -78,46 +80,59 @@ import {
 } from '../../store/slices/uiSlice';
 
 interface Issue {
-  id: string;
+  _id: string;
   title: string;
   description: string;
   category: string;
-  priority: 'low' | 'medium' | 'high' | 'urgent';
-  status: 'pending' | 'assigned' | 'in_progress' | 'resolved' | 'closed';
+  priority: 'low' | 'medium' | 'high' | 'critical';
+  status: 'pending' | 'acknowledged' | 'in_progress' | 'resolved' | 'closed' | 'rejected';
   location: {
     address: string;
-    coordinates: {
-      lat: number;
-      lng: number;
-    };
+    coordinates: [number, number];
   };
   reportedBy: {
-    id: string;
+    _id: string;
     name: string;
-    email: string;
+    email?: string;
+  };
+  assignedDepartment?: {
+    _id: string;
+    name: string;
   };
   assignedTo?: {
-    id: string;
+    _id: string;
     name: string;
-    department: string;
   };
-  attachments: Array<{
-    id: string;
-    filename: string;
-    url: string;
-    type: string;
-  }>;
+  timeline: {
+    reported: string;
+    acknowledged?: string;
+    started?: string;
+    resolved?: string;
+  };
+  media: {
+    images: string[];
+    videos?: string[];
+  };
   comments: Array<{
-    id: string;
-    content: string;
-    createdBy: string;
-    createdAt: string;
+    _id: string;
+    user: {
+      _id: string;
+      name: string;
+    };
+    message: string;
+    timestamp: string;
+    isOfficial: boolean;
   }>;
+  votes: {
+    upvotes: string[];
+    downvotes: string[];
+  };
+  isPublic: boolean;
+  tags: string[];
   createdAt: string;
   updatedAt: string;
-  resolvedAt?: string;
-  rating?: number;
-  feedback?: string;
+  commentsCount?: number;
+  upvotes?: number;
 }
 
 const IssueManagement: React.FC = () => {
@@ -128,6 +143,7 @@ const IssueManagement: React.FC = () => {
   const loading = useSelector(selectIssuesLoading);
   const error = useSelector(selectIssuesError);
   const pagination = useSelector(selectIssuesPagination);
+  const categories = useSelector(selectIssuesCategories);
 
   const [page, setPage] = useState(0);
   const [rowsPerPage, setRowsPerPage] = useState(25);
@@ -162,11 +178,21 @@ const IssueManagement: React.FC = () => {
   });
 
   useEffect(() => {
+    console.log('🔄 IssueManagement: Component mounted, setting up page');
     dispatch(setPageTitle('Issue Management'));
     dispatch(setBreadcrumbs([
       { label: 'Dashboard', path: '/dashboard' },
       { label: 'Issues', path: '/issues' }
     ]));
+    
+    console.log('📡 IssueManagement: Dispatching fetchIssues with params:', {
+      page: page + 1,
+      limit: rowsPerPage,
+      search: searchTerm,
+      category: categoryFilter,
+      status: statusFilter,
+      priority: priorityFilter,
+    });
     
     dispatch(fetchIssues({
       page: page + 1,
@@ -197,7 +223,7 @@ const IssueManagement: React.FC = () => {
   const handleAssignIssue = (issue: Issue) => {
     setSelectedIssue(issue);
     setAssignmentData({
-      assigneeId: issue.assignedTo?.id || '',
+      assigneeId: issue.assignedTo?._id || '',
       priority: issue.priority,
       dueDate: '',
       notes: '',
@@ -209,8 +235,8 @@ const IssueManagement: React.FC = () => {
   const handleStatusUpdate = async (issueId: string, status: string) => {
     try {
       await dispatch(updateIssue({
-        id: issueId,
-        status,
+        issueId,
+        issueData: { status },
       })).unwrap();
       setSnackbar({
         open: true,
@@ -231,8 +257,11 @@ const IssueManagement: React.FC = () => {
     if (selectedIssue) {
       try {
         await dispatch(assignIssue({
-          issueId: selectedIssue.id,
-          ...assignmentData,
+          issueId: selectedIssue._id,
+          assigneeId: assignmentData.assigneeId,
+          priority: assignmentData.priority,
+          dueDate: assignmentData.dueDate,
+          notes: assignmentData.notes,
         })).unwrap();
         setSnackbar({
           open: true,
@@ -273,7 +302,7 @@ const IssueManagement: React.FC = () => {
 
   const getPriorityColor = (priority: string) => {
     switch (priority) {
-      case 'urgent': return 'error';
+      case 'critical': return 'error';
       case 'high': return 'warning';
       case 'medium': return 'info';
       case 'low': return 'default';
@@ -284,10 +313,11 @@ const IssueManagement: React.FC = () => {
   const getStatusColor = (status: string) => {
     switch (status) {
       case 'pending': return 'default';
-      case 'assigned': return 'info';
+      case 'acknowledged': return 'info';
       case 'in_progress': return 'warning';
       case 'resolved': return 'success';
       case 'closed': return 'default';
+      case 'rejected': return 'error';
       default: return 'default';
     }
   };
@@ -295,10 +325,11 @@ const IssueManagement: React.FC = () => {
   const getStatusIcon = (status: string) => {
     switch (status) {
       case 'pending': return <Schedule />;
-      case 'assigned': return <Assignment />;
+      case 'acknowledged': return <Info />;
       case 'in_progress': return <Warning />;
       case 'resolved': return <CheckCircle />;
       case 'closed': return <Info />;
+      case 'rejected': return <Error />;
       default: return <Info />;
     }
   };
@@ -311,23 +342,23 @@ const IssueManagement: React.FC = () => {
     return new Date(dateString).toLocaleString();
   };
 
-  const isSelected = (id: string) => selectedIssues.indexOf(id) !== -1;
+  const isSelected = (_id: string) => selectedIssues.indexOf(_id) !== -1;
 
   const handleSelectAllClick = (event: React.ChangeEvent<HTMLInputElement>) => {
     if (event.target.checked) {
-      const newSelected = issues.map((issue) => issue.id);
+      const newSelected = issues.map((issue) => issue._id);
       setSelectedIssues(newSelected);
       return;
     }
     setSelectedIssues([]);
   };
 
-  const handleIssueSelect = (id: string) => {
-    const selectedIndex = selectedIssues.indexOf(id);
+  const handleIssueSelect = (_id: string) => {
+    const selectedIndex = selectedIssues.indexOf(_id);
     let newSelected: string[] = [];
 
     if (selectedIndex === -1) {
-      newSelected = newSelected.concat(selectedIssues, id);
+      newSelected = newSelected.concat(selectedIssues, _id);
     } else if (selectedIndex === 0) {
       newSelected = newSelected.concat(selectedIssues.slice(1));
     } else if (selectedIndex === selectedIssues.length - 1) {
@@ -344,6 +375,39 @@ const IssueManagement: React.FC = () => {
 
   return (
     <Box sx={{ flexGrow: 1 }}>
+      {/* Error Alert */}
+      {error && (
+        <Alert severity="error" sx={{ mb: 3 }}>
+          {error}
+        </Alert>
+      )}
+
+      {/* Loading State */}
+      {loading && issues.length === 0 && (
+        <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: 400 }}>
+          <Typography variant="h6" color="text.secondary">
+            Loading issues...
+          </Typography>
+        </Box>
+      )}
+
+      {/* No Issues State */}
+      {!loading && !error && issues.length === 0 && (
+        <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: 400 }}>
+          <Box sx={{ textAlign: 'center' }}>
+            <Typography variant="h6" color="text.secondary" gutterBottom>
+              No issues found
+            </Typography>
+            <Typography variant="body2" color="text.secondary">
+              {searchTerm || categoryFilter.length > 0 || statusFilter.length > 0 || priorityFilter.length > 0
+                ? 'Try adjusting your filters or search terms'
+                : 'Issues reported by citizens will appear here'
+              }
+            </Typography>
+          </Box>
+        </Box>
+      )}
+
       {/* Header */}
       <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
         <Typography variant="h4" fontWeight="bold">
@@ -354,6 +418,7 @@ const IssueManagement: React.FC = () => {
             variant="outlined"
             startIcon={<Download />}
             size="small"
+            disabled={loading || issues.length === 0}
           >
             Export
           </Button>
@@ -369,6 +434,24 @@ const IssueManagement: React.FC = () => {
       {/* Filters and Search */}
       <Card sx={{ mb: 3 }}>
         <CardContent>
+          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+            <Typography variant="h6">Filters</Typography>
+            <Button
+              size="small"
+              startIcon={<Refresh />}
+              onClick={() => dispatch(fetchIssues({
+                page: page + 1,
+                limit: rowsPerPage,
+                search: searchTerm,
+                category: categoryFilter,
+                status: statusFilter,
+                priority: priorityFilter,
+              }))}
+              disabled={loading}
+            >
+              Refresh
+            </Button>
+          </Box>
           <Grid container spacing={2} alignItems="center">
             <Grid item xs={12} md={4}>
               <TextField
@@ -381,11 +464,12 @@ const IssueManagement: React.FC = () => {
                   startAdornment: <Search sx={{ mr: 1, color: 'text.secondary' }} />,
                 }}
                 fullWidth
+                disabled={loading}
               />
             </Grid>
             
             <Grid item xs={12} md={2}>
-              <FormControl size="small" fullWidth>
+              <FormControl size="small" fullWidth disabled={loading}>
                 <InputLabel>Category</InputLabel>
                 <Select
                   multiple
@@ -394,10 +478,10 @@ const IssueManagement: React.FC = () => {
                   input={<OutlinedInput label="Category" />}
                   renderValue={(selected) => selected.join(', ')}
                 >
-                  {['Infrastructure', 'Environment', 'Safety', 'Transportation', 'Health'].map((category) => (
+                  {categories.map((category) => (
                     <MenuItem key={category} value={category}>
                       <Checkbox checked={categoryFilter.indexOf(category) > -1} />
-                      <ListItemText primary={category} />
+                      <ListItemText primary={category.replace('_', ' ')} />
                     </MenuItem>
                   ))}
                 </Select>
@@ -405,7 +489,7 @@ const IssueManagement: React.FC = () => {
             </Grid>
             
             <Grid item xs={12} md={2}>
-              <FormControl size="small" fullWidth>
+              <FormControl size="small" fullWidth disabled={loading}>
                 <InputLabel>Status</InputLabel>
                 <Select
                   multiple
@@ -414,10 +498,10 @@ const IssueManagement: React.FC = () => {
                   input={<OutlinedInput label="Status" />}
                   renderValue={(selected) => selected.join(', ')}
                 >
-                  {['pending', 'assigned', 'in_progress', 'resolved', 'closed'].map((status) => (
+                  {['pending', 'acknowledged', 'in_progress', 'resolved', 'closed', 'rejected'].map((status) => (
                     <MenuItem key={status} value={status}>
                       <Checkbox checked={statusFilter.indexOf(status) > -1} />
-                      <ListItemText primary={status} />
+                      <ListItemText primary={status.replace('_', ' ')} />
                     </MenuItem>
                   ))}
                 </Select>
@@ -425,7 +509,7 @@ const IssueManagement: React.FC = () => {
             </Grid>
             
             <Grid item xs={12} md={2}>
-              <FormControl size="small" fullWidth>
+              <FormControl size="small" fullWidth disabled={loading}>
                 <InputLabel>Priority</InputLabel>
                 <Select
                   multiple
@@ -434,7 +518,7 @@ const IssueManagement: React.FC = () => {
                   input={<OutlinedInput label="Priority" />}
                   renderValue={(selected) => selected.join(', ')}
                 >
-                  {['low', 'medium', 'high', 'urgent'].map((priority) => (
+                  {['low', 'medium', 'high', 'critical'].map((priority) => (
                     <MenuItem key={priority} value={priority}>
                       <Checkbox checked={priorityFilter.indexOf(priority) > -1} />
                       <ListItemText primary={priority} />
@@ -462,10 +546,20 @@ const IssueManagement: React.FC = () => {
           <Typography sx={{ flex: '1 1 100%' }} variant="subtitle1" component="div">
             {selectedIssues.length} issue(s) selected
           </Typography>
+          <Tooltip title="Mark Acknowledged">
+            <IconButton
+              color="inherit"
+              onClick={() => handleBulkStatusUpdate('acknowledged')}
+              disabled={loading}
+            >
+              <Info />
+            </IconButton>
+          </Tooltip>
           <Tooltip title="Mark In Progress">
             <IconButton
               color="inherit"
               onClick={() => handleBulkStatusUpdate('in_progress')}
+              disabled={loading}
             >
               <Warning />
             </IconButton>
@@ -474,6 +568,7 @@ const IssueManagement: React.FC = () => {
             <IconButton
               color="inherit"
               onClick={() => handleBulkStatusUpdate('resolved')}
+              disabled={loading}
             >
               <CheckCircle />
             </IconButton>
@@ -492,6 +587,7 @@ const IssueManagement: React.FC = () => {
                     indeterminate={selectedIssues.length > 0 && selectedIssues.length < issues.length}
                     checked={issues.length > 0 && selectedIssues.length === issues.length}
                     onChange={handleSelectAllClick}
+                    disabled={loading}
                   />
                 </TableCell>
                 <TableCell>Issue</TableCell>
@@ -504,119 +600,164 @@ const IssueManagement: React.FC = () => {
               </TableRow>
             </TableHead>
             <TableBody>
-              {issues.map((issue) => {
-                const isItemSelected = isSelected(issue.id);
-                
-                return (
-                  <TableRow
-                    key={issue.id}
-                    hover
-                    selected={isItemSelected}
-                    onClick={() => handleIssueSelect(issue.id)}
-                    sx={{ cursor: 'pointer' }}
-                  >
+              {loading && issues.length === 0 ? (
+                // Loading skeleton rows
+                Array.from({ length: 5 }).map((_, index) => (
+                  <TableRow key={`loading-${index}`}>
                     <TableCell padding="checkbox">
-                      <Checkbox checked={isItemSelected} />
+                      <Checkbox disabled />
                     </TableCell>
-                    
                     <TableCell>
-                      <Box>
-                        <Typography variant="subtitle2" fontWeight="medium" noWrap>
-                          {issue.title}
-                        </Typography>
-                        <Typography variant="body2" color="text.secondary" noWrap>
-                          {issue.category}
-                        </Typography>
-                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mt: 1 }}>
-                          {issue.attachments.length > 0 && (
-                            <AttachFile fontSize="small" color="action" />
-                          )}
-                          {issue.comments.length > 0 && (
-                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                              <Comment fontSize="small" color="action" />
-                              <Typography variant="caption">
-                                {issue.comments.length}
-                              </Typography>
-                            </Box>
-                          )}
-                        </Box>
+                      <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
+                        <Box sx={{ height: 20, bgcolor: 'grey.300', borderRadius: 1 }} />
+                        <Box sx={{ height: 16, width: '60%', bgcolor: 'grey.200', borderRadius: 1 }} />
                       </Box>
                     </TableCell>
-                    
                     <TableCell>
-                      <Chip
-                        label={issue.priority}
-                        color={getPriorityColor(issue.priority) as any}
-                        size="small"
-                        icon={issue.priority === 'urgent' ? <PriorityHigh /> : undefined}
-                      />
+                      <Box sx={{ height: 24, width: 60, bgcolor: 'grey.300', borderRadius: 12 }} />
                     </TableCell>
-                    
                     <TableCell>
-                      <Chip
-                        label={issue.status.replace('_', ' ')}
-                        color={getStatusColor(issue.status) as any}
-                        size="small"
-                        icon={getStatusIcon(issue.status)}
-                      />
+                      <Box sx={{ height: 24, width: 80, bgcolor: 'grey.300', borderRadius: 12 }} />
                     </TableCell>
-                    
                     <TableCell>
-                      {issue.assignedTo ? (
-                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                          <Avatar sx={{ width: 24, height: 24, fontSize: '0.75rem' }}>
-                            {issue.assignedTo.name.charAt(0)}
-                          </Avatar>
-                          <Box>
-                            <Typography variant="body2" fontWeight="medium">
-                              {issue.assignedTo.name}
-                            </Typography>
-                            <Typography variant="caption" color="text.secondary">
-                              {issue.assignedTo.department}
-                            </Typography>
-                          </Box>
-                        </Box>
-                      ) : (
-                        <Typography variant="body2" color="text.secondary">
-                          Unassigned
-                        </Typography>
-                      )}
+                      <Box sx={{ height: 40, width: 120, bgcolor: 'grey.300', borderRadius: 1 }} />
                     </TableCell>
-                    
                     <TableCell>
-                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                        <LocationOn fontSize="small" color="action" />
-                        <Typography variant="body2" noWrap sx={{ maxWidth: 150 }}>
-                          {issue.location.address}
-                        </Typography>
-                      </Box>
+                      <Box sx={{ height: 20, width: 100, bgcolor: 'grey.300', borderRadius: 1 }} />
                     </TableCell>
-                    
                     <TableCell>
-                      <Box>
-                        <Typography variant="body2">
-                          {formatDate(issue.createdAt)}
-                        </Typography>
-                        <Typography variant="caption" color="text.secondary">
-                          by {issue.reportedBy.name}
-                        </Typography>
-                      </Box>
+                      <Box sx={{ height: 20, width: 80, bgcolor: 'grey.300', borderRadius: 1 }} />
                     </TableCell>
-                    
                     <TableCell align="right">
-                      <IconButton
-                        size="small"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleMenuOpen(e, issue.id);
-                        }}
-                      >
+                      <IconButton disabled>
                         <MoreVert />
                       </IconButton>
                     </TableCell>
                   </TableRow>
-                );
-              })}
+                ))
+              ) : issues.length === 0 && !loading ? (
+                <TableRow>
+                  <TableCell colSpan={8} sx={{ textAlign: 'center', py: 6 }}>
+                    <Typography variant="body1" color="text.secondary">
+                      No issues found matching your criteria
+                    </Typography>
+                  </TableCell>
+                </TableRow>
+              ) : (
+                issues.map((issue) => {
+                  const isItemSelected = isSelected(issue._id);
+                  
+                  return (
+                    <TableRow
+                      key={issue._id}
+                      hover
+                      selected={isItemSelected}
+                      onClick={() => handleIssueSelect(issue._id)}
+                      sx={{ cursor: 'pointer' }}
+                    >
+                      <TableCell padding="checkbox">
+                        <Checkbox checked={isItemSelected} disabled={loading} />
+                      </TableCell>
+                      
+                      <TableCell>
+                        <Box>
+                          <Typography variant="subtitle2" fontWeight="medium" noWrap>
+                            {issue.title}
+                          </Typography>
+                          <Typography variant="body2" color="text.secondary" noWrap>
+                            {issue.category}
+                          </Typography>
+                          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mt: 1 }}>
+                            {issue.media.images.length > 0 && (
+                              <AttachFile fontSize="small" color="action" />
+                            )}
+                            {issue.comments.length > 0 && (
+                              <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                                <Comment fontSize="small" color="action" />
+                                <Typography variant="caption">
+                                  {issue.comments.length}
+                                </Typography>
+                              </Box>
+                            )}
+                          </Box>
+                        </Box>
+                      </TableCell>
+                      
+                      <TableCell>
+                        <Chip
+                          label={issue.priority}
+                          color={getPriorityColor(issue.priority) as any}
+                          size="small"
+                        />
+                      </TableCell>
+                      
+                      <TableCell>
+                        <Chip
+                          label={issue.status.replace('_', ' ')}
+                          color={getStatusColor(issue.status) as any}
+                          size="small"
+                          icon={getStatusIcon(issue.status)}
+                        />
+                      </TableCell>
+                      
+                      <TableCell>
+                        {issue.assignedTo ? (
+                          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                            <Avatar sx={{ width: 24, height: 24, fontSize: '0.75rem' }}>
+                              {issue.assignedTo.name.charAt(0)}
+                            </Avatar>
+                            <Box>
+                              <Typography variant="body2" fontWeight="medium">
+                                {issue.assignedTo.name}
+                              </Typography>
+                              <Typography variant="caption" color="text.secondary">
+                                {issue.assignedDepartment?.name || 'Department'}
+                              </Typography>
+                            </Box>
+                          </Box>
+                        ) : (
+                          <Typography variant="body2" color="text.secondary">
+                            Unassigned
+                          </Typography>
+                        )}
+                      </TableCell>
+                      
+                      <TableCell>
+                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                          <LocationOn fontSize="small" color="action" />
+                          <Typography variant="body2" noWrap sx={{ maxWidth: 150 }}>
+                            {issue.location.address}
+                          </Typography>
+                        </Box>
+                      </TableCell>
+                      
+                      <TableCell>
+                        <Box>
+                          <Typography variant="body2">
+                            {formatDate(issue.createdAt)}
+                          </Typography>
+                          <Typography variant="caption" color="text.secondary">
+                            by {issue.reportedBy.name}
+                          </Typography>
+                        </Box>
+                      </TableCell>
+                      
+                      <TableCell align="right">
+                        <IconButton
+                          size="small"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleMenuOpen(e, issue._id);
+                          }}
+                          disabled={loading}
+                        >
+                          <MoreVert />
+                        </IconButton>
+                      </TableCell>
+                    </TableRow>
+                  );
+                })
+              )}
             </TableBody>
           </Table>
         </TableContainer>
@@ -643,7 +784,7 @@ const IssueManagement: React.FC = () => {
       >
         <MenuItem
           onClick={() => {
-            const issue = issues.find(i => i.id === menuIssueId);
+            const issue = issues.find(i => i._id === menuIssueId);
             if (issue) handleViewIssue(issue);
           }}
         >
@@ -652,7 +793,7 @@ const IssueManagement: React.FC = () => {
         </MenuItem>
         <MenuItem
           onClick={() => {
-            const issue = issues.find(i => i.id === menuIssueId);
+            const issue = issues.find(i => i._id === menuIssueId);
             if (issue) handleAssignIssue(issue);
           }}
         >
@@ -660,6 +801,10 @@ const IssueManagement: React.FC = () => {
           Assign
         </MenuItem>
         <Divider />
+        <MenuItem onClick={() => handleStatusUpdate(menuIssueId!, 'acknowledged')}>
+          <Info sx={{ mr: 1 }} />
+          Mark Acknowledged
+        </MenuItem>
         <MenuItem onClick={() => handleStatusUpdate(menuIssueId!, 'in_progress')}>
           <Warning sx={{ mr: 1 }} />
           Mark In Progress
@@ -667,6 +812,14 @@ const IssueManagement: React.FC = () => {
         <MenuItem onClick={() => handleStatusUpdate(menuIssueId!, 'resolved')}>
           <CheckCircle sx={{ mr: 1 }} />
           Mark Resolved
+        </MenuItem>
+        <MenuItem onClick={() => handleStatusUpdate(menuIssueId!, 'closed')}>
+          <Info sx={{ mr: 1 }} />
+          Mark Closed
+        </MenuItem>
+        <MenuItem onClick={() => handleStatusUpdate(menuIssueId!, 'rejected')}>
+          <Error sx={{ mr: 1 }} />
+          Mark Rejected
         </MenuItem>
       </Menu>
 
@@ -813,7 +966,7 @@ const IssueManagement: React.FC = () => {
                 <MenuItem value="low">Low</MenuItem>
                 <MenuItem value="medium">Medium</MenuItem>
                 <MenuItem value="high">High</MenuItem>
-                <MenuItem value="urgent">Urgent</MenuItem>
+                <MenuItem value="critical">Critical</MenuItem>
               </Select>
             </FormControl>
             

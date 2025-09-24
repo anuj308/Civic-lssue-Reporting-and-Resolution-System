@@ -68,7 +68,7 @@ const NotificationSchema = new mongoose.Schema({
   priority: {
     type: String,
     enum: {
-      values: ['low', 'medium', 'high', 'urgent'],
+      values: ['low', 'medium', 'high', 'critical'],
       message: 'Invalid priority level'
     },
     default: 'medium'
@@ -134,7 +134,7 @@ NotificationSchema.statics.createIssueNotification = async function(
     relatedDepartment: issue.assignedDepartment,
     channels: ['app', 'email'],
     createdBy: issue.reportedBy,
-    priority: issue.priority === 'urgent' ? 'high' : 'medium'
+    priority: issue.priority === 'critical' ? 'high' : 'medium'
   };
 
   switch (type) {

@@ -68,10 +68,10 @@ const Login: React.FC = () => {
   // Redirect if already authenticated
   React.useEffect(() => {
     if (isAuthenticated) {
-      const from = location.state?.from?.pathname || '/dashboard';
+      const from = (typeof location.state?.from === 'string' ? location.state.from : '/dashboard');
       navigate(from, { replace: true });
     }
-  }, [isAuthenticated, navigate, location]);
+  }, [isAuthenticated, navigate, location.state?.from]);
 
   // Handle email verification required
   React.useEffect(() => {
@@ -80,13 +80,12 @@ const Login: React.FC = () => {
         state: {
           email: verificationEmail,
           isLoginVerification: true,
-          password: verificationPassword,
-          from: location.state?.from?.pathname,
+          password: verificationPassword || '',
         },
         replace: true,
       });
     }
-  }, [needsVerification, verificationEmail, verificationPassword, navigate, location]);
+  }, [needsVerification, verificationEmail, verificationPassword, navigate]);
 
   // Clear verification state when component mounts (allows user to start fresh)
   React.useEffect(() => {

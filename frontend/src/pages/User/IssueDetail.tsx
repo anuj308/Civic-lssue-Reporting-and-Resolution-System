@@ -152,7 +152,7 @@ const IssueDetail: React.FC = () => {
       case 'low': return 'success';
       case 'medium': return 'warning';
       case 'high': return 'error';
-      case 'urgent': return 'error';
+      case 'critical': return 'error';
       default: return 'default';
     }
   };
@@ -545,7 +545,7 @@ const IssueDetail: React.FC = () => {
             onChange={(e) => setEditForm(prev => ({ ...prev, priority: e.target.value }))}
             sx={{ mt: 2 }}
           >
-            {['low', 'medium', 'high', 'urgent'].map((option) => (
+            {['low', 'medium', 'high', 'critical'].map((option) => (
               <option key={option} value={option}>
                 {option.toUpperCase()}
               </option>

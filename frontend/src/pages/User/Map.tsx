@@ -135,7 +135,7 @@ const Map: React.FC = () => {
       case 'low': return '#4caf50';
       case 'medium': return '#ff9800';
       case 'high': return '#f44336';
-      case 'urgent': return '#d32f2f';
+      case 'critical': return '#d32f2f';
       default: return '#757575';
     }
   };
@@ -271,7 +271,7 @@ const Map: React.FC = () => {
                   <option value="low">Low</option>
                   <option value="medium">Medium</option>
                   <option value="high">High</option>
-                  <option value="urgent">Urgent</option>
+                  <option value="critical">Critical</option>
                 </select>
               </Box>
             </Box>

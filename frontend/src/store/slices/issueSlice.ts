@@ -181,6 +181,7 @@ export const fetchIssues = createAsyncThunk(
   'issues/fetchIssues',
   async (params: { page?: number; limit?: number; status?: string; category?: string; priority?: string; reportedBy?: string; search?: string }, { rejectWithValue }) => {
     try {
+      console.log('🚀 Frontend fetchIssues thunk - Called with params:', params);
       const queryParams: any = {};
       if (params.page) queryParams.page = params.page;
       if (params.limit) queryParams.limit = params.limit;
@@ -191,9 +192,37 @@ export const fetchIssues = createAsyncThunk(
       if (params.search) queryParams.search = params.search;
 
       const data = await issuesAPI.getIssues(queryParams);
+      console.log('✅ Frontend fetchIssues thunk - API returned:', data);
+      console.log('✅ Frontend fetchIssues thunk - Data keys:', Object.keys(data || {}));
+      console.log('✅ Frontend fetchIssues thunk - Has issues:', !!data?.issues);
+      console.log('✅ Frontend fetchIssues thunk - Issues count:', data?.issues?.length || 0);
       return data;
     } catch (error: any) {
+      console.log('❌ Frontend fetchIssues thunk - Error:', error);
       return rejectWithValue(error.message || 'Failed to fetch issues');
+    }
+  }
+);
+
+export const fetchMyIssues = createAsyncThunk(
+  'issues/fetchMyIssues',
+  async (params: { page?: number; limit?: number; status?: string; category?: string; priority?: string; search?: string }, { rejectWithValue }) => {
+    try {
+      console.log('🚀 Frontend fetchMyIssues thunk - Called with params:', params);
+      const queryParams: any = {};
+      if (params.page) queryParams.page = params.page;
+      if (params.limit) queryParams.limit = params.limit;
+      if (params.status) queryParams.status = params.status;
+      if (params.category) queryParams.category = params.category;
+      if (params.priority) queryParams.priority = params.priority;
+      if (params.search) queryParams.search = params.search;
+
+      const data = await issuesAPI.getMyIssues(queryParams);
+      console.log('✅ Frontend fetchMyIssues thunk - API returned:', data);
+      return data;
+    } catch (error: any) {
+      console.log('❌ Frontend fetchMyIssues thunk - Error:', error);
+      return rejectWithValue(error.message || 'Failed to fetch my issues');
     }
   }
 );
@@ -226,24 +255,10 @@ export const updateIssue = createAsyncThunk(
   'issues/updateIssue',
   async ({ issueId, issueData }: { issueId: string; issueData: UpdateIssueData }, { rejectWithValue }) => {
     try {
-      const response = await fetch(`/api/issues/${issueId}`, {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        credentials: 'include',
-        body: JSON.stringify(issueData),
-      });
-
-      const data = await response.json();
-
-      if (!response.ok) {
-        return rejectWithValue(data.message || 'Failed to update issue');
-      }
-
+      const data = await issuesAPI.updateIssue(issueId, issueData);
       return data;
-    } catch (error) {
-      return rejectWithValue('Network error occurred');
+    } catch (error: any) {
+      return rejectWithValue(error.message || 'Failed to update issue');
     }
   }
 );
@@ -252,20 +267,10 @@ export const deleteIssue = createAsyncThunk(
   'issues/deleteIssue',
   async (issueId: string, { rejectWithValue }) => {
     try {
-      const response = await fetch(`/api/issues/${issueId}`, {
-        method: 'DELETE',
-        credentials: 'include',
-      });
-
-      const data = await response.json();
-
-      if (!response.ok) {
-        return rejectWithValue(data.message || 'Failed to delete issue');
-      }
-
+      await issuesAPI.deleteIssue(issueId);
       return { issueId };
-    } catch (error) {
-      return rejectWithValue('Network error occurred');
+    } catch (error: any) {
+      return rejectWithValue(error.message || 'Failed to delete issue');
     }
   }
 );
@@ -274,24 +279,10 @@ export const addIssueComment = createAsyncThunk(
   'issues/addComment',
   async ({ issueId, content, isInternal }: { issueId: string; content: string; isInternal: boolean }, { rejectWithValue }) => {
     try {
-      const response = await fetch(`/api/issues/${issueId}/comments`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        credentials: 'include',
-        body: JSON.stringify({ content, isInternal }),
-      });
-
-      const data = await response.json();
-
-      if (!response.ok) {
-        return rejectWithValue(data.message || 'Failed to add comment');
-      }
-
+      const data = await issuesAPI.addComment(issueId, { content, isInternal });
       return data;
-    } catch (error) {
-      return rejectWithValue('Network error occurred');
+    } catch (error: any) {
+      return rejectWithValue(error.message || 'Failed to add comment');
     }
   }
 );
@@ -300,20 +291,10 @@ export const voteOnIssue = createAsyncThunk(
   'issues/vote',
   async (issueId: string, { rejectWithValue }) => {
     try {
-      const response = await fetch(`/api/issues/${issueId}/vote`, {
-        method: 'POST',
-        credentials: 'include',
-      });
-
-      const data = await response.json();
-
-      if (!response.ok) {
-        return rejectWithValue(data.message || 'Failed to vote on issue');
-      }
-
+      const data = await issuesAPI.voteOnIssue(issueId);
       return data;
-    } catch (error) {
-      return rejectWithValue('Network error occurred');
+    } catch (error: any) {
+      return rejectWithValue(error.message || 'Failed to vote on issue');
     }
   }
 );
@@ -328,29 +309,26 @@ export const assignIssue = createAsyncThunk(
     notes?: string; 
   }, { rejectWithValue }) => {
     try {
-      const response = await fetch(`/api/issues/${issueId}/assign`, {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        credentials: 'include',
-        body: JSON.stringify({
-          assignedTo: assigneeId,
-          priority,
-          dueDate,
-          notes,
-        }),
-      });
+      // First assign the issue
+      const assignData = {
+        assignedTo: assigneeId,
+      };
+      await issuesAPI.assignIssue(issueId, assignData);
 
-      const data = await response.json();
-
-      if (!response.ok) {
-        return rejectWithValue(data.message || 'Failed to assign issue');
+      // Then update other fields if provided
+      if (priority || dueDate || notes) {
+        const updateData: UpdateIssueData = {};
+        if (priority) updateData.priority = priority;
+        if (dueDate) updateData.dueDate = dueDate;
+        if (notes) updateData.notes = notes;
+        await issuesAPI.updateIssue(issueId, updateData);
       }
 
+      // Fetch the updated issue
+      const data = await issuesAPI.getIssueById(issueId);
       return data;
-    } catch (error) {
-      return rejectWithValue('Network error occurred');
+    } catch (error: any) {
+      return rejectWithValue(error.message || 'Failed to assign issue');
     }
   }
 );
@@ -359,27 +337,10 @@ export const bulkUpdateIssues = createAsyncThunk(
   'issues/bulkUpdateIssues',
   async ({ issueIds, updates }: { issueIds: string[]; updates: UpdateIssueData }, { rejectWithValue }) => {
     try {
-      const response = await fetch('/api/issues/bulk-update', {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        credentials: 'include',
-        body: JSON.stringify({
-          issueIds,
-          updates,
-        }),
-      });
-
-      const data = await response.json();
-
-      if (!response.ok) {
-        return rejectWithValue(data.message || 'Failed to bulk update issues');
-      }
-
+      const data = await issuesAPI.bulkUpdateIssues({ issueIds, updates });
       return data;
-    } catch (error) {
-      return rejectWithValue('Network error occurred');
+    } catch (error: any) {
+      return rejectWithValue(error.message || 'Failed to bulk update issues');
     }
   }
 );
@@ -419,6 +380,11 @@ const issueSlice = createSlice({
         state.error = null;
       })
       .addCase(fetchIssues.fulfilled, (state, action) => {
+        console.log('✅ Frontend fetchIssues.fulfilled - Action payload:', action.payload);
+        console.log('✅ Frontend fetchIssues.fulfilled - Payload keys:', Object.keys(action.payload || {}));
+        console.log('✅ Frontend fetchIssues.fulfilled - Has issues:', !!action.payload?.issues);
+        console.log('✅ Frontend fetchIssues.fulfilled - Issues count:', action.payload?.issues?.length || 0);
+        
         state.loading = false;
         state.issues = action.payload.issues.map((issue: any) => ({
           ...issue,
@@ -433,8 +399,44 @@ const issueSlice = createSlice({
           currentPage: action.payload.currentPage || action.payload.pagination?.currentPage || 1,
         };
         state.error = null;
+        
+        console.log('✅ Frontend fetchIssues.fulfilled - Updated state.issues count:', state.issues.length);
+        console.log('✅ Frontend fetchIssues.fulfilled - Updated state.totalIssues:', state.totalIssues);
       })
       .addCase(fetchIssues.rejected, (state, action) => {
+        console.log('❌ Frontend fetchIssues.rejected - Error:', action.payload);
+        state.loading = false;
+        state.error = action.payload as string;
+      });
+
+    // Fetch my issues
+    builder
+      .addCase(fetchMyIssues.pending, (state) => {
+        state.loading = true;
+        state.error = null;
+      })
+      .addCase(fetchMyIssues.fulfilled, (state, action) => {
+        console.log('✅ Frontend fetchMyIssues.fulfilled - Action payload:', action.payload);
+        
+        state.loading = false;
+        state.issues = action.payload.issues.map((issue: any) => ({
+          ...issue,
+          _id: issue.id,
+          commentsCount: issue.comments?.length || 0,
+          upvotes: issue.votes?.upvotes?.length || 0,
+        }));
+        state.totalIssues = action.payload.total || action.payload.issues.length;
+        state.pagination = {
+          ...state.pagination,
+          ...action.payload.pagination,
+          currentPage: action.payload.currentPage || action.payload.pagination?.currentPage || 1,
+        };
+        state.error = null;
+        
+        console.log('✅ Frontend fetchMyIssues.fulfilled - Updated state.issues count:', state.issues.length);
+      })
+      .addCase(fetchMyIssues.rejected, (state, action) => {
+        console.log('❌ Frontend fetchMyIssues.rejected - Error:', action.payload);
         state.loading = false;
         state.error = action.payload as string;
       });
@@ -494,11 +496,11 @@ const issueSlice = createSlice({
       .addCase(updateIssue.fulfilled, (state, action) => {
         state.loading = false;
         const updatedIssue = action.payload.data.issue;
-        const index = state.issues.findIndex(issue => issue.id === updatedIssue.id);
+        const index = state.issues.findIndex(issue => issue._id === updatedIssue._id);
         if (index !== -1) {
           state.issues[index] = updatedIssue;
         }
-        if (state.selectedIssue && state.selectedIssue.id === updatedIssue.id) {
+        if (state.selectedIssue && state.selectedIssue._id === updatedIssue._id) {
           state.selectedIssue = updatedIssue;
         }
         state.error = null;
@@ -516,9 +518,9 @@ const issueSlice = createSlice({
       })
       .addCase(deleteIssue.fulfilled, (state, action) => {
         state.loading = false;
-        state.issues = state.issues.filter(issue => issue.id !== action.payload.issueId);
+        state.issues = state.issues.filter(issue => issue._id !== action.payload.issueId);
         state.totalIssues -= 1;
-        if (state.selectedIssue && state.selectedIssue.id === action.payload.issueId) {
+        if (state.selectedIssue && state.selectedIssue._id === action.payload.issueId) {
           state.selectedIssue = null;
         }
         state.error = null;
@@ -555,11 +557,11 @@ const issueSlice = createSlice({
       .addCase(voteOnIssue.fulfilled, (state, action) => {
         state.loading = false;
         const updatedIssue = action.payload.data.issue;
-        const index = state.issues.findIndex(issue => issue.id === updatedIssue.id);
+        const index = state.issues.findIndex(issue => issue._id === updatedIssue._id);
         if (index !== -1) {
           state.issues[index] = updatedIssue;
         }
-        if (state.selectedIssue && state.selectedIssue.id === updatedIssue.id) {
+        if (state.selectedIssue && state.selectedIssue._id === updatedIssue._id) {
           state.selectedIssue = updatedIssue;
         }
         state.error = null;

@@ -38,7 +38,7 @@ import { useDispatch, useSelector } from 'react-redux';
 import { useNavigate } from 'react-router-dom';
 import { AppDispatch } from '../../store/store';
 import {
-  fetchIssues,
+  fetchMyIssues,
   selectIssues,
   selectIssuesLoading,
   selectIssuesError,
@@ -100,7 +100,7 @@ const IssueCard: React.FC<IssueCardProps> = ({ issue, onViewDetails }) => {
         return 'warning';
       case 'high':
         return 'error';
-      case 'urgent':
+      case 'critical':
         return 'error';
       default:
         return 'default';
@@ -115,8 +115,8 @@ const IssueCard: React.FC<IssueCardProps> = ({ issue, onViewDetails }) => {
         return 'Medium';
       case 'high':
         return 'High';
-      case 'urgent':
-        return 'Urgent';
+      case 'critical':
+        return 'Critical';
       default:
         return priority;
     }
@@ -220,7 +220,6 @@ const MyIssues: React.FC = () => {
 
   const loadIssues = () => {
     const params: any = {
-      reportedBy: currentUser?._id,
       page: currentPage,
       limit: 10,
       sort: '-createdAt'
@@ -230,7 +229,7 @@ const MyIssues: React.FC = () => {
     if (priorityFilter) params.priority = priorityFilter;
     if (searchTerm) params.search = searchTerm;
 
-    dispatch(fetchIssues(params));
+    dispatch(fetchMyIssues(params));
   };
 
   const handleSearch = () => {
@@ -336,7 +335,7 @@ const MyIssues: React.FC = () => {
                   <MenuItem value="low">Low</MenuItem>
                   <MenuItem value="medium">Medium</MenuItem>
                   <MenuItem value="high">High</MenuItem>
-                  <MenuItem value="urgent">Urgent</MenuItem>
+                  <MenuItem value="critical">Critical</MenuItem>
                 </Select>
               </FormControl>
             </Grid>
