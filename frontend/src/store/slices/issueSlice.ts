@@ -244,17 +244,27 @@ export const fetchMyIssues = createAsyncThunk(
   }
 );
 
+export const fetchNearbyIssues = createAsyncThunk(
+  'issues/fetchNearbyIssues',
+  async (params: { latitude: number; longitude: number; radius?: number; page?: number; limit?: number }, { rejectWithValue }) => {
+    try {
+      console.log('🚀 Frontend fetchNearbyIssues thunk - Called with params:', params);
+      const data = await issuesAPI.getNearbyIssues(params);
+      console.log('✅ Frontend fetchNearbyIssues thunk - API returned:', data);
+      return data;
+    } catch (error: any) {
+      console.log('❌ Frontend fetchNearbyIssues thunk - Error:', error);
+      return rejectWithValue(error.message || 'Failed to fetch nearby issues');
+    }
+  }
+);
+
 export const fetchMapIssues = createAsyncThunk(
   'issues/fetchMapIssues',
   async (params: { status?: string; category?: string; priority?: string }, { rejectWithValue }) => {
     try {
       console.log('🚀 Frontend fetchMapIssues thunk - Called with params:', params);
-      const queryParams: any = {};
-      if (params.status) queryParams.status = params.status;
-      if (params.category) queryParams.category = params.category;
-      if (params.priority) queryParams.priority = params.priority;
-
-      const data = await issuesAPI.getMapIssues(queryParams);
+      const data = await issuesAPI.getMapIssues(params);
       console.log('✅ Frontend fetchMapIssues thunk - API returned:', data);
       return data;
     } catch (error: any) {
@@ -501,6 +511,33 @@ const issueSlice = createSlice({
       })
       .addCase(fetchMyIssues.rejected, (state, action) => {
         console.log('❌ Frontend fetchMyIssues.rejected - Error:', action.payload);
+        state.loading = false;
+        state.error = action.payload as string;
+      });
+
+    // Fetch nearby issues
+    builder
+      .addCase(fetchNearbyIssues.pending, (state) => {
+        state.loading = true;
+        state.error = null;
+      })
+      .addCase(fetchNearbyIssues.fulfilled, (state, action) => {
+        console.log('✅ Frontend fetchNearbyIssues.fulfilled - Action payload:', action.payload);
+
+        state.loading = false;
+        state.issues = action.payload.issues.map((issue: any) => ({
+          ...issue,
+          _id: issue.id,
+          commentsCount: issue.comments?.length || 0,
+          upvotes: issue.voteScore || 0,
+        }));
+        state.totalIssues = action.payload.totalFound || action.payload.issues.length;
+        state.error = null;
+
+        console.log('✅ Frontend fetchNearbyIssues.fulfilled - Updated state.issues count:', state.issues.length);
+      })
+      .addCase(fetchNearbyIssues.rejected, (state, action) => {
+        console.log('❌ Frontend fetchNearbyIssues.rejected - Error:', action.payload);
         state.loading = false;
         state.error = action.payload as string;
       });

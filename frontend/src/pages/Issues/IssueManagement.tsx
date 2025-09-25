@@ -415,6 +415,7 @@ const IssueManagement: React.FC = () => {
 
     setSelectedIssues(newSelected);
   };
+  console.log(issues)
 
   return (
     <Box sx={{ flexGrow: 1 }}>

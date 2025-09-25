@@ -35,6 +35,7 @@ import {
   Map,
   Add,
   AccountCircle,
+  VideoLibrary,
 } from '@mui/icons-material';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useSelector } from 'react-redux';
@@ -190,6 +191,12 @@ const Sidebar: React.FC<SidebarProps> = ({
           label: 'Issue Map',
           icon: <Map />,
           path: '/map',
+        },
+        {
+          id: 'reels',
+          label: 'Issue Reels',
+          icon: <VideoLibrary />,
+          path: '/reels',
         },
         {
           id: 'profile',

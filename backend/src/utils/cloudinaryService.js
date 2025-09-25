@@ -16,11 +16,83 @@ console.log('🌩️ Cloudinary configured:', {
 });
 
 /**
- * Upload a single image to Cloudinary
- * @param {string} base64Data - Base64 encoded image data or file path
+ * Upload a single video to Cloudinary
+ * @param {string} base64Data - Base64 encoded video data or file path
  * @param {Object} options - Upload options
  * @returns {Promise<Object>} - Cloudinary upload result
  */
+const uploadVideo = async (base64Data, options = {}) => {
+  try {
+    const defaultOptions = {
+      folder: 'civic-issues',
+      resource_type: 'video',
+      transformation: [
+        { width: 1280, height: 720, crop: 'limit', quality: 'auto' },
+        { fetch_format: 'auto' }
+      ],
+      ...options
+    };
+
+    console.log('🎥 Uploading video to Cloudinary...');
+    console.log('🔍 Input data type:', typeof base64Data);
+    console.log('🔍 Input data preview:', base64Data.substring(0, 100) + '...');
+
+    // Handle different video data formats
+    let uploadData = base64Data;
+
+    if (base64Data.startsWith('data:')) {
+      // Already a data URI
+      uploadData = base64Data;
+      console.log('📋 Format: Data URI detected');
+    } else if (base64Data.startsWith('file://')) {
+      // React Native file URI - need to read as base64
+      uploadData = base64Data;
+      console.log('📋 Format: File URI detected');
+    } else if (base64Data.startsWith('content://')) {
+      // Android content URI
+      uploadData = base64Data;
+      console.log('📋 Format: Content URI detected');
+    } else if (base64Data.startsWith('/')) {
+      // Absolute file path
+      uploadData = base64Data;
+      console.log('📋 Format: File path detected');
+    } else {
+      // Assume it's raw base64 data
+      uploadData = `data:video/mp4;base64,${base64Data}`;
+      console.log('📋 Format: Raw base64 detected, adding data URI prefix');
+    }
+
+    const result = await cloudinary.uploader.upload(uploadData, defaultOptions);
+
+    console.log('✅ Video uploaded successfully:', {
+      public_id: result.public_id,
+      url: result.secure_url,
+      size: result.bytes,
+      duration: result.duration,
+      format: result.format
+    });
+
+    return {
+      public_id: result.public_id,
+      url: result.secure_url,
+      secure_url: result.secure_url,
+      width: result.width,
+      height: result.height,
+      format: result.format,
+      bytes: result.bytes,
+      duration: result.duration,
+      created_at: result.created_at
+    };
+  } catch (error) {
+    console.error('❌ Cloudinary video upload error:', error);
+    console.error('❌ Error details:', {
+      message: error.message,
+      name: error.name,
+      stack: error.response
+    });
+    throw new Error(`Failed to upload video: ${error.message || error.toString() || 'Unknown error'}`);
+  }
+};
 const uploadImage = async (base64Data, options = {}) => {
   try {
     const defaultOptions = {
@@ -92,11 +164,32 @@ const uploadImage = async (base64Data, options = {}) => {
 };
 
 /**
- * Upload multiple images to Cloudinary
- * @param {Array<string>} base64Array - Array of base64 encoded images
+ * Upload multiple videos to Cloudinary
+ * @param {Array<string>} base64Array - Array of base64 encoded videos
  * @param {Object} options - Upload options
  * @returns {Promise<Array<Object>>} - Array of Cloudinary upload results
  */
+const uploadMultipleVideos = async (base64Array, options = {}) => {
+  try {
+    console.log(`🎥 Uploading ${base64Array.length} videos to Cloudinary...`);
+
+    const uploadPromises = base64Array.map((base64Data, index) => {
+      const videoOptions = {
+        ...options,
+        public_id: options.public_id ? `${options.public_id}_${index}` : undefined
+      };
+      return uploadVideo(base64Data, videoOptions);
+    });
+
+    const results = await Promise.all(uploadPromises);
+    console.log(`✅ All ${results.length} videos uploaded successfully`);
+
+    return results;
+  } catch (error) {
+    console.error('❌ Error uploading multiple videos:', error);
+    throw error;
+  }
+};
 const uploadMultipleImages = async (base64Array, options = {}) => {
   try {
     console.log(`🌩️ Uploading ${base64Array.length} images to Cloudinary...`);
@@ -183,11 +276,48 @@ const extractPublicId = (url) => {
 };
 
 /**
- * Process issue images and upload to Cloudinary
- * @param {Array<string>} images - Array of base64 image data
+ * Process issue videos and upload to Cloudinary
+ * @param {Array<string>} videos - Array of base64 video data
  * @param {string} issueId - Issue ID for folder organization
- * @returns {Promise<Array<Object>>} - Array of processed image objects
+ * @returns {Promise<Array<Object>>} - Array of processed video objects
  */
+const processIssueVideos = async (videos, issueId) => {
+  try {
+    if (!videos || videos.length === 0) {
+      return [];
+    }
+
+    console.log(`🔄 Processing ${videos.length} videos for issue ${issueId}`);
+
+    const options = {
+      folder: `civic-issues/${issueId}`,
+      public_id: `issue_${issueId}_video`,
+      resource_type: 'video',
+      transformation: [
+        { width: 1280, height: 720, crop: 'limit', quality: 'auto:good' },
+        { fetch_format: 'auto' }
+      ]
+    };
+
+    const uploadResults = await uploadMultipleVideos(videos, options);
+
+    // Return structured video objects for database storage
+    return uploadResults.map((result, index) => ({
+      url: result.secure_url,
+      publicId: result.public_id,
+      format: result.format,
+      width: result.width,
+      height: result.height,
+      bytes: result.bytes,
+      duration: result.duration,
+      uploadedAt: new Date(result.created_at),
+      originalIndex: index
+    }));
+  } catch (error) {
+    console.error('❌ Error processing issue videos:', error);
+    throw error;
+  }
+};
 const processIssueImages = async (images, issueId) => {
   try {
     if (!images || images.length === 0) {
@@ -260,10 +390,13 @@ const uploadAvatar = async (buffer, userId) => {
 module.exports = {
   uploadImage,
   uploadMultipleImages,
+  uploadVideo,
+  uploadMultipleVideos,
   deleteImage,
   deleteMultipleImages,
   getTransformedImageUrl,
   extractPublicId,
   processIssueImages,
+  processIssueVideos,
   uploadAvatar
 };

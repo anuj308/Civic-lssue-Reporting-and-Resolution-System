@@ -91,7 +91,7 @@ const IssueDetail: React.FC = () => {
         _id: issue._id,
         userVote: issue.userVote,
         upvotes: issue.upvotes,
-        downvotes: issue.downvotes,
+        downvotes: issue.votes?.downvotes?.length || 0,
         voteScore: issue.voteScore
       });
       setEditForm({
@@ -173,7 +173,7 @@ const IssueDetail: React.FC = () => {
     console.log('🚀 IssueDetail - handleVote called with:', voteType);
     console.log('🚀 IssueDetail - current issue.userVote:', issue?.userVote);
     console.log('🚀 IssueDetail - current issue.upvotes:', issue?.upvotes);
-    console.log('🚀 IssueDetail - current issue.downvotes:', issue?.downvotes);
+    console.log('🚀 IssueDetail - current issue.downvotes:', issue?.votes?.downvotes?.length || 0);
 
     setIsVoting(true);
     try {
@@ -399,6 +399,57 @@ const IssueDetail: React.FC = () => {
                                 e.stopPropagation();
                                 const filename = `issue-image-${index + 1}.jpg`;
                                 handleDownload(imageUrl, filename);
+                              }}
+                            >
+                              <Download fontSize="small" />
+                            </IconButton>
+                          </Box>
+                        </Grid>
+                      )
+                    )}
+                  </Grid>
+                </Box>
+              )}
+
+              {/* Issue Videos */}
+              {issue.media?.videos && issue.media.videos.length > 0 && (
+                <Box mb={3}>
+                  <Typography variant="h6" gutterBottom>
+                    Videos
+                  </Typography>
+                  <Grid container spacing={2}>
+                    {issue.media.videos.map(
+                      (videoUrl: string, index: number) => (
+                        <Grid item xs={12} sm={6} key={index}>
+                          <Box position="relative">
+                            <video
+                              controls
+                              style={{
+                                width: '100%',
+                                maxHeight: '300px',
+                                borderRadius: '8px',
+                                backgroundColor: '#000',
+                              }}
+                              src={videoUrl}
+                              preload="metadata"
+                            >
+                              Your browser does not support the video tag.
+                            </video>
+                            <IconButton
+                              size="small"
+                              sx={{
+                                position: 'absolute',
+                                top: 8,
+                                right: 8,
+                                backgroundColor: 'rgba(255, 255, 255, 0.8)',
+                                '&:hover': {
+                                  backgroundColor: 'rgba(255, 255, 255, 0.9)',
+                                },
+                              }}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                const filename = `issue-video-${index + 1}.mp4`;
+                                handleDownload(videoUrl, filename);
                               }}
                             >
                               <Download fontSize="small" />
@@ -649,7 +700,7 @@ const IssueDetail: React.FC = () => {
                     }}
                     disabled={isVoting}
                   >
-                    {issue.downvotes || 0}
+                    {issue.votes?.downvotes?.length || 0}
                   </Button>
                 </Box>
               </Box>

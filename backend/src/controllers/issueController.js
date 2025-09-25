@@ -2,6 +2,7 @@ const { validationResult } = require('express-validator');
 const { Issue } = require('../models/Issue');
 const { Department } = require('../models/Department');
 const { processIssueImages } = require('../utils/cloudinaryService');
+const { processIssueImages, processIssueVideos } = require('../utils/cloudinaryService');
 
 class IssueController {
   /**
@@ -80,7 +81,39 @@ class IssueController {
       }
 
       // Copy other media types as-is
-      if (media?.videos) processedMedia.videos = media.videos;
+      if (media?.videos && media.videos.length > 0) {
+        console.log('🎥 Processing videos with Cloudinary...');
+        console.log('Raw videos received:', media.videos.length);
+        console.log('🔍 Video data analysis:');
+        media.videos.forEach((vid, index) => {
+          console.log(`  Video ${index}:`, {
+            type: typeof vid,
+            length: vid?.length,
+            preview: typeof vid === 'string' ? vid.substring(0, 100) + '...' : vid,
+            startsWithFile: typeof vid === 'string' ? vid.startsWith('file://') : false,
+            startsWithData: typeof vid === 'string' ? vid.startsWith('data:') : false,
+          });
+        });
+
+        try {
+          // Create a temporary issue ID for folder organization
+          const tempIssueId = new Date().getTime().toString();
+
+          // Upload videos to Cloudinary
+          const uploadedVideos = await processIssueVideos(media.videos, tempIssueId);
+
+          // Extract URLs for the database (keeping it simple as per schema)
+          processedMedia.videos = uploadedVideos.map(vid => vid.url);
+
+          console.log('✅ Videos processed successfully:', uploadedVideos.length, 'uploaded');
+          console.log('📋 Video URLs:', processedMedia.videos);
+        } catch (videoError) {
+          console.error('❌ Error processing videos:', videoError);
+          // Continue with issue creation but log the error
+          // You might want to decide whether to fail the entire request or continue
+          processedMedia.videos = []; // Fallback to empty array
+        }
+      }
       if (media?.audio) processedMedia.audio = media.audio;
 
       // Process location coordinates - convert from object to array format for MongoDB 2dsphere
