@@ -26,6 +26,7 @@ import {
   MyLocation,
   Send,
   ArrowBack,
+  Videocam,
 } from "@mui/icons-material";
 import { useDispatch, useSelector } from "react-redux";
 import { useNavigate } from "react-router-dom";
@@ -46,6 +47,7 @@ interface IssueFormData {
     landmark?: string;
   };
   images: File[];
+  videos: File[];
 }
 
 const ReportIssue: React.FC = () => {
@@ -53,6 +55,7 @@ const ReportIssue: React.FC = () => {
   const dispatch = useDispatch<AppDispatch>();
   const navigate = useNavigate();
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const videoInputRef = useRef<HTMLInputElement>(null);
 
   const currentUser = useSelector(selectCurrentUser);
   const validationErrors = useSelector(selectIssuesValidationErrors);
@@ -69,6 +72,7 @@ const ReportIssue: React.FC = () => {
       landmark: "",
     },
     images: [],
+    videos: [],
   });
 
   const [loading, setLoading] = useState(false);
@@ -201,6 +205,41 @@ const ReportIssue: React.FC = () => {
     }));
   };
 
+  const handleVideoUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const files = event.target.files;
+    if (files) {
+      const newVideos = Array.from(files);
+      const validVideos = newVideos.filter((file) => {
+        // Check file type
+        if (!file.type.startsWith("video/")) {
+          setError("Please select only video files");
+          return false;
+        }
+        // Check file size (max 10MB per video as per backend)
+        if (file.size > 10 * 1024 * 1024) {
+          setError("Video size should not exceed 10MB");
+          return false;
+        }
+        return true;
+      });
+
+      if (validVideos.length > 0) {
+        setFormData((prev) => ({
+          ...prev,
+          videos: [...prev.videos, ...validVideos].slice(0, 3), // Max 3 videos
+        }));
+        setError("");
+      }
+    }
+  };
+
+  const handleRemoveVideo = (index: number) => {
+    setFormData((prev) => ({
+      ...prev,
+      videos: prev.videos.filter((_, i) => i !== index),
+    }));
+  };
+
   const getCurrentLocation = () => {
     if (!navigator.geolocation) {
       setError("Geolocation is not supported by this browser");
@@ -313,7 +352,26 @@ const ReportIssue: React.FC = () => {
         });
       });
 
-      const base64Images = await Promise.all(imagePromises);
+      // Convert videos to base64 data URLs
+      const videoPromises = formData.videos.map(async (video) => {
+        return new Promise<string>((resolve, reject) => {
+          const reader = new FileReader();
+          reader.onload = () => {
+            if (typeof reader.result === 'string') {
+              resolve(reader.result);
+            } else {
+              reject(new Error('Failed to convert video'));
+            }
+          };
+          reader.onerror = () => reject(new Error('Failed to read video'));
+          reader.readAsDataURL(video);
+        });
+      });
+
+      const [base64Images, base64Videos] = await Promise.all([
+        Promise.all(imagePromises),
+        Promise.all(videoPromises)
+      ]);
 
       // Prepare data in the exact format expected by backend (matching mobile app)
       const submitData = {
@@ -333,7 +391,7 @@ const ReportIssue: React.FC = () => {
         },
         media: {
           images: base64Images, // Send as base64 data URLs
-          videos: [],
+          videos: base64Videos, // Send videos as base64 data URLs
           audio: null
         },
         tags: [],
@@ -666,6 +724,106 @@ const ReportIssue: React.FC = () => {
                         >
                           <Delete fontSize="small" />
                         </IconButton>
+                      </Box>
+                    ))}
+                  </Box>
+                )}
+              </CardContent>
+            </Card>
+          </Grid>
+
+          {/* Videos */}
+          <Grid item xs={12}>
+            <Card>
+              <CardContent>
+                <Typography variant="h6" fontWeight="bold" gutterBottom>
+                  Videos (Optional)
+                </Typography>
+                <Typography
+                  variant="body2"
+                  color="text.secondary"
+                  sx={{ mb: 2 }}
+                >
+                  Add up to 3 videos to show the issue in action (max 10MB each)
+                </Typography>
+
+                {/* Video Upload Button */}
+                <Box sx={{ mb: 2 }}>
+                  <input
+                    ref={videoInputRef}
+                    type="file"
+                    accept="video/*"
+                    multiple
+                    onChange={handleVideoUpload}
+                    style={{ display: "none" }}
+                  />
+                  <Button
+                    variant="outlined"
+                    startIcon={<Videocam />}
+                    onClick={() => videoInputRef.current?.click()}
+                    disabled={formData.videos.length >= 3}
+                  >
+                    Add Videos ({formData.videos.length}/3)
+                  </Button>
+                </Box>
+
+                {/* Video Preview */}
+                {formData.videos.length > 0 && (
+                  <Box sx={{ display: "flex", flexWrap: "wrap", gap: 2 }}>
+                    {formData.videos.map((video, index) => (
+                      <Box key={index} sx={{ position: "relative" }}>
+                        <Paper
+                          sx={{
+                            width: 150,
+                            height: 100,
+                            display: "flex",
+                            alignItems: "center",
+                            justifyContent: "center",
+                            overflow: "hidden",
+                            bgcolor: "grey.100",
+                          }}
+                        >
+                          <video
+                            src={URL.createObjectURL(video)}
+                            style={{
+                              width: "100%",
+                              height: "100%",
+                              objectFit: "cover",
+                            }}
+                            controls={false}
+                            muted
+                            onMouseEnter={(e) => e.currentTarget.play()}
+                            onMouseLeave={(e) => e.currentTarget.pause()}
+                          />
+                        </Paper>
+                        <IconButton
+                          size="small"
+                          onClick={() => handleRemoveVideo(index)}
+                          sx={{
+                            position: "absolute",
+                            top: -8,
+                            right: -8,
+                            bgcolor: "background.paper",
+                            boxShadow: 1,
+                            "&:hover": { bgcolor: "grey.100" },
+                          }}
+                        >
+                          <Delete fontSize="small" />
+                        </IconButton>
+                        <Typography
+                          variant="caption"
+                          sx={{
+                            position: "absolute",
+                            bottom: 4,
+                            left: 4,
+                            bgcolor: "rgba(0,0,0,0.7)",
+                            color: "white",
+                            px: 1,
+                            borderRadius: 1,
+                          }}
+                        >
+                          Video {index + 1}
+                        </Typography>
                       </Box>
                     ))}
                   </Box>

@@ -1,7 +1,7 @@
 const { validationResult } = require('express-validator');
 const { Issue } = require('../models/Issue');
 const { Department } = require('../models/Department');
-const { processIssueImages } = require('../utils/cloudinaryService');
+const { processIssueImages, processIssueVideos } = require('../utils/cloudinaryService');
 
 class IssueController {
   /**
@@ -80,7 +80,39 @@ class IssueController {
       }
 
       // Copy other media types as-is
-      if (media?.videos) processedMedia.videos = media.videos;
+      if (media?.videos && media.videos.length > 0) {
+        console.log('🎥 Processing videos with Cloudinary...');
+        console.log('Raw videos received:', media.videos.length);
+        console.log('🔍 Video data analysis:');
+        media.videos.forEach((vid, index) => {
+          console.log(`  Video ${index}:`, {
+            type: typeof vid,
+            length: vid?.length,
+            preview: typeof vid === 'string' ? vid.substring(0, 100) + '...' : vid,
+            startsWithFile: typeof vid === 'string' ? vid.startsWith('file://') : false,
+            startsWithData: typeof vid === 'string' ? vid.startsWith('data:') : false,
+          });
+        });
+
+        try {
+          // Create a temporary issue ID for folder organization
+          const tempIssueId = new Date().getTime().toString();
+
+          // Upload videos to Cloudinary
+          const uploadedVideos = await processIssueVideos(media.videos, tempIssueId);
+
+          // Extract URLs for the database (keeping it simple as per schema)
+          processedMedia.videos = uploadedVideos.map(vid => vid.url);
+
+          console.log('✅ Videos processed successfully:', uploadedVideos.length, 'uploaded');
+          console.log('📋 Video URLs:', processedMedia.videos);
+        } catch (videoError) {
+          console.error('❌ Error processing videos:', videoError);
+          // Continue with issue creation but log the error
+          // You might want to decide whether to fail the entire request or continue
+          processedMedia.videos = []; // Fallback to empty array
+        }
+      }
       if (media?.audio) processedMedia.audio = media.audio;
 
       // Process location coordinates - convert from object to array format for MongoDB 2dsphere
@@ -183,7 +215,7 @@ class IssueController {
    */
   static async getMyIssues(req, res) {
     try {
-      const { page = 1, limit = 10, status, category, sortBy = 'createdAt', order = 'desc' } = req.query;
+      const { page = 1, limit = 10, status, category, sortBy = 'createdAt', order = 'desc', fields } = req.query;
       
       const filters = { reportedBy: req.user._id };
       
@@ -197,12 +229,26 @@ class IssueController {
 
       const skip = (parseInt(page) - 1) * parseInt(limit);
 
+      // Define field selection based on request
+      let fieldSelection = {};
+      if (fields) {
+        const requestedFields = fields.split(',').map(f => f.trim());
+        // Always include essential fields for functionality
+        const essentialFields = ['_id', 'title', 'description', 'category', 'status', 'location', 'timeline', 'votes', 'isPublic'];
+        const allFields = [...new Set([...essentialFields, ...requestedFields])];
+        fieldSelection = allFields.reduce((acc, field) => {
+          acc[field] = 1;
+          return acc;
+        }, {});
+      }
+
       console.log('🔍 Fetching issues for user:', req.user._id, 'with filters:', filters);
 
       const issues = await Issue.find(filters)
         .populate('reportedBy', 'name email')
         .populate('assignedTo', 'name email')
         .populate('assignedDepartment', 'name')
+        .select(fieldSelection)
         .sort(sortOptions)
         .skip(skip)
         .limit(parseInt(limit))
@@ -223,7 +269,8 @@ class IssueController {
           userVote = 'downvote';
         }
 
-        return {
+        // Return optimized response based on fields requested
+        const baseResponse = {
           id: issue._id,
           title: issue.title,
           description: issue.description,
@@ -233,12 +280,14 @@ class IssueController {
           status: issue.status,
           statusDisplay: getStatusDisplay(issue.status),
           location: issue.location,
-          media: issue.media,
           timeline: issue.timeline,
           reportedBy: issue.reportedBy,
           assignedTo: issue.assignedTo,
           assignedDepartment: issue.assignedDepartment,
           voteScore: (issue.votes?.upvotes?.length || 0) - (issue.votes?.downvotes?.length || 0),
+          upvotesCount: issue.votes?.upvotes?.length || 0,
+          downvotesCount: issue.votes?.downvotes?.length || 0,
+          commentsCount: issue.comments?.length || 0,
           userVote: userVote,
           daysSinceReported: Math.floor((Date.now() - new Date(issue.timeline?.reported || issue.createdAt).getTime()) / (1000 * 60 * 60 * 24)),
           tags: issue.tags,
@@ -246,6 +295,13 @@ class IssueController {
           createdAt: issue.createdAt,
           updatedAt: issue.updatedAt
         };
+
+        // Add media only if specifically requested or no fields filter
+        if (!fields || fields.includes('media')) {
+          baseResponse.media = issue.media;
+        }
+
+        return baseResponse;
       });
 
       res.status(200).json({
@@ -279,15 +335,15 @@ class IssueController {
    */
   static async getPublicIssues(req, res) {
     try {
-      const { page = 1, limit = 10, status, category, priority, search, sortBy = 'createdAt', order = 'desc' } = req.query;
-      
+      const { page = 1, limit = 10, status, category, priority, search, sortBy = 'createdAt', order = 'desc', fields } = req.query;
+
       const filters = { isPublic: true };
-      
+
       // Add optional filters
       if (status) filters.status = status;
       if (category) filters.category = category;
       if (priority) filters.priority = priority;
-      
+
       // Add search filter if provided
       if (search && search.trim()) {
         const searchRegex = new RegExp(search.trim(), 'i'); // Case-insensitive search
@@ -303,9 +359,23 @@ class IssueController {
 
       const skip = (parseInt(page) - 1) * parseInt(limit);
 
+      // Define field selection based on request
+      let fieldSelection = {};
+      if (fields) {
+        const requestedFields = fields.split(',').map(f => f.trim());
+        // Always include essential fields for functionality
+        const essentialFields = ['_id', 'title', 'description', 'category', 'status', 'location', 'timeline', 'votes', 'isPublic'];
+        const allFields = [...new Set([...essentialFields, ...requestedFields])];
+        fieldSelection = allFields.reduce((acc, field) => {
+          acc[field] = 1;
+          return acc;
+        }, {});
+      }
+
       const issues = await Issue.find(filters)
         .populate('reportedBy', 'name')
         .populate('assignedDepartment', 'name')
+        .select(fieldSelection)
         .sort(sortOptions)
         .skip(skip)
         .limit(parseInt(limit))
@@ -326,7 +396,8 @@ class IssueController {
           }
         }
 
-        return {
+        // Return optimized response based on fields requested
+        const baseResponse = {
           id: issue._id,
           title: issue.title,
           description: issue.description,
@@ -343,17 +414,26 @@ class IssueController {
             landmark: issue.location.landmark
             // Don't expose exact coordinates for privacy
           },
-          media: issue.media,
           timeline: issue.timeline,
           reportedBy: issue.reportedBy ? { name: issue.reportedBy.name } : null,
           assignedDepartment: issue.assignedDepartment,
           voteScore: (issue.votes?.upvotes?.length || 0) - (issue.votes?.downvotes?.length || 0),
+          upvotesCount: issue.votes?.upvotes?.length || 0,
+          downvotesCount: issue.votes?.downvotes?.length || 0,
+          commentsCount: issue.comments?.length || 0,
           userVote: userVote,
           daysSinceReported: Math.floor((Date.now() - new Date(issue.timeline?.reported || issue.createdAt).getTime()) / (1000 * 60 * 60 * 24)),
           tags: issue.tags,
           createdAt: issue.createdAt,
           updatedAt: issue.updatedAt
         };
+
+        // Add media only if specifically requested or no fields filter
+        if (!fields || fields.includes('media')) {
+          baseResponse.media = issue.media;
+        }
+
+        return baseResponse;
       });
 
       res.status(200).json({
@@ -387,7 +467,7 @@ class IssueController {
    */
   static async getNearbyIssues(req, res) {
     try {
-      const { latitude, longitude, radius = 5000, page = 1, limit = 10 } = req.query;
+      const { latitude, longitude, radius = 5000, page = 1, limit = 10, fields } = req.query;
 
       if (!latitude || !longitude) {
         return res.status(400).json({
@@ -397,6 +477,19 @@ class IssueController {
       }
 
       const skip = (parseInt(page) - 1) * parseInt(limit);
+
+      // Define field selection based on request
+      let fieldSelection = {};
+      if (fields) {
+        const requestedFields = fields.split(',').map(f => f.trim());
+        // Always include essential fields for functionality
+        const essentialFields = ['_id', 'title', 'description', 'category', 'status', 'location', 'timeline', 'votes', 'isPublic'];
+        const allFields = [...new Set([...essentialFields, ...requestedFields])];
+        fieldSelection = allFields.reduce((acc, field) => {
+          acc[field] = 1;
+          return acc;
+        }, {});
+      }
 
       const issues = await Issue.find({
         isPublic: true,
@@ -412,6 +505,7 @@ class IssueController {
       })
       .populate('reportedBy', 'name')
       .populate('assignedDepartment', 'name')
+      .select(fieldSelection)
       .sort({ createdAt: -1 })
       .skip(skip)
       .limit(parseInt(limit))
@@ -429,7 +523,8 @@ class IssueController {
           }
         }
 
-        return {
+        // Return optimized response based on fields requested
+        const baseResponse = {
           id: issue._id,
           title: issue.title,
           description: issue.description,
@@ -438,17 +533,26 @@ class IssueController {
           status: issue.status,
           statusDisplay: getStatusDisplay(issue.status),
           location: issue.location,
-          media: issue.media,
           timeline: issue.timeline,
           reportedBy: issue.reportedBy ? { name: issue.reportedBy.name } : null,
           assignedDepartment: issue.assignedDepartment,
           voteScore: (issue.votes?.upvotes?.length || 0) - (issue.votes?.downvotes?.length || 0),
+          upvotesCount: issue.votes?.upvotes?.length || 0,
+          downvotesCount: issue.votes?.downvotes?.length || 0,
+          commentsCount: issue.comments?.length || 0,
           userVote: userVote,
           daysSinceReported: Math.floor((Date.now() - new Date(issue.timeline?.reported || issue.createdAt).getTime()) / (1000 * 60 * 60 * 24)),
           tags: issue.tags,
           createdAt: issue.createdAt,
           updatedAt: issue.updatedAt
         };
+
+        // Add media only if specifically requested or no fields filter
+        if (!fields || fields.includes('media')) {
+          baseResponse.media = issue.media;
+        }
+
+        return baseResponse;
       });
 
       res.status(200).json({

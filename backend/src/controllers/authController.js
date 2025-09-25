@@ -1,5 +1,5 @@
 const bcrypt = require('bcryptjs');
-const { User } = require('../models/User');
+const User = require('../models/User');
 const { Session } = require('../models/Session');
 const { SecurityAlert } = require('../models/SecurityAlert');
 const { JWTUtils } = require('../utils/jwt');

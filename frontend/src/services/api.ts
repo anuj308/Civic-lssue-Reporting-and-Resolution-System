@@ -311,7 +311,13 @@ export const issuesAPI = {
     return apiService.get('/issues/my', params);
   },
 
-  getMapIssues: (params?: any) => {
+  getNearbyIssues: (params: { latitude: number; longitude: number; radius?: number; page?: number; limit?: number }) => {
+    console.log('📡 Frontend API: getNearbyIssues called with params:', params);
+    console.log('📡 Frontend API: Making request to /issues/nearby');
+    return apiService.get('/issues/nearby', params);
+  },
+
+  getMapIssues: (params?: { status?: string; category?: string; priority?: string }) => {
     console.log('📡 Frontend API: getMapIssues called with params:', params);
     console.log('📡 Frontend API: Making request to /issues/map');
     return apiService.get('/issues/map', params);

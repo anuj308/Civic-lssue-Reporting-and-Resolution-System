@@ -1,5 +1,5 @@
 const { JWTUtils } = require('../utils/jwt');
-const { User } = require('../models/User');
+const User = require('../models/User');
 const { Session } = require('../models/Session');
 const { Department } = require('../models/Department');
 

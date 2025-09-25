@@ -130,7 +130,7 @@ const IssuesScreen: React.FC = () => {
   const loadIssues = async () => {
     try {
       console.log('🔍 Loading user issues...');
-      await dispatch(fetchMyIssues({ page: 1, limit: 20 })).unwrap();
+      await dispatch(fetchMyIssues({ page: 1, limit: 20, fields: 'id,title,description,category,status,location,timeline,createdAt,media' })).unwrap();
       console.log('✅ Issues loaded successfully');
     } catch (error: any) {
       console.error('❌ Error loading issues:', error);
