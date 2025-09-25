@@ -1,6 +1,8 @@
 const express = require('express');
-const { body, param, query } = require('express-validator');
+const { param, body, query } = require('express-validator');
 const adminAuth = require('../middleware/adminAuth');
+const { authenticateToken } = require('../middleware/auth');
+const ensureDepartment = require('../middleware/departmentAuth');
 const controller = require('../controllers/departmentController');
 
 const router = express.Router();
@@ -95,6 +97,50 @@ router.delete(
   adminAuth,
   [param('id').isMongoId()],
   controller.remove
+);
+
+// Department account: list my issues
+router.get(
+  '/me/issues',
+  authenticateToken,
+  ensureDepartment,
+  [
+    query('page').optional().isInt({ min: 1 }).toInt(),
+    query('limit').optional().isInt({ min: 1, max: 100 }).toInt(),
+    query('status').optional().isIn(['pending', 'acknowledged', 'in_progress', 'resolved', 'closed', 'rejected']),
+    query('category').optional().isString().trim(),
+    query('search').optional().isString().trim(),
+  ],
+  controller.listMyIssues
+);
+
+// Department account: update an issue status
+router.patch(
+  '/issues/:issueId/status',
+  authenticateToken,
+  ensureDepartment,
+  [
+    param('issueId').isMongoId(),
+    body('status').isIn(['pending', 'acknowledged', 'in_progress', 'resolved', 'closed', 'rejected']),
+  ],
+  controller.updateIssueStatus
+);
+
+// Department account: resolve an issue with details
+router.post(
+  '/issues/:issueId/resolve',
+  authenticateToken,
+  ensureDepartment,
+  [
+    param('issueId').isMongoId(),
+    body('description').isString().trim().isLength({ min: 5 }),
+    body('images').optional().isArray(),
+    body('images.*').optional().isString(),
+    body('cost').optional().isFloat({ min: 0 }).toFloat(),
+    body('resources').optional().isArray(),
+    body('resources.*').optional().isString(),
+  ],
+  controller.resolveIssue
 );
 
 module.exports = router;
