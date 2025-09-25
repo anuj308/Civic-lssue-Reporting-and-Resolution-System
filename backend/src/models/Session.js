@@ -299,8 +299,9 @@ sessionSchema.statics.getSecurityStats = function(userId) {
 // Pre-save middleware
 sessionSchema.pre('save', function(next) {
   if (this.isNew) {
-    // Set expiration time if not already set (7 days from creation)
-    if (!this.expiresAt) {
+    // Set expiration time if not already set or if set to less than 7 days
+    const sevenDaysFromNow = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
+    if (!this.expiresAt || this.expiresAt <= sevenDaysFromNow) {
       this.expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
     }
     

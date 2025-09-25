@@ -69,6 +69,7 @@ const Login: React.FC = () => {
   const [forgotPasswordDialogOpen, setForgotPasswordDialogOpen] = useState(false);
   const [forgotPasswordLoading, setForgotPasswordLoading] = useState(false);
   const [forgotPasswordSuccess, setForgotPasswordSuccess] = useState(false);
+  const [urlError, setUrlError] = useState<string | null>(null);
   const dispatch = useDispatch<AppDispatch>();
   const navigate = useNavigate();
   const location = useLocation();
@@ -133,10 +134,16 @@ const Login: React.FC = () => {
     }
   }, [needsVerification, verificationEmail, verificationPassword, navigate]);
 
-  // Clear verification state when component mounts (allows user to start fresh)
+  // Check for error message in URL parameters
   React.useEffect(() => {
-    dispatch(clearVerificationState());
-  }, [dispatch]);
+    const urlParams = new URLSearchParams(location.search);
+    const errorParam = urlParams.get('error');
+    if (errorParam) {
+      setUrlError(decodeURIComponent(errorParam));
+      // Clear the error from URL
+      navigate(location.pathname, { replace: true });
+    }
+  }, [location.search, navigate]);
 
   // Clear error when component unmounts
   React.useEffect(() => {
@@ -148,6 +155,8 @@ const Login: React.FC = () => {
   const onSubmit = async (data: LoginFormData) => {
     try {
       await dispatch(loginUser(data)).unwrap();
+      // Reset redirecting flag after successful login
+      authAPI.resetRedirectingFlag();
       // Navigation will be handled by the useEffect above
     } catch (error) {
       // Error will be handled by Redux state
@@ -234,8 +243,29 @@ const Login: React.FC = () => {
             </Typography>
           </Box>
 
+          {/* URL Error Alert */}
+          {urlError && (
+            <Alert 
+              severity="info" 
+              sx={{ mb: 3 }}
+              onClose={() => setUrlError(null)}
+            >
+              {urlError}
+            </Alert>
+          )}
+
           {/* Login Form */}
-          <Box component="form" onSubmit={handleSubmit(onSubmit)} noValidate>
+          <Box 
+            component="form" 
+            onSubmit={handleSubmit(onSubmit)} 
+            noValidate
+            onKeyDown={(e) => {
+              // Prevent form submission when forgot password dialog is open
+              if (forgotPasswordDialogOpen && e.key === 'Enter') {
+                e.preventDefault();
+              }
+            }}
+          >
             <Controller
               name="email"
               control={control}

@@ -1,5 +1,17 @@
 import axios, { AxiosInstance, AxiosResponse, AxiosError } from 'axios';
 
+// Extend window interface for toast notifications
+declare global {
+  interface Window {
+    toast?: {
+      error: (message: string) => void;
+      success: (message: string) => void;
+      info: (message: string) => void;
+      warning: (message: string) => void;
+    };
+  }
+}
+
 // Create axios instance
 const api: AxiosInstance = axios.create({
   baseURL: import.meta.env.VITE_API_URL || '/api',
@@ -13,7 +25,8 @@ const api: AxiosInstance = axios.create({
 // In-memory token storage (more secure than Redux)
 let accessToken: string | null = null;
 let isRefreshing = false; // Prevent multiple simultaneous refresh attempts
-let refreshPromise: Promise<any> | null = null; // Store the refresh promise
+let refreshPromise: Promise<any> | null = null;
+let isRedirecting = false; // Prevent multiple redirects // Store the refresh promise
 
 // Load access token from sessionStorage on startup
 const loadAccessToken = () => {
@@ -61,6 +74,41 @@ export const clearAccessToken = () => {
   saveAccessToken(null);
 };
 
+// Clear all authentication data
+export const clearAllAuthData = () => {
+  clearAccessToken();
+  // Clear refresh token cookie
+  document.cookie = 'refreshToken=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;';
+  // Clear any other auth-related localStorage items
+  localStorage.removeItem('user');
+  localStorage.removeItem('authState');
+};
+
+// Reset redirecting flag (call this after successful login)
+export const resetRedirectingFlag = () => {
+  isRedirecting = false;
+};
+
+// Handle authentication errors
+export const handleAuthError = (error: any) => {
+  if (error.code === 'SESSION_EXPIRED' || error.code === 'SESSION_REVOKED' || error.type === 'auth') {
+    clearAllAuthData();
+    const errorMessage = error.message || 'Your session has expired. Please log in again.';
+    
+    // Show toast notification if available
+    if (window.toast) {
+      window.toast.error(errorMessage);
+    }
+    
+    // Redirect to login
+    if (window.location.pathname !== '/login') {
+      window.location.href = `/login?error=${encodeURIComponent(errorMessage)}`;
+    }
+    return true; // Handled
+  }
+  return false; // Not handled
+};
+
 // Request interceptor
 api.interceptors.request.use(
   (config) => {
@@ -88,6 +136,12 @@ api.interceptors.response.use(
     if (error.response?.status === 401 && !originalRequest._retry) {
       originalRequest._retry = true;
 
+      // If already redirecting, don't try to refresh
+      if (isRedirecting) {
+        console.log('🔄 API: Already redirecting, rejecting request');
+        return Promise.reject(error);
+      }
+
       // If already refreshing, wait for the existing refresh to complete
       if (isRefreshing) {
         console.log('🔄 API: Refresh already in progress, waiting...');
@@ -114,15 +168,26 @@ api.interceptors.response.use(
         })
         .catch((refreshError) => {
           console.log('❌ API: Token refresh failed:', refreshError.message);
-          // Clear token and redirect to login
-          clearAccessToken();
-
-          // Redirect to login if we're not already there
-          if (window.location.pathname !== '/login') {
-            window.location.href = '/login';
-          }
-
-          return Promise.reject(refreshError);
+          
+          // Set redirecting flag to prevent further refreshes
+          isRedirecting = true;
+          
+          // Clear all auth data immediately
+          clearAllAuthData();
+          
+          // Force redirect to login - use setTimeout to ensure cleanup happens first
+          const errorMessage = 'Your session has expired. Please log in again.';
+          console.log('🔄 API: Redirecting to login due to session expiry');
+          
+          setTimeout(() => {
+            window.location.href = `/login?error=${encodeURIComponent(errorMessage)}`;
+          }, 100);
+          
+          return Promise.reject({
+            message: errorMessage,
+            type: 'auth',
+            code: 'SESSION_EXPIRED'
+          });
         })
         .finally(() => {
           isRefreshing = false;
@@ -162,6 +227,38 @@ interface ApiResponse<T = any> {
 
 // Generic API methods
 export const apiService = {
+  // Handle API errors globally
+  handleError: (error: any) => {
+    // Check if it's an auth error
+    if (handleAuthError(error)) {
+      return; // Auth error handled
+    }
+    
+    // Handle other error types
+    if (error.type === 'network') {
+      console.error('Network error:', error.message);
+      // Show network error message
+      if (window.toast) {
+        window.toast.error('Network error. Please check your connection.');
+      }
+    } else if (error.status === 403) {
+      console.error('Permission denied:', error.message);
+      if (window.toast) {
+        window.toast.error('You do not have permission to perform this action.');
+      }
+    } else if (error.status === 404) {
+      console.error('Not found:', error.message);
+      if (window.toast) {
+        window.toast.error('The requested resource was not found.');
+      }
+    } else {
+      console.error('API error:', error);
+      if (window.toast) {
+        window.toast.error(error.message || 'An error occurred. Please try again.');
+      }
+    }
+  },
+
   // GET request
   get: async <T = any>(url: string, params?: any): Promise<T> => {
     console.log('🌐 Frontend apiService.get - Requesting:', url, 'with params:', params);

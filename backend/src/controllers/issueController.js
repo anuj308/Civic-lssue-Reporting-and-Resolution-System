@@ -1,6 +1,7 @@
 const { validationResult } = require('express-validator');
 const { Issue } = require('../models/Issue');
 const { Department } = require('../models/Department');
+const { User } = require('../models/User');
 const { processIssueImages, processIssueVideos } = require('../utils/cloudinaryService');
 
 class IssueController {
@@ -1050,6 +1051,73 @@ class IssueController {
       res.status(500).json({
         success: false,
         message: 'Internal server error while removing vote'
+      });
+    }
+  }
+
+  /**
+   * Get all comments for an issue
+   * @param {Object} req - Express request object
+   * @param {Object} res - Express response object
+   */
+  static async getIssueComments(req, res) {
+    try {
+      const { issueId } = req.params;
+      const { page = 1, limit = 10 } = req.query;
+
+      const issue = await Issue.findById(issueId)
+        .populate('comments.user', 'name')
+        .select('comments isPublic reportedBy');
+
+      if (!issue) {
+        return res.status(404).json({
+          success: false,
+          message: 'Issue not found'
+        });
+      }
+
+      // Check if user has permission to view comments
+      if (!issue.isPublic && (!req.user || req.user._id.toString() !== issue.reportedBy.toString())) {
+        return res.status(403).json({
+          success: false,
+          message: 'Access denied. You do not have permission to view comments on this issue.'
+        });
+      }
+
+      // Sort comments by timestamp (newest first) and paginate
+      const sortedComments = issue.comments
+        .sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp))
+        .slice((parseInt(page) - 1) * parseInt(limit), parseInt(page) * parseInt(limit));
+
+      const totalComments = issue.comments.length;
+      const totalPages = Math.ceil(totalComments / parseInt(limit));
+
+      res.status(200).json({
+        success: true,
+        message: 'Comments retrieved successfully',
+        data: {
+          comments: sortedComments.map(comment => ({
+            id: comment._id,
+            user: comment.user,
+            message: comment.message,
+            timestamp: comment.timestamp,
+            isOfficial: comment.isOfficial
+          })),
+          pagination: {
+            currentPage: parseInt(page),
+            totalPages,
+            totalComments,
+            hasNextPage: parseInt(page) < totalPages,
+            hasPrevPage: parseInt(page) > 1
+          }
+        }
+      });
+
+    } catch (error) {
+      console.error('❌ Error fetching issue comments:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Internal server error while fetching comments'
       });
     }
   }
