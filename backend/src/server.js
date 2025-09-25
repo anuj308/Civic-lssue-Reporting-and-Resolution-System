@@ -11,6 +11,7 @@ const compression = require('compression');
 const morgan = require('morgan');
 const rateLimit = require('express-rate-limit');
 const cookieParser = require('cookie-parser');
+const adminAuthRoutes = require('./routes/adminAuth');
 const { createServer } = require('http');
 const { Server } = require('socket.io');
 
@@ -101,7 +102,7 @@ app.use(cors({
 app.use(morgan('combined'));
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
-app.use(cookieParser()); // Add cookie parser middleware
+app.use(cookieParser());
 app.use(limiter);
 
 // Health check route
@@ -130,6 +131,7 @@ app.use('/api/auth', authRoutes);
 app.use('/api/issues', issueRoutes);
 app.use('/api/sessions', sessionRoutes);
 app.use('/api/users', userRoutes);
+app.use('/api/admin/auth', adminAuthRoutes);
 // app.use('/api/departments', departmentRoutes);
 // app.use('/api/analytics', analyticsRoutes);
 // app.use('/api/notifications', notificationRoutes);
