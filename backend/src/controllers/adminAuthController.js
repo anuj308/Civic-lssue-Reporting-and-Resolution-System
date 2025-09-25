@@ -4,8 +4,11 @@ const Admin = require('../models/admin');
 
 const ACCESS_EXPIRES_IN = process.env.ADMIN_JWT_EXPIRES_IN || '15m';
 const REFRESH_EXPIRES_IN = process.env.ADMIN_REFRESH_EXPIRES_IN || '7d';
-const ACCESS_SECRET = process.env.ADMIN_JWT_SECRET || process.env.JWT_SECRET;
-const REFRESH_SECRET = process.env.ADMIN_REFRESH_JWT_SECRET || process.env.REFRESH_JWT_SECRET || ACCESS_SECRET;
+// Prefer admin-specific secrets, else fall back to app secrets you already have
+const ACCESS_SECRET =
+  process.env.ADMIN_JWT_SECRET || process.env.JWT_ACCESS_SECRET;
+const REFRESH_SECRET =
+  process.env.ADMIN_REFRESH_JWT_SECRET || process.env.JWT_REFRESH_SECRET || ACCESS_SECRET;
 
 function signToken(payload, secret, expiresIn) {
   return jwt.sign(payload, secret, { expiresIn });
