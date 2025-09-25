@@ -64,26 +64,21 @@ const departmentSchema = new mongoose.Schema({
   categories: [{
     type: String,
     enum: [
-      'pothole',
-      'streetlight',
-      'garbage',
-      'water_supply',
-      'sewerage',
-      'traffic',
-      'park_maintenance',
-      'road_maintenance',
-      'electrical',
-      'construction',
-      'noise_pollution',
-      'air_pollution',
-      'water_pollution',
-      'stray_animals',
-      'illegal_parking',
-      'illegal_construction',
-      'public_transport',
-      'healthcare',
-      'education',
-      'other'
+      // Actual departments mapped to issue categories
+      'roads',            // Road Maintenance Department
+      'streetlights',     // Electrical Department
+      'sanitation',       // Sanitation/Garbage Department
+      'water_supply',     // Water Supply Department
+      'sewerage',         // Sewerage Department
+      'traffic',          // Traffic Police/Transport Department
+      'parks',            // Parks & Recreation Department
+      'construction',     // Building/Construction Department
+      'environment',      // Pollution Control/Environment Department
+      'animal_control',   // Animal Control Department
+      'healthcare',       // Health Department
+      'education',        // Education Department
+      'public_transport', // Public Transport Department
+      'other'             // Other/General Administration
     ]
   }],
   responseTime: {
