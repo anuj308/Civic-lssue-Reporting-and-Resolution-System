@@ -28,7 +28,7 @@ const bcrypt = require('bcryptjs');
  * @property {Date} [lastLoginAt] - Last login timestamp
  */
 
-const userSchema = new mongoose.Schema({
+const UserSchema = new mongoose.Schema({
   name: {
     type: String,
     required: [true, 'Name is required'],
@@ -56,16 +56,11 @@ const userSchema = new mongoose.Schema({
   },
   role: {
     type: String,
-    enum: ['citizen', 'admin', 'department_head', 'field_worker'],
-    default: 'citizen'
+    enum: ['citizen', 'department', 'admin', 'super_admin'],
+    default: 'citizen',
+    index: true,
   },
-  department: {
-    type: String,
-    ref: 'Department',
-    required: function() {
-      return this.role !== 'citizen' && this.role !== 'admin';
-    }
-  },
+  department: { type: mongoose.Schema.Types.ObjectId, ref: 'Department' }, // set only for department accounts
   profileImage: {
     type: String,
     default: null
@@ -146,18 +141,18 @@ const userSchema = new mongoose.Schema({
 });
 
 // Indexes for better query performance
-userSchema.index({ email: 1 });
-userSchema.index({ role: 1 });
-userSchema.index({ department: 1 });
-userSchema.index({ 'address.coordinates': '2dsphere' });
+UserSchema.index({ email: 1 });
+UserSchema.index({ role: 1 });
+UserSchema.index({ department: 1 });
+UserSchema.index({ 'address.coordinates': '2dsphere' });
 
 // Virtual for user's full name display
-userSchema.virtual('displayName').get(function() {
+UserSchema.virtual('displayName').get(function() {
   return this.name;
 });
 
 // Pre-save middleware to hash password
-userSchema.pre('save', async function(next) {
+UserSchema.pre('save', async function(next) {
   if (!this.isModified('password')) return next();
   
   try {
@@ -170,18 +165,16 @@ userSchema.pre('save', async function(next) {
 });
 
 // Method to compare password
-userSchema.methods.comparePassword = async function(candidatePassword) {
+UserSchema.methods.comparePassword = async function(candidatePassword) {
   return bcrypt.compare(candidatePassword, this.password);
 };
 
 // Method to remove sensitive data
-userSchema.methods.toJSON = function() {
+UserSchema.methods.toJSON = function() {
   const userObject = this.toObject();
   delete userObject.password;
   delete userObject.__v;
   return userObject;
 };
 
-const User = mongoose.model('User', userSchema);
-
-module.exports = { User };
+module.exports = mongoose.model('User', UserSchema);

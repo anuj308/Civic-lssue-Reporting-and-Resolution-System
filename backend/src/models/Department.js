@@ -40,15 +40,13 @@ const departmentSchema = new mongoose.Schema({
     type: String,
     maxLength: [500, 'Description cannot exceed 500 characters']
   },
-  head: {
+  accountUser: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'User',
-    default: null
+    required: [true, 'Department account user is required'],
+    unique: true,
+    index: true,
   },
-  staff: [{
-    type: mongoose.Schema.Types.ObjectId,
-    ref: 'User'
-  }],
   contactEmail: {
     type: String,
     required: [true, 'Contact email is required'],
@@ -88,12 +86,6 @@ const departmentSchema = new mongoose.Schema({
       'other'
     ]
   }],
-  priority: {
-    type: Number,
-    min: [1, 'Priority must be between 1 and 5'],
-    max: [5, 'Priority must be between 1 and 5'],
-    default: 3
-  },
   responseTime: {
     acknowledge: {
       type: Number,
@@ -162,7 +154,7 @@ const departmentSchema = new mongoose.Schema({
 departmentSchema.index({ code: 1 });
 departmentSchema.index({ isActive: 1 });
 departmentSchema.index({ categories: 1 });
-departmentSchema.index({ head: 1 });
+departmentSchema.index({ accountUser: 1 });
 
 // Virtual for efficiency rate
 departmentSchema.virtual('efficiencyRate').get(function() {
