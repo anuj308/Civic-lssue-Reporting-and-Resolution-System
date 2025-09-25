@@ -3,7 +3,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 
 // Base URL - Update this to match your backend URL
 const BASE_URL = process.env.EXPO_PUBLIC_API_BASE_URL || (__DEV__ 
-  ? 'http://192.168.18.101:5000/api' // Your computer's WiFi IP for Expo Go
+  ? 'http://10.142.168.102:5000/api' // Your computer's USB tethering IP for Expo Go
   : 'https://your-production-api.com/api');
 
 console.log('🌐 API Service initialized with BASE_URL:', BASE_URL);

@@ -255,10 +255,11 @@ class AuthController {
 
       // Set HTTP-only cookie for refresh token
       res.cookie('refreshToken', tokens.refreshToken, {
-        httpOnly: true,
-        secure: process.env.NODE_ENV === 'production',
-        sameSite: 'strict',
-        maxAge: 7 * 24 * 60 * 60 * 1000 // 7 days
+  httpOnly: true,
+  secure: process.env.NODE_ENV === 'production',
+  sameSite: 'strict',
+  maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
+  path: '/'
       });
 
       console.log('✅ User verified successfully:', user.email);
@@ -411,10 +412,11 @@ class AuthController {
       });
 
       // Set HTTP-only cookie for refresh token
+      const isProduction = process.env.NODE_ENV === 'production';
       res.cookie('refreshToken', tokens.refreshToken, {
         httpOnly: true,
-        secure: process.env.NODE_ENV === 'production',
-        sameSite: 'strict',
+        secure: isProduction,
+        sameSite: isProduction ? 'strict' : 'lax', // Use 'lax' in development for cross-origin requests
         maxAge: 7 * 24 * 60 * 60 * 1000 // 7 days
       });
 
@@ -740,10 +742,11 @@ class AuthController {
       });
 
       // Set HTTP-only cookie for refresh token
+      const isProduction = process.env.NODE_ENV === 'production';
       res.cookie('refreshToken', tokens.refreshToken, {
         httpOnly: true,
-        secure: process.env.NODE_ENV === 'production',
-        sameSite: 'strict',
+        secure: isProduction,
+        sameSite: isProduction ? 'strict' : 'lax', // Use 'lax' in development for cross-origin requests
         maxAge: 7 * 24 * 60 * 60 * 1000 // 7 days
       });
 
@@ -832,10 +835,12 @@ class AuthController {
       }
 
       // Clear the refresh token cookie
+      const isProduction = process.env.NODE_ENV === 'production';
       res.clearCookie('refreshToken', {
-        httpOnly: true,
-        secure: process.env.NODE_ENV === 'production',
-        sameSite: 'strict'
+  httpOnly: true,
+  secure: isProduction,
+  sameSite: isProduction ? 'strict' : 'lax', // Use 'lax' in development for cross-origin requests
+  path: '/'
       });
 
       res.status(200).json({
@@ -865,6 +870,11 @@ class AuthController {
       
       const token = refreshToken || bodyRefreshToken;
 
+      console.log('🔄 Refresh Token Debug:');
+      console.log('  - Cookie refreshToken:', refreshToken ? 'Present' : 'Not present');
+      console.log('  - Body refreshToken:', bodyRefreshToken ? 'Present' : 'Not present');
+      console.log('  - Using token from:', refreshToken ? 'cookie' : 'body');
+
       if (!token) {
         res.status(401).json({
           success: false,
@@ -885,6 +895,14 @@ class AuthController {
         return;
       }
 
+      console.log('  - Decoded token payload:', {
+        userId: decoded.userId,
+        email: decoded.email,
+        tokenFamily: decoded.tokenFamily,
+        iat: decoded.iat,
+        exp: decoded.exp
+      });
+
       // Find user
       const user = await User.findById(decoded.userId);
       if (!user || !user.isActive) {
@@ -901,20 +919,25 @@ class AuthController {
       // ================================
 
       // Find the session associated with this refresh token
+      const sessionLookupValue = decoded.tokenFamily || token;
+      console.log('  - Session lookup value:', sessionLookupValue);
+      console.log('  - Using tokenFamily from decoded?', !!decoded.tokenFamily);
+
       const session = await Session.findOne({
-        refreshTokenFamily: decoded.tokenFamily || token,
+        refreshTokenFamily: sessionLookupValue,
         userId: decoded.userId,
         isActive: true
       });
 
-      if (!session) {
-        console.log('❌ Session not found for refresh token. Token family:', decoded.tokenFamily || 'none');
-        res.status(401).json({
-          success: false,
-          message: 'Session not found or expired',
-          error: { code: 'SESSION_NOT_FOUND' }
+      console.log('  - Session found:', !!session);
+      if (session) {
+        console.log('  - Session details:', {
+          id: session._id,
+          refreshTokenFamily: session.refreshTokenFamily,
+          isActive: session.isActive,
+          createdAt: session.createdAt,
+          expiresAt: session.expiresAt
         });
-        return;
       }
 
       // Check if session is still valid
@@ -972,10 +995,11 @@ class AuthController {
       await session.save();
 
       // Set new refresh token cookie
+      const isProduction = process.env.NODE_ENV === 'production';
       res.cookie('refreshToken', tokens.refreshToken, {
         httpOnly: true,
-        secure: process.env.NODE_ENV === 'production',
-        sameSite: 'strict',
+        secure: isProduction,
+        sameSite: isProduction ? 'strict' : 'lax', // Use 'lax' in development for cross-origin requests
         maxAge: 7 * 24 * 60 * 60 * 1000 // 7 days
       });
 
@@ -1530,10 +1554,12 @@ class AuthController {
       console.log('✅ Account permanently deleted for user:', user.email);
       
       // Clear cookies
+      const isProduction = process.env.NODE_ENV === 'production';
       res.clearCookie('refreshToken', {
-        httpOnly: true,
-        secure: process.env.NODE_ENV === 'production',
-        sameSite: 'strict'
+  httpOnly: true,
+  secure: isProduction,
+  sameSite: isProduction ? 'strict' : 'lax', // Use 'lax' in development for cross-origin requests
+  path: '/'
       });
 
       res.status(200).json({
@@ -1583,10 +1609,11 @@ class AuthController {
       console.log('✅ Account soft deactivated for user:', user.email);
       
       // Clear cookies
+      const isProduction = process.env.NODE_ENV === 'production';
       res.clearCookie('refreshToken', {
         httpOnly: true,
-        secure: process.env.NODE_ENV === 'production',
-        sameSite: 'strict'
+        secure: isProduction,
+        sameSite: isProduction ? 'strict' : 'lax' // Use 'lax' in development for cross-origin requests
       });
 
       res.status(200).json({

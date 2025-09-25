@@ -105,7 +105,8 @@ const authenticateToken = async (req, res, next) => {
         
         // Validate session for refresh token
         const session = await Session.findOne({
-          refreshTokenFamily: refreshToken,
+          refreshTokenFamily: refreshPayload.tokenFamily,
+          userId: refreshPayload.userId,
           isActive: true
         });
 
@@ -183,12 +184,18 @@ const authenticateToken = async (req, res, next) => {
         isActive: true
       }).sort({ lastActiveAt: -1 });
     } else {
-      // For web apps, find session by refresh token
+      // For web apps, find session by refresh token family
       if (refreshToken) {
-        session = await Session.findOne({
-          refreshTokenFamily: refreshToken,
-          isActive: true
-        });
+        try {
+          const refreshPayload = JWTUtils.verifyRefreshToken(refreshToken);
+          session = await Session.findOne({
+            refreshTokenFamily: refreshPayload.tokenFamily,
+            userId: payload.userId,
+            isActive: true
+          });
+        } catch (error) {
+          console.log('⚠️ Could not verify refresh token for session lookup');
+        }
       }
     }
 

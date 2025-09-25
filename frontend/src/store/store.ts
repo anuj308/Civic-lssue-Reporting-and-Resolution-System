@@ -1,10 +1,10 @@
 import { configureStore } from '@reduxjs/toolkit';
-import { persistStore, persistReducer } from 'redux-persist';
+import { persistStore, persistReducer, REHYDRATE } from 'redux-persist';
 import storage from 'redux-persist/lib/storage';
 import { combineReducers } from '@reduxjs/toolkit';
 
 // Import reducers
-import authReducer from './slices/authSlice';
+import authReducer, { getCurrentUser } from './slices/authSlice';
 import userReducer from './slices/userSlice';
 import issueReducer from './slices/issueSlice';
 import departmentReducer from './slices/departmentSlice';
@@ -47,6 +47,17 @@ export const store = configureStore({
 
 // Persistor
 export const persistor = persistStore(store);
+
+// Authentication validation on rehydration
+persistor.subscribe(() => {
+  const state = store.getState();
+
+  // If auth state was rehydrated but we don't have a user, try to validate
+  if (state.auth.isAuthenticated && !state.auth.user && !state.auth.loading) {
+    console.log('🔄 Store: Auth state rehydrated, validation needed on next render');
+    // The ProtectedRoute component will handle validation by calling getCurrentUser
+  }
+});
 
 // Types
 export type RootState = ReturnType<typeof store.getState>;

@@ -1,6 +1,4 @@
 import axios, { AxiosInstance, AxiosResponse, AxiosError } from 'axios';
-import { store } from '../store/store';
-import { logoutUser, refreshToken } from '../store/slices/authSlice';
 
 // Create axios instance
 const api: AxiosInstance = axios.create({
@@ -14,10 +12,44 @@ const api: AxiosInstance = axios.create({
 
 // In-memory token storage (more secure than Redux)
 let accessToken: string | null = null;
+let isRefreshing = false; // Prevent multiple simultaneous refresh attempts
+let refreshPromise: Promise<any> | null = null; // Store the refresh promise
+
+// Load access token from sessionStorage on startup
+const loadAccessToken = () => {
+  try {
+    const token = sessionStorage.getItem('accessToken');
+    if (token) {
+      accessToken = token;
+      console.log('🔑 API: Loaded access token from sessionStorage');
+    }
+  } catch (error) {
+    console.warn('⚠️ API: Failed to load access token from sessionStorage:', error);
+  }
+};
+
+// Save access token to sessionStorage
+const saveAccessToken = (token: string | null) => {
+  try {
+    if (token) {
+      sessionStorage.setItem('accessToken', token);
+      console.log('💾 API: Saved access token to sessionStorage');
+    } else {
+      sessionStorage.removeItem('accessToken');
+      console.log('🗑️ API: Cleared access token from sessionStorage');
+    }
+  } catch (error) {
+    console.warn('⚠️ API: Failed to save access token to sessionStorage:', error);
+  }
+};
+
+// Initialize token on module load
+loadAccessToken();
 
 // Token management functions
 export const setAccessToken = (token: string) => {
   accessToken = token;
+  saveAccessToken(token);
 };
 
 export const getAccessToken = () => {
@@ -26,6 +58,7 @@ export const getAccessToken = () => {
 
 export const clearAccessToken = () => {
   accessToken = null;
+  saveAccessToken(null);
 };
 
 // Request interceptor
@@ -55,31 +88,48 @@ api.interceptors.response.use(
     if (error.response?.status === 401 && !originalRequest._retry) {
       originalRequest._retry = true;
 
-      try {
-        // Try to refresh the token using the auth API
-        const refreshResponse = await api.post('/auth/refresh');
-        const newToken = refreshResponse.data.data.accessToken;
-
-        if (newToken) {
-          // Update both Redux and in-memory token
-          setAccessToken(newToken);
-          store.dispatch({ type: 'auth/refreshToken/fulfilled', payload: refreshResponse.data });
-          originalRequest.headers.Authorization = `Bearer ${newToken}`;
-        }
-
-        return api(originalRequest);
-      } catch (refreshError) {
-        // Refresh failed, logout user
-        clearAccessToken();
-        store.dispatch(logoutUser());
-
-        // Redirect to login if we're not already there
-        if (window.location.pathname !== '/login') {
-          window.location.href = '/login';
-        }
-
-        return Promise.reject(refreshError);
+      // If already refreshing, wait for the existing refresh to complete
+      if (isRefreshing) {
+        console.log('🔄 API: Refresh already in progress, waiting...');
+        return refreshPromise?.then(() => api(originalRequest)).catch(() => Promise.reject(error));
       }
+
+      console.log('🔄 API: Starting token refresh...');
+      isRefreshing = true;
+
+      // Create a single refresh promise
+      refreshPromise = api.post('/auth/refresh-token')
+        .then((refreshResponse) => {
+          const newToken = refreshResponse.data.data.accessToken;
+
+          if (newToken) {
+            console.log('✅ API: Token refreshed successfully');
+            // Update token in memory
+            setAccessToken(newToken);
+            originalRequest.headers.Authorization = `Bearer ${newToken}`;
+            return api(originalRequest);
+          } else {
+            throw new Error('No token received');
+          }
+        })
+        .catch((refreshError) => {
+          console.log('❌ API: Token refresh failed:', refreshError.message);
+          // Clear token and redirect to login
+          clearAccessToken();
+
+          // Redirect to login if we're not already there
+          if (window.location.pathname !== '/login') {
+            window.location.href = '/login';
+          }
+
+          return Promise.reject(refreshError);
+        })
+        .finally(() => {
+          isRefreshing = false;
+          refreshPromise = null;
+        });
+
+      return refreshPromise;
     }
 
     // Handle network errors
@@ -198,7 +248,7 @@ export const authAPI = {
     apiService.post('/auth/logout'),
 
   refresh: () =>
-    apiService.post('/auth/refresh'),
+    apiService.post('/auth/refresh-token'),
 
   getCurrentUser: () =>
     apiService.get('/auth/me'),

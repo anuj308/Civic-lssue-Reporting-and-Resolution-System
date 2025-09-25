@@ -150,7 +150,7 @@ export const refreshToken = createAsyncThunk(
   'auth/refresh',
   async (_, { rejectWithValue }) => {
     try {
-      const response = await fetch('/api/auth/refresh', {
+      const response = await fetch('/api/auth/refresh-token', {
         method: 'POST',
         credentials: 'include',
       });

@@ -1,46 +1,36 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useCallback, useRef } from "react";
 import {
   Box,
   Card,
   CardContent,
   Typography,
   Chip,
-  Button,
   Grid,
   Paper,
-  IconButton,
-  Drawer,
-  List,
-  ListItem,
-  ListItemText,
-  ListItemAvatar,
-  Avatar,
-  Divider,
   CircularProgress,
   Alert,
+  Button,
 } from "@mui/material";
 import {
-  Map as MapIcon,
   LocationOn,
-  Close,
   FilterList,
   MyLocation,
   Refresh,
 } from "@mui/icons-material";
 import { useSelector, useDispatch } from "react-redux";
+import { useNavigate } from "react-router-dom";
 import {
   GoogleMap,
   useLoadScript,
   Marker,
-  InfoWindow,
 } from "@react-google-maps/api";
 
-import { selectUser } from "../../store/slices/authSlice";
+import { selectUser, selectIsAuthenticated, selectAuthLoading } from "../../store/slices/authSlice";
 import {
   selectIssues,
   selectIssuesLoading,
   selectIssuesError,
-  fetchIssues,
+  fetchMyIssues,
   Issue,
 } from "../../store/slices/issueSlice";
 import { setBreadcrumbs } from "../../store/slices/uiSlice";
@@ -52,18 +42,19 @@ const containerStyle = {
 
 const defaultCenter = {
   lat: 40.7128,
-  lng: -74.006, // Default to New York City
+  lng: -74.006, // Default to New York City+
 };
 
 const Map: React.FC = () => {
   const dispatch = useDispatch();
+  const navigate = useNavigate();
   const user = useSelector(selectUser);
   const issues = useSelector(selectIssues);
   const isLoading = useSelector(selectIssuesLoading);
   const error = useSelector(selectIssuesError);
+  const isAuthenticated = useSelector(selectIsAuthenticated);
+  const authLoading = useSelector(selectAuthLoading);
 
-  const [selectedIssue, setSelectedIssue] = useState<Issue | null>(null);
-  const [drawerOpen, setDrawerOpen] = useState(false);
   const [mapCenter, setMapCenter] = useState(defaultCenter);
   const [userLocation, setUserLocation] = useState<{
     lat: number;
@@ -74,6 +65,8 @@ const Map: React.FC = () => {
     category: "",
     priority: "",
   });
+  const hasFetchedRef = useRef(false);
+  const lastFiltersRef = useRef<string>("");
 
   const { isLoaded, loadError } = useLoadScript({
     googleMapsApiKey: import.meta.env.VITE_GOOGLE_MAPS_API_KEY || "",
@@ -88,15 +81,41 @@ const Map: React.FC = () => {
     );
   }, [dispatch]);
 
-  useEffect(() => {
-    // Fetch issues when component mounts or filters change
+  // Memoize the fetch function to prevent unnecessary re-renders
+  const fetchIssuesData = useCallback(() => {
+    // Only fetch if user is authenticated, user object exists, not loading auth
+    if (!isAuthenticated || !user || authLoading) {
+      console.log('🚫 Map: Skipping fetch - Auth status:', { isAuthenticated, hasUser: !!user, authLoading });
+      return;
+    }
+
+    // Create a filter key to check if filters changed
+    const filterKey = `${filters.status}-${filters.category}-${filters.priority}`;
+    
+    // Only fetch if filters changed or we haven't fetched yet
+    if (hasFetchedRef.current && lastFiltersRef.current === filterKey) {
+      console.log('🚫 Map: Skipping fetch - already fetched with same filters');
+      return;
+    }
+    
+    console.log('📡 Map: Fetching user issues with filters:', filters);
+    lastFiltersRef.current = filterKey;
+    hasFetchedRef.current = true;
+    
     dispatch(
-      fetchIssues({
-        reportedBy: user?.id,
+      fetchMyIssues({
         ...filters,
       })
     );
-  }, [dispatch, user?.id, filters]);
+  }, [dispatch, isAuthenticated, user, authLoading, filters.status, filters.category, filters.priority]);
+
+  useEffect(() => {
+    // Only fetch issues when user is fully authenticated
+    if (isAuthenticated && user && !authLoading) {
+      console.log('🔄 Map: Triggering fetch - user authenticated and ready');
+      fetchIssuesData();
+    }
+  }, [isAuthenticated, user, authLoading, fetchIssuesData]); // Only depend on authentication and fetch function
 
   useEffect(() => {
     // Get user's current location
@@ -115,8 +134,7 @@ const Map: React.FC = () => {
   }, []);
 
   const handleMarkerClick = (issue: Issue) => {
-    setSelectedIssue(issue);
-    setDrawerOpen(true);
+    navigate(`/issue/${issue._id}`);
   };
 
   const handleCenterOnUser = () => {
@@ -126,13 +144,48 @@ const Map: React.FC = () => {
   };
 
   const handleRefresh = () => {
-    dispatch(
-      fetchIssues({
-        reportedBy: user?.id,
-        ...filters,
-      })
-    );
+    if (!isAuthenticated || !user) {
+      console.log('🚫 Map: Cannot refresh - user not authenticated');
+      return;
+    }
+    hasFetchedRef.current = false; // Reset ref to allow refetch
+    fetchIssuesData();
   };
+
+  useEffect(() => {
+    // Reset fetch flag when filters change
+    hasFetchedRef.current = false;
+  }, [filters.status, filters.category, filters.priority]);
+
+  // Show loading state while checking authentication
+  if (authLoading || (!isAuthenticated && !user)) {
+    return (
+      <Box
+        display="flex"
+        flexDirection="column"
+        alignItems="center"
+        justifyContent="center"
+        minHeight="400px"
+        textAlign="center"
+      >
+        <CircularProgress size={40} />
+        <Typography variant="body1" sx={{ mt: 2 }}>
+          Verifying authentication...
+        </Typography>
+      </Box>
+    );
+  }
+
+  // Show authentication required if not authenticated
+  if (!isAuthenticated || !user) {
+    return (
+      <Box p={3}>
+        <Alert severity="error">
+          Authentication required. Please log in to view your issues on the map.
+        </Alert>
+      </Box>
+    );
+  }
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -172,6 +225,16 @@ const Map: React.FC = () => {
       if (filters.priority && issue.priority !== filters.priority) return false;
       return true;
     }) || [];
+
+  if (error && error.includes('unauthorized')) {
+    return (
+      <Box p={3}>
+        <Alert severity="error">
+          Authentication required. Please log in to view your issues on the map.
+        </Alert>
+      </Box>
+    );
+  }
 
   if (loadError) {
     return (
@@ -227,7 +290,7 @@ const Map: React.FC = () => {
             variant="outlined"
             startIcon={<Refresh />}
             onClick={handleRefresh}
-            disabled={isLoading}
+            disabled={isLoading || !isAuthenticated}
           >
             Refresh
           </Button>
@@ -380,49 +443,6 @@ const Map: React.FC = () => {
                 }}
               />
             ))}
-
-            {/* Info Window for selected issue */}
-            {selectedIssue && (
-              <InfoWindow
-                position={{
-                  lat: selectedIssue.location.coordinates[1],
-                  lng: selectedIssue.location.coordinates[0],
-                }}
-                onCloseClick={() => setSelectedIssue(null)}
-              >
-                <Box sx={{ p: 1, maxWidth: 250 }}>
-                  <Typography variant="h6" gutterBottom>
-                    {selectedIssue.title}
-                  </Typography>
-                  <Typography variant="body2" paragraph>
-                    {selectedIssue.description.substring(0, 100)}...
-                  </Typography>
-                  <Box display="flex" gap={1} mb={1}>
-                    <Chip
-                      label={selectedIssue.status.replace("_", " ")}
-                      size="small"
-                      sx={{
-                        backgroundColor: getStatusColor(selectedIssue.status),
-                        color: "white",
-                      }}
-                    />
-                    <Chip
-                      label={selectedIssue.priority}
-                      size="small"
-                      sx={{
-                        backgroundColor: getPriorityColor(
-                          selectedIssue.priority
-                        ),
-                        color: "white",
-                      }}
-                    />
-                  </Box>
-                  <Typography variant="caption" color="text.secondary">
-                    Reported by {selectedIssue.reportedBy.name}
-                  </Typography>
-                </Box>
-              </InfoWindow>
-            )}
           </GoogleMap>
         </CardContent>
       </Card>
@@ -482,105 +502,6 @@ const Map: React.FC = () => {
           </Paper>
         </Grid>
       </Grid>
-
-      {/* Issue Details Drawer */}
-      <Drawer
-        anchor="right"
-        open={drawerOpen}
-        onClose={() => setDrawerOpen(false)}
-        sx={{
-          "& .MuiDrawer-paper": {
-            width: { xs: "100%", sm: 400 },
-          },
-        }}
-      >
-        <Box sx={{ p: 2 }}>
-          <Box
-            display="flex"
-            justifyContent="space-between"
-            alignItems="center"
-            mb={2}
-          >
-            <Typography variant="h6">Issue Details</Typography>
-            <IconButton onClick={() => setDrawerOpen(false)}>
-              <Close />
-            </IconButton>
-          </Box>
-
-          {selectedIssue && (
-            <Box>
-              <Typography variant="h6" gutterBottom>
-                {selectedIssue.title}
-              </Typography>
-
-              <Box display="flex" gap={1} mb={2}>
-                <Chip
-                  label={selectedIssue.status.replace("_", " ")}
-                  size="small"
-                  sx={{
-                    backgroundColor: getStatusColor(selectedIssue.status),
-                    color: "white",
-                  }}
-                />
-                <Chip
-                  label={selectedIssue.priority}
-                  size="small"
-                  sx={{
-                    backgroundColor: getPriorityColor(selectedIssue.priority),
-                    color: "white",
-                  }}
-                />
-                <Chip
-                  label={selectedIssue.category}
-                  size="small"
-                  variant="outlined"
-                />
-              </Box>
-
-              <Typography variant="body2" paragraph>
-                {selectedIssue.description}
-              </Typography>
-
-              <Box display="flex" alignItems="center" gap={1} mb={2}>
-                <LocationOn fontSize="small" color="action" />
-                <Typography variant="body2">
-                  {selectedIssue.location.address ||
-                    "Location coordinates available"}
-                </Typography>
-              </Box>
-
-              <Typography variant="caption" color="text.secondary">
-                Reported by {selectedIssue.reportedBy.name}
-              </Typography>
-
-              {/* Issue Images */}
-              {selectedIssue.media?.images &&
-                selectedIssue.media.images.length > 0 && (
-                  <Box mt={2}>
-                    <Typography variant="subtitle2" gutterBottom>
-                      Images
-                    </Typography>
-                    <Grid container spacing={1}>
-                      {selectedIssue.media.images.map((imageUrl, index) => (
-                        <Grid item xs={6} key={index}>
-                          <Paper
-                            sx={{
-                              height: 80,
-                              backgroundImage: `url(${imageUrl})`,
-                              backgroundSize: "cover",
-                              backgroundPosition: "center",
-                              borderRadius: 1,
-                            }}
-                          />
-                        </Grid>
-                      ))}
-                    </Grid>
-                  </Box>
-                )}
-            </Box>
-          )}
-        </Box>
-      </Drawer>
     </Box>
   );
 };

@@ -21,8 +21,10 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
   const { isAuthenticated, user, loading } = useSelector(selectAuth);
 
   // Try to get current user if we don't have user data but have authentication
+  // This handles the case where Redux state was rehydrated but we need to validate
   useEffect(() => {
     if (isAuthenticated && !user && !loading) {
+      console.log('🔄 ProtectedRoute: Validating rehydrated auth state...');
       dispatch(getCurrentUser());
     }
   }, [dispatch, isAuthenticated, user, loading]);
