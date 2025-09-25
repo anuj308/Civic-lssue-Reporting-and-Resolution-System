@@ -11,6 +11,44 @@ export interface IssueLocation {
   landmark?: string;
 }
 
+export interface IssueListItem {
+  id: string;
+  title: string;
+  description: string;
+  category: string;
+  subcategory?: string;
+  priority: 'low' | 'medium' | 'high' | 'critical';
+  status: 'pending' | 'acknowledged' | 'in_progress' | 'resolved' | 'closed' | 'rejected';
+  location: IssueLocation;
+  timeline: {
+    reported: string;
+    acknowledged?: string;
+    started?: string;
+    resolved?: string;
+    closed?: string;
+  };
+  reportedBy?: {
+    _id: string;
+    name: string;
+  };
+  assignedDepartment?: {
+    _id: string;
+    name: string;
+  };
+  voteScore?: number;
+  userVote?: 'upvote' | 'downvote' | null;
+  daysSinceReported?: number;
+  tags: string[];
+  createdAt: string;
+  updatedAt: string;
+  // Media is optional and only included when specifically requested
+  media?: {
+    images: string[];
+    videos?: string[];
+    audio?: string;
+  };
+}
+
 export interface IssueAttachment {
   _id: string;
   fileName: string;
@@ -149,6 +187,7 @@ export interface IssueState {
   };
   categories: string[];
   mapMode: boolean;
+  loadMoreMode: boolean; // Whether to append new issues or replace existing ones
 }
 
 // Initial state
@@ -191,12 +230,13 @@ const initialState: IssueState = {
     'other'
   ],
   mapMode: false,
+  loadMoreMode: false,
 };
 
 // Async thunks
 export const fetchIssues = createAsyncThunk(
   'issues/fetchIssues',
-  async (params: { page?: number; limit?: number; status?: string; category?: string; priority?: string; reportedBy?: string; search?: string }, { rejectWithValue }) => {
+  async (params: { page?: number; limit?: number; status?: string; category?: string; priority?: string; reportedBy?: string; search?: string; fields?: string }, { rejectWithValue }) => {
     try {
       console.log('🚀 Frontend fetchIssues thunk - Called with params:', params);
       const queryParams: any = {};
@@ -207,6 +247,7 @@ export const fetchIssues = createAsyncThunk(
       if (params.priority) queryParams.priority = params.priority;
       if (params.reportedBy) queryParams.reportedBy = params.reportedBy;
       if (params.search) queryParams.search = params.search;
+      if (params.fields) queryParams.fields = params.fields;
 
       const data = await issuesAPI.getIssues(queryParams);
       console.log('✅ Frontend fetchIssues thunk - API returned:', data);
@@ -223,7 +264,7 @@ export const fetchIssues = createAsyncThunk(
 
 export const fetchMyIssues = createAsyncThunk(
   'issues/fetchMyIssues',
-  async (params: { page?: number; limit?: number; status?: string; category?: string; priority?: string; search?: string }, { rejectWithValue }) => {
+  async (params: { page?: number; limit?: number; status?: string; category?: string; priority?: string; search?: string; fields?: string }, { rejectWithValue }) => {
     try {
       console.log('🚀 Frontend fetchMyIssues thunk - Called with params:', params);
       const queryParams: any = {};
@@ -233,6 +274,7 @@ export const fetchMyIssues = createAsyncThunk(
       if (params.category) queryParams.category = params.category;
       if (params.priority) queryParams.priority = params.priority;
       if (params.search) queryParams.search = params.search;
+      if (params.fields) queryParams.fields = params.fields;
 
       const data = await issuesAPI.getMyIssues(queryParams);
       console.log('✅ Frontend fetchMyIssues thunk - API returned:', data);
@@ -246,7 +288,7 @@ export const fetchMyIssues = createAsyncThunk(
 
 export const fetchNearbyIssues = createAsyncThunk(
   'issues/fetchNearbyIssues',
-  async (params: { latitude: number; longitude: number; radius?: number; page?: number; limit?: number }, { rejectWithValue }) => {
+  async (params: { latitude: number; longitude: number; radius?: number; page?: number; limit?: number; fields?: string }, { rejectWithValue }) => {
     try {
       console.log('🚀 Frontend fetchNearbyIssues thunk - Called with params:', params);
       const data = await issuesAPI.getNearbyIssues(params);
@@ -445,6 +487,9 @@ const issueSlice = createSlice({
     setLoading: (state, action: PayloadAction<boolean>) => {
       state.loading = action.payload;
     },
+    setLoadMoreMode: (state, action: PayloadAction<boolean>) => {
+      state.loadMoreMode = action.payload;
+    },
   },
   extraReducers: (builder) => {
     // Fetch issues
@@ -460,12 +505,21 @@ const issueSlice = createSlice({
         console.log('✅ Frontend fetchIssues.fulfilled - Issues count:', action.payload?.issues?.length || 0);
 
         state.loading = false;
-        state.issues = action.payload.issues.map((issue: any) => ({
+        const normalizedIssues = action.payload.issues.map((issue: any) => ({
           ...issue,
           _id: issue.id,
           commentsCount: issue.comments?.length || 0,
           upvotes: issue.votes?.upvotes?.length || 0,
         }));
+
+        if (state.loadMoreMode) {
+          // Append new issues to existing ones
+          state.issues = [...state.issues, ...normalizedIssues];
+        } else {
+          // Replace existing issues
+          state.issues = normalizedIssues;
+        }
+
         state.totalIssues = action.payload.total || action.payload.issues.length;
         state.pagination = {
           ...state.pagination,
@@ -493,12 +547,21 @@ const issueSlice = createSlice({
         console.log('✅ Frontend fetchMyIssues.fulfilled - Action payload:', action.payload);
 
         state.loading = false;
-        state.issues = action.payload.issues.map((issue: any) => ({
+        const normalizedIssues = action.payload.issues.map((issue: any) => ({
           ...issue,
           _id: issue.id,
           commentsCount: issue.comments?.length || 0,
           upvotes: issue.votes?.upvotes?.length || 0,
         }));
+
+        if (state.loadMoreMode) {
+          // Append new issues to existing ones
+          state.issues = [...state.issues, ...normalizedIssues];
+        } else {
+          // Replace existing issues
+          state.issues = normalizedIssues;
+        }
+
         state.totalIssues = action.payload.total || action.payload.issues.length;
         state.pagination = {
           ...state.pagination,
@@ -525,12 +588,21 @@ const issueSlice = createSlice({
         console.log('✅ Frontend fetchNearbyIssues.fulfilled - Action payload:', action.payload);
 
         state.loading = false;
-        state.issues = action.payload.issues.map((issue: any) => ({
+        const normalizedIssues = action.payload.issues.map((issue: any) => ({
           ...issue,
           _id: issue.id,
           commentsCount: issue.comments?.length || 0,
           upvotes: issue.voteScore || 0,
         }));
+
+        if (state.loadMoreMode) {
+          // Append new issues to existing ones
+          state.issues = [...state.issues, ...normalizedIssues];
+        } else {
+          // Replace existing issues
+          state.issues = normalizedIssues;
+        }
+
         state.totalIssues = action.payload.totalFound || action.payload.issues.length;
         state.error = null;
 
@@ -871,6 +943,7 @@ export const {
   setPagination,
   setMapMode,
   setLoading,
+  setLoadMoreMode,
 } = issueSlice.actions;
 
 // Selectors
@@ -885,5 +958,6 @@ export const selectIssuesValidationErrors = (state: { issues: IssueState }) => s
 export const selectIssuesPagination = (state: { issues: IssueState }) => state.issues.pagination;
 export const selectIssuesCategories = (state: { issues: IssueState }) => state.issues.categories;
 export const selectMapMode = (state: { issues: IssueState }) => state.issues.mapMode;
+export const selectLoadMoreMode = (state: { issues: IssueState }) => state.issues.loadMoreMode;
 
 export default issueSlice.reducer;

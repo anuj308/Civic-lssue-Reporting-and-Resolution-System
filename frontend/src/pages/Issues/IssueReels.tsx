@@ -50,49 +50,18 @@ import {
   selectIssues,
   selectIssuesLoading,
   selectIssuesError,
-  clearError
+  clearError,
+  setLoadMoreMode
 } from "../../store/slices/issueSlice";
 import { selectCurrentUser } from "../../store/slices/authSlice";
-import { setBreadcrumbs, setPageTitle } from "../../store/slices/uiSlice";
+import { IssueListItem } from "../../store/slices/issueSlice";
 
-interface Issue {
-  id: string;
-  title: string;
-  description: string;
-  category: string;
-  priority: string;
-  status: string;
-  statusDisplay: string;
-  location: {
-    address: string;
-    city: string;
-    state?: string;
-    pincode: string;
-    coordinates?: {
-      latitude: number;
-      longitude: number;
-    };
-  };
-  media: {
+interface Issue extends IssueListItem {
+  media?: {
     images: string[];
     videos: string[];
     audio?: string;
   };
-  timeline: {
-    reported: string;
-    acknowledged?: string;
-    started?: string;
-    resolved?: string;
-  };
-  reportedBy: {
-    name: string;
-  } | null;
-  voteScore: number;
-  userVote: 'upvote' | 'downvote' | null;
-  daysSinceReported: number;
-  tags: string[];
-  isPublic: boolean;
-  createdAt: string;
 }
 
 const IssueReels: React.FC = () => {
@@ -117,6 +86,7 @@ const IssueReels: React.FC = () => {
     userLocation: null as { lat: number; lng: number } | null,
     scope: 'nearby' as 'nearby' | 'city' | 'state' | 'nationwide'
   });
+  const [hasMoreIssues, setHasMoreIssues] = useState(true);
 
   const videoRefs = useRef<Map<string, HTMLVideoElement>>(new Map());
   const containerRef = useRef<HTMLDivElement>(null);
@@ -137,13 +107,14 @@ const IssueReels: React.FC = () => {
     loadIssues();
   }, [dispatch]);
 
-  const loadIssues = useCallback(async () => {
+  const loadIssues = useCallback(async (loadMore: boolean = false) => {
     try {
       let queryParams: any = {
-        page: 1,
-        limit: 20,
+        page: loadMore ? Math.floor(issues.length / 10) + 1 : 1,
+        limit: 10,
         sortBy: 'createdAt',
-        order: 'desc'
+        order: 'desc',
+        fields: 'id,title,description,category,priority,status,statusDisplay,location,timeline,reportedBy,voteScore,userVote,daysSinceReported,tags,isPublic,createdAt' // Exclude media for performance
       };
 
       // Add location-based filtering if enabled
@@ -154,8 +125,9 @@ const IssueReels: React.FC = () => {
             latitude: filters.userLocation.lat,
             longitude: filters.userLocation.lng,
             radius: filters.radius,
-            page: 1,
-            limit: 20
+            page: loadMore ? Math.floor(issues.length / 10) + 1 : 1,
+            limit: 10,
+            fields: queryParams.fields
           })).unwrap();
           return;
         }
@@ -166,11 +138,18 @@ const IssueReels: React.FC = () => {
         queryParams.category = filters.category;
       }
 
+      // Set load more mode
+      dispatch(setLoadMoreMode(loadMore));
+
       await dispatch(fetchIssues(queryParams)).unwrap();
+
+      // Check if there are more issues to load
+      const totalLoaded = loadMore ? issues.length + 10 : 10;
+      setHasMoreIssues(totalLoaded < 1000); // Assume max 1000 issues for now
     } catch (err) {
       console.error('Failed to load issues:', err);
     }
-  }, [dispatch, filters]);
+  }, [dispatch, filters, issues.length]);
 
   // Get user's current location
   const getCurrentLocation = () => {
@@ -280,13 +259,16 @@ const IssueReels: React.FC = () => {
     }
   };
 
-  // Handle scroll to next/previous reel
-  const scrollToReel = (direction: 'next' | 'prev') => {
-    if (direction === 'next' && currentIndex < issues.length - 1) {
-      setCurrentIndex(prev => prev + 1);
-    } else if (direction === 'prev' && currentIndex > 0) {
-      setCurrentIndex(prev => prev - 1);
-    }
+  const handleLoadMore = () => {
+    loadIssues(true);
+  };
+
+  // Handle filter application
+  const handleApplyFilters = () => {
+    setFilterOpen(false);
+    setHasMoreIssues(true);
+    dispatch(setLoadMoreMode(false)); // Reset load more mode for fresh load
+    loadIssues(false);
   };
 
   // Handle keyboard navigation
@@ -308,7 +290,7 @@ const IssueReels: React.FC = () => {
   // Auto-play visible video
   useEffect(() => {
     const currentIssue = issues[currentIndex];
-    if (currentIssue && currentIssue.media.videos.length > 0) {
+    if (currentIssue && currentIssue.media?.videos && currentIssue.media.videos.length > 0) {
       const video = videoRefs.current.get(currentIssue.id);
       if (video && !playingVideos.has(currentIssue.id)) {
         video.play().catch(() => {
@@ -454,7 +436,7 @@ const IssueReels: React.FC = () => {
           >
             {/* Media Content */}
             <Box sx={{ flex: 1, position: 'relative' }}>
-              {issue.media.videos.length > 0 ? (
+              {issue.media?.videos && issue.media.videos.length > 0 ? (
                 <video
                   ref={el => {
                     if (el) videoRefs.current.set(issue.id, el);
@@ -474,7 +456,7 @@ const IssueReels: React.FC = () => {
                     return newSet;
                   })}
                 />
-              ) : issue.media.images.length > 0 ? (
+              ) : issue.media?.images && issue.media.images.length > 0 ? (
                 <Box
                   component="img"
                   src={issue.media.images[0]}
@@ -502,7 +484,7 @@ const IssueReels: React.FC = () => {
               )}
 
               {/* Video Controls */}
-              {issue.media.videos.length > 0 && (
+              {issue.media?.videos && issue.media.videos.length > 0 && (
                 <Box
                   sx={{
                     position: 'absolute',
@@ -777,10 +759,7 @@ const IssueReels: React.FC = () => {
         <DialogActions>
           <Button onClick={() => setFilterOpen(false)}>Cancel</Button>
           <Button
-            onClick={() => {
-              setFilterOpen(false);
-              loadIssues();
-            }}
+            onClick={handleApplyFilters}
             variant="contained"
           >
             Apply Filters
@@ -804,16 +783,22 @@ const IssueReels: React.FC = () => {
         </Alert>
       )}
 
-      {/* Loading Indicator */}
-      {loading && issues.length > 0 && (
-        <CircularProgress
+      {/* Load More Button */}
+      {hasMoreIssues && issues.length >= 10 && (
+        <Fab
+          onClick={handleLoadMore}
           sx={{
             position: 'absolute',
-            bottom: 16,
+            bottom: 100,
             right: 16,
-            zIndex: 10
+            bgcolor: 'primary.main',
+            color: 'white',
+            '&:hover': { bgcolor: 'primary.dark' }
           }}
-        />
+          disabled={loading}
+        >
+          {loading ? <CircularProgress size={20} color="inherit" /> : '+'}
+        </Fab>
       )}
     </Box>
   );

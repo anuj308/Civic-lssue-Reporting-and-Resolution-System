@@ -1,7 +1,6 @@
 const { validationResult } = require('express-validator');
 const { Issue } = require('../models/Issue');
 const { Department } = require('../models/Department');
-const { processIssueImages } = require('../utils/cloudinaryService');
 const { processIssueImages, processIssueVideos } = require('../utils/cloudinaryService');
 
 class IssueController {
@@ -216,7 +215,7 @@ class IssueController {
    */
   static async getMyIssues(req, res) {
     try {
-      const { page = 1, limit = 10, status, category, sortBy = 'createdAt', order = 'desc' } = req.query;
+      const { page = 1, limit = 10, status, category, sortBy = 'createdAt', order = 'desc', fields } = req.query;
       
       const filters = { reportedBy: req.user._id };
       
@@ -230,12 +229,26 @@ class IssueController {
 
       const skip = (parseInt(page) - 1) * parseInt(limit);
 
+      // Define field selection based on request
+      let fieldSelection = {};
+      if (fields) {
+        const requestedFields = fields.split(',').map(f => f.trim());
+        // Always include essential fields for functionality
+        const essentialFields = ['_id', 'title', 'description', 'category', 'status', 'location', 'timeline', 'votes', 'isPublic'];
+        const allFields = [...new Set([...essentialFields, ...requestedFields])];
+        fieldSelection = allFields.reduce((acc, field) => {
+          acc[field] = 1;
+          return acc;
+        }, {});
+      }
+
       console.log('🔍 Fetching issues for user:', req.user._id, 'with filters:', filters);
 
       const issues = await Issue.find(filters)
         .populate('reportedBy', 'name email')
         .populate('assignedTo', 'name email')
         .populate('assignedDepartment', 'name')
+        .select(fieldSelection)
         .sort(sortOptions)
         .skip(skip)
         .limit(parseInt(limit))
@@ -256,7 +269,8 @@ class IssueController {
           userVote = 'downvote';
         }
 
-        return {
+        // Return optimized response based on fields requested
+        const baseResponse = {
           id: issue._id,
           title: issue.title,
           description: issue.description,
@@ -266,7 +280,6 @@ class IssueController {
           status: issue.status,
           statusDisplay: getStatusDisplay(issue.status),
           location: issue.location,
-          media: issue.media,
           timeline: issue.timeline,
           reportedBy: issue.reportedBy,
           assignedTo: issue.assignedTo,
@@ -279,6 +292,13 @@ class IssueController {
           createdAt: issue.createdAt,
           updatedAt: issue.updatedAt
         };
+
+        // Add media only if specifically requested or no fields filter
+        if (!fields || fields.includes('media')) {
+          baseResponse.media = issue.media;
+        }
+
+        return baseResponse;
       });
 
       res.status(200).json({
@@ -312,15 +332,15 @@ class IssueController {
    */
   static async getPublicIssues(req, res) {
     try {
-      const { page = 1, limit = 10, status, category, priority, search, sortBy = 'createdAt', order = 'desc' } = req.query;
-      
+      const { page = 1, limit = 10, status, category, priority, search, sortBy = 'createdAt', order = 'desc', fields } = req.query;
+
       const filters = { isPublic: true };
-      
+
       // Add optional filters
       if (status) filters.status = status;
       if (category) filters.category = category;
       if (priority) filters.priority = priority;
-      
+
       // Add search filter if provided
       if (search && search.trim()) {
         const searchRegex = new RegExp(search.trim(), 'i'); // Case-insensitive search
@@ -336,9 +356,23 @@ class IssueController {
 
       const skip = (parseInt(page) - 1) * parseInt(limit);
 
+      // Define field selection based on request
+      let fieldSelection = {};
+      if (fields) {
+        const requestedFields = fields.split(',').map(f => f.trim());
+        // Always include essential fields for functionality
+        const essentialFields = ['_id', 'title', 'description', 'category', 'status', 'location', 'timeline', 'votes', 'isPublic'];
+        const allFields = [...new Set([...essentialFields, ...requestedFields])];
+        fieldSelection = allFields.reduce((acc, field) => {
+          acc[field] = 1;
+          return acc;
+        }, {});
+      }
+
       const issues = await Issue.find(filters)
         .populate('reportedBy', 'name')
         .populate('assignedDepartment', 'name')
+        .select(fieldSelection)
         .sort(sortOptions)
         .skip(skip)
         .limit(parseInt(limit))
@@ -359,7 +393,8 @@ class IssueController {
           }
         }
 
-        return {
+        // Return optimized response based on fields requested
+        const baseResponse = {
           id: issue._id,
           title: issue.title,
           description: issue.description,
@@ -376,7 +411,6 @@ class IssueController {
             landmark: issue.location.landmark
             // Don't expose exact coordinates for privacy
           },
-          media: issue.media,
           timeline: issue.timeline,
           reportedBy: issue.reportedBy ? { name: issue.reportedBy.name } : null,
           assignedDepartment: issue.assignedDepartment,
@@ -387,6 +421,13 @@ class IssueController {
           createdAt: issue.createdAt,
           updatedAt: issue.updatedAt
         };
+
+        // Add media only if specifically requested or no fields filter
+        if (!fields || fields.includes('media')) {
+          baseResponse.media = issue.media;
+        }
+
+        return baseResponse;
       });
 
       res.status(200).json({
@@ -420,7 +461,7 @@ class IssueController {
    */
   static async getNearbyIssues(req, res) {
     try {
-      const { latitude, longitude, radius = 5000, page = 1, limit = 10 } = req.query;
+      const { latitude, longitude, radius = 5000, page = 1, limit = 10, fields } = req.query;
 
       if (!latitude || !longitude) {
         return res.status(400).json({
@@ -430,6 +471,19 @@ class IssueController {
       }
 
       const skip = (parseInt(page) - 1) * parseInt(limit);
+
+      // Define field selection based on request
+      let fieldSelection = {};
+      if (fields) {
+        const requestedFields = fields.split(',').map(f => f.trim());
+        // Always include essential fields for functionality
+        const essentialFields = ['_id', 'title', 'description', 'category', 'status', 'location', 'timeline', 'votes', 'isPublic'];
+        const allFields = [...new Set([...essentialFields, ...requestedFields])];
+        fieldSelection = allFields.reduce((acc, field) => {
+          acc[field] = 1;
+          return acc;
+        }, {});
+      }
 
       const issues = await Issue.find({
         isPublic: true,
@@ -445,6 +499,7 @@ class IssueController {
       })
       .populate('reportedBy', 'name')
       .populate('assignedDepartment', 'name')
+      .select(fieldSelection)
       .sort({ createdAt: -1 })
       .skip(skip)
       .limit(parseInt(limit))
@@ -462,7 +517,8 @@ class IssueController {
           }
         }
 
-        return {
+        // Return optimized response based on fields requested
+        const baseResponse = {
           id: issue._id,
           title: issue.title,
           description: issue.description,
@@ -471,7 +527,6 @@ class IssueController {
           status: issue.status,
           statusDisplay: getStatusDisplay(issue.status),
           location: issue.location,
-          media: issue.media,
           timeline: issue.timeline,
           reportedBy: issue.reportedBy ? { name: issue.reportedBy.name } : null,
           assignedDepartment: issue.assignedDepartment,
@@ -482,6 +537,13 @@ class IssueController {
           createdAt: issue.createdAt,
           updatedAt: issue.updatedAt
         };
+
+        // Add media only if specifically requested or no fields filter
+        if (!fields || fields.includes('media')) {
+          baseResponse.media = issue.media;
+        }
+
+        return baseResponse;
       });
 
       res.status(200).json({

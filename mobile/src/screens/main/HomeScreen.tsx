@@ -46,7 +46,7 @@ const HomeScreen: React.FC = () => {
       await dispatch(getCurrentLocation()).unwrap();
       
       // Fetch user's issues
-      dispatch(fetchMyIssues({ limit: 5 }));
+      dispatch(fetchMyIssues({ limit: 5, fields: 'id,title,description,category,status,location,timeline,createdAt' }));
       
       // Fetch nearby issues if location is available
       if (currentLocation) {

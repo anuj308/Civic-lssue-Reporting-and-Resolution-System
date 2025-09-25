@@ -73,6 +73,8 @@ import {
   selectIssuesError,
   selectIssuesPagination,
   selectIssuesCategories,
+  selectLoadMoreMode,
+  setLoadMoreMode,
 } from "../../store/slices/issueSlice";
 import { setBreadcrumbs, setPageTitle } from "../../store/slices/uiSlice";
 
@@ -147,6 +149,7 @@ const IssueManagement: React.FC = () => {
   const error = useSelector(selectIssuesError);
   const pagination = useSelector(selectIssuesPagination);
   const categories = useSelector(selectIssuesCategories);
+  const loadMoreMode = useSelector(selectLoadMoreMode);
 
   const [page, setPage] = useState(0);
   const [rowsPerPage, setRowsPerPage] = useState(25);
@@ -197,6 +200,7 @@ const IssueManagement: React.FC = () => {
       category: categoryFilter,
       status: statusFilter,
       priority: priorityFilter,
+      fields: 'title,description,category,status,location,timeline,reportedBy,assignedDepartment,votes,isPublic,tags,createdAt,updatedAt' // Exclude media for faster loading
     });
 
     dispatch(
@@ -207,6 +211,7 @@ const IssueManagement: React.FC = () => {
         category: categoryFilter,
         status: statusFilter,
         priority: priorityFilter,
+        fields: 'title,description,category,status,location,timeline,reportedBy,assignedDepartment,votes,isPublic,tags,createdAt,updatedAt'
       })
     );
   }, [
@@ -396,24 +401,22 @@ const IssueManagement: React.FC = () => {
     setSelectedIssues([]);
   };
 
-  const handleIssueSelect = (_id: string) => {
-    const selectedIndex = selectedIssues.indexOf(_id);
-    let newSelected: string[] = [];
-
-    if (selectedIndex === -1) {
-      newSelected = newSelected.concat(selectedIssues, _id);
-    } else if (selectedIndex === 0) {
-      newSelected = newSelected.concat(selectedIssues.slice(1));
-    } else if (selectedIndex === selectedIssues.length - 1) {
-      newSelected = newSelected.concat(selectedIssues.slice(0, -1));
-    } else if (selectedIndex > 0) {
-      newSelected = newSelected.concat(
-        selectedIssues.slice(0, selectedIndex),
-        selectedIssues.slice(selectedIndex + 1)
+  const handleLoadMore = () => {
+    if (!loading && pagination.hasNextPage) {
+      dispatch(setLoadMoreMode(true)); // Enable append mode
+      dispatch(
+        fetchIssues({
+          page: page + 2, // Next page (since page is 0-indexed but API is 1-indexed)
+          limit: rowsPerPage,
+          search: searchTerm,
+          category: categoryFilter,
+          status: statusFilter,
+          priority: priorityFilter,
+          fields: 'title,description,category,status,location,timeline,reportedBy,assignedDepartment,votes,isPublic,tags,createdAt,updatedAt'
+        })
       );
+      setPage(page + 1); // Increment local page state
     }
-
-    setSelectedIssues(newSelected);
   };
   console.log(issues)
 
@@ -510,18 +513,21 @@ const IssueManagement: React.FC = () => {
             <Button
               size="small"
               startIcon={<Refresh />}
-              onClick={() =>
+              onClick={() => {
+                dispatch(setLoadMoreMode(false)); // Reset to replace mode for refresh
                 dispatch(
                   fetchIssues({
-                    page: page + 1,
+                    page: 1, // Reset to first page on refresh
                     limit: rowsPerPage,
                     search: searchTerm,
                     category: categoryFilter,
                     status: statusFilter,
                     priority: priorityFilter,
+                    fields: 'title,description,category,status,location,timeline,reportedBy,assignedDepartment,votes,isPublic,tags,createdAt,updatedAt'
                   })
-                )
-              }
+                );
+                setPage(0); // Reset local page state
+              }}
               disabled={loading}
             >
               Refresh
@@ -976,6 +982,20 @@ const IssueManagement: React.FC = () => {
             setPage(0);
           }}
         />
+
+        {/* Load More Button */}
+        {pagination.hasNextPage && (
+          <Box sx={{ p: 2, display: 'flex', justifyContent: 'center' }}>
+            <Button
+              variant="outlined"
+              onClick={handleLoadMore}
+              disabled={loading}
+              size="large"
+            >
+              {loading ? 'Loading...' : 'Load More Issues'}
+            </Button>
+          </Box>
+        )}
       </Card>
 
       {/* Action Menu */}

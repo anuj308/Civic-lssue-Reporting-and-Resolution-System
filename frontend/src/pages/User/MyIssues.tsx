@@ -43,6 +43,8 @@ import {
   selectIssuesLoading,
   selectIssuesError,
   selectIssuesPagination,
+  selectLoadMoreMode,
+  setLoadMoreMode,
 } from "../../store/slices/issueSlice";
 import { selectCurrentUser } from "../../store/slices/authSlice";
 import { setBreadcrumbs, setPageTitle } from "../../store/slices/uiSlice";
@@ -214,6 +216,7 @@ const MyIssues: React.FC = () => {
   const loading = useSelector(selectIssuesLoading);
   const error = useSelector(selectIssuesError);
   const pagination = useSelector(selectIssuesPagination);
+  const loadMoreMode = useSelector(selectLoadMoreMode);
 
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState("");
@@ -238,6 +241,7 @@ const MyIssues: React.FC = () => {
       page: currentPage,
       limit: 10,
       sort: "-createdAt",
+      fields: 'title,description,category,status,location,timeline,reportedBy,assignedDepartment,votes,isPublic,tags,createdAt,updatedAt' // Exclude media for faster loading
     };
 
     if (statusFilter) params.status = statusFilter;
@@ -268,10 +272,32 @@ const MyIssues: React.FC = () => {
   };
 
   const handleRefresh = () => {
+    dispatch(setLoadMoreMode(false)); // Reset to replace mode for refresh
+    setCurrentPage(1);
     loadIssues();
   };
 
+  const handleLoadMore = () => {
+    if (!loading && pagination.hasNextPage) {
+      dispatch(setLoadMoreMode(true)); // Enable append mode
+      const params: any = {
+        page: currentPage + 1,
+        limit: 10,
+        sort: "-createdAt",
+        fields: 'title,description,category,status,location,timeline,reportedBy,assignedDepartment,votes,isPublic,tags,createdAt,updatedAt'
+      };
+
+      if (statusFilter) params.status = statusFilter;
+      if (priorityFilter) params.priority = priorityFilter;
+      if (searchTerm) params.search = searchTerm;
+
+      dispatch(fetchMyIssues(params));
+      setCurrentPage(currentPage + 1);
+    }
+  };
+
   const handleClearFilters = () => {
+    dispatch(setLoadMoreMode(false)); // Reset to replace mode
     setSearchTerm("");
     setStatusFilter("");
     setPriorityFilter("");
@@ -459,6 +485,20 @@ const MyIssues: React.FC = () => {
             </Typography>
             <Button variant="contained" onClick={handleReportIssue}>
               Report Your First Issue
+            </Button>
+          </Box>
+        )}
+
+        {/* Load More Button */}
+        {pagination && pagination.hasNextPage && userIssues.length > 0 && (
+          <Box sx={{ display: "flex", justifyContent: "center", mt: 3, mb: 2 }}>
+            <Button
+              variant="outlined"
+              onClick={handleLoadMore}
+              disabled={loading}
+              size="large"
+            >
+              {loading ? 'Loading...' : 'Load More Issues'}
             </Button>
           </Box>
         )}

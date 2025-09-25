@@ -212,6 +212,7 @@ const UserDashboard: React.FC = () => {
     dispatch(
       fetchMyIssues({
         limit: 10,
+        fields: 'id,title,description,category,status,location,timeline,createdAt',
       })
     );
   };

@@ -1,6 +1,6 @@
 const { Session } = require('../models/Session');
 const { SecurityAlert } = require('../models/SecurityAlert');
-const { User } = require('../models/User');
+const User = require('../models/User');
 const { LocationService } = require('../utils/locationService');
 
 /**
