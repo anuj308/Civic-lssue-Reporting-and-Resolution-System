@@ -1,6 +1,7 @@
 const { JWTUtils } = require('../utils/jwt');
 const { User } = require('../models/User');
 const { Session } = require('../models/Session');
+const { Department } = require('../models/Department');
 
 /**
  * Type guard to check if request is authenticated

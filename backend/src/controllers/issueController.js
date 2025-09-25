@@ -1,5 +1,6 @@
 const { validationResult } = require('express-validator');
 const { Issue } = require('../models/Issue');
+const { Department } = require('../models/Department');
 const { processIssueImages } = require('../utils/cloudinaryService');
 
 class IssueController {
@@ -1153,5 +1154,61 @@ function getStatusDisplay(status) {
   };
   return statusMap[status] || status;
 }
+
+/**
+ * Find department for a given category
+ * @param {string} category - Category slug
+ * @returns {Object} Department object or null
+ */
+async function findDepartmentForCategory(category) {
+  return Department.findOne({ isActive: true, categories: category }).select('_id').lean();
+}
+
+exports.createIssue = async (req, res, next) => {
+  try {
+    const { title, description, category, location, media } = req.body;
+    const dept = await findDepartmentForCategory(category);
+    const issue = await Issue.create({
+      title,
+      description,
+      category,
+      location,
+      media,
+      reportedBy: req.user._id, // per your convention
+      department: dept?._id || undefined,
+      status: 'pending',
+    });
+    res.status(201).json({
+      success: true,
+      message: 'Issue reported successfully!',
+      data: {
+        issue: {
+          id: issue._id,
+          title: issue.title,
+          description: issue.description,
+          category: issue.category,
+          subcategory: issue.subcategory,
+          priority: issue.priority,
+          status: issue.status,
+          statusDisplay: issue.statusDisplay,
+          location: issue.location,
+          media: issue.media,
+          timeline: issue.timeline,
+          reportedBy: issue.reportedBy,
+          urgencyScore: issue.urgencyScore,
+          voteScore: issue.voteScore,
+          daysSinceReported: issue.daysSinceReported,
+          tags: issue.tags,
+          isPublic: issue.isPublic,
+          createdAt: issue.createdAt,
+          updatedAt: issue.updatedAt
+        }
+      }
+    });
+
+  } catch (err) {
+    next(err);
+  }
+};
 
 module.exports = { IssueController };
