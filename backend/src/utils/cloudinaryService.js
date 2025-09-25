@@ -224,6 +224,39 @@ const processIssueImages = async (images, issueId) => {
   }
 };
 
+/**
+ * Upload user avatar to Cloudinary
+ * @param {Buffer} buffer - Image buffer
+ * @param {string} userId - User ID for folder organization
+ * @returns {Promise<string>} - Avatar URL
+ */
+const uploadAvatar = async (buffer, userId) => {
+  try {
+    console.log('🌩️ Uploading avatar for user:', userId);
+
+    // Convert buffer to base64
+    const base64Data = `data:image/jpeg;base64,${buffer.toString('base64')}`;
+
+    const options = {
+      folder: `civic-issues/avatars/${userId}`,
+      public_id: `avatar_${userId}_${Date.now()}`,
+      transformation: [
+        { width: 300, height: 300, crop: 'fill', gravity: 'face' },
+        { quality: 'auto:good' },
+        { fetch_format: 'auto' }
+      ]
+    };
+
+    const result = await uploadImage(base64Data, options);
+
+    console.log('✅ Avatar uploaded successfully:', result.secure_url);
+    return result.secure_url;
+  } catch (error) {
+    console.error('❌ Error uploading avatar:', error);
+    throw new Error(`Failed to upload avatar: ${error.message}`);
+  }
+};
+
 module.exports = {
   uploadImage,
   uploadMultipleImages,
@@ -231,5 +264,6 @@ module.exports = {
   deleteMultipleImages,
   getTransformedImageUrl,
   extractPublicId,
-  processIssueImages
+  processIssueImages,
+  uploadAvatar
 };

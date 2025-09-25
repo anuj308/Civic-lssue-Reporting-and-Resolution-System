@@ -103,10 +103,10 @@ const resetPasswordValidation = [
     .normalizeEmail()
     .withMessage('Please provide a valid email address'),
   
-  body('otpCode')
+  body('token')
     .isLength({ min: 6, max: 6 })
     .isNumeric()
-    .withMessage('OTP must be a 6-digit number'),
+    .withMessage('Reset token must be a 6-digit number'),
   
   body('newPassword')
     .isLength({ min: 8 })
@@ -305,12 +305,5 @@ router.post('/verify-email', authenticateToken, AuthController.requestEmailVerif
  * @access  Public (optional auth)
  */
 router.get('/status', AuthController.getAuthStatus);
-
-/**
- * @route   GET /api/auth/debug-otp-status
- * @desc    Debug endpoint to check OTP status (development only)
- * @access  Public (development only)
- */
-router.get('/debug-otp-status', AuthController.debugOTPStatus);
 
 module.exports = router;

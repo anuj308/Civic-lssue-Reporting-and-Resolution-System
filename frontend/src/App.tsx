@@ -23,6 +23,7 @@ import { selectUser } from "./store/slices/authSlice";
 import Login from "./pages/Auth/Login";
 import Register from "./pages/Auth/Register";
 import OTPVerification from "./pages/Auth/OTPVerification";
+import ResetPassword from "./pages/Auth/ResetPassword";
 import ProtectedRoute from "./components/Auth/ProtectedRoute";
 
 // Layout Components
@@ -56,6 +57,7 @@ const AppRoutes: React.FC = () => {
       <Route path="/login" element={<Login />} />
       <Route path="/register" element={<Register />} />
       <Route path="/verify-otp" element={<OTPVerification />} />
+      <Route path="/reset-password" element={<ResetPassword />} />
 
       {/* Protected Routes with Layout */}
       <Route

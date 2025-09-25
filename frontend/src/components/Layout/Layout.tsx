@@ -43,8 +43,7 @@ const Layout: React.FC = () => {
           backgroundColor: 'background.default',
           marginLeft: 0,
           width: '100%',
-          paddingLeft: isMobile ? 0 : sidebarOpen ? `${SIDEBAR_WIDTH}px` : `${SIDEBAR_COLLAPSED_WIDTH}px`,
-          transition: theme.transitions.create('padding-left', {
+          transition: theme.transitions.create('margin-left', {
             easing: theme.transitions.easing.sharp,
             duration: theme.transitions.duration.leavingScreen,
           }),

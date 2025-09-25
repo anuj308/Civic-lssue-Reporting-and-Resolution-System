@@ -254,7 +254,7 @@ export const authAPI = {
     apiService.get('/auth/me'),
 
   changePassword: (data: { currentPassword: string; newPassword: string }) =>
-    apiService.put('/auth/change-password', data),
+    apiService.post('/auth/change-password', data),
 
   // OTP-related endpoints
   verifyOTP: (data: { email: string; otpCode: string }) =>
@@ -268,6 +268,12 @@ export const authAPI = {
 
   resendLoginOTP: (data: { email: string }) =>
     apiService.post('/auth/resend-login-otp', data),
+
+  forgotPassword: (email: string) =>
+    apiService.post('/auth/forgot-password', { email }),
+
+  resetPassword: (data: { email: string; token: string; newPassword: string }) =>
+    apiService.post('/auth/reset-password', data),
 };
 
 // Users API
@@ -406,6 +412,24 @@ export const notificationsAPI = {
 
   getStats: () =>
     apiService.get('/notifications/stats'),
+};
+
+// User Profile API
+export const userApi = {
+  getProfile: () =>
+    apiService.get('/users/profile'),
+
+  updateProfile: (data: any) =>
+    apiService.patch('/users/profile', data),
+
+  getStats: () =>
+    apiService.get('/users/stats'),
+
+  uploadAvatar: (imageData: FormData) =>
+    apiService.upload('/users/avatar', imageData),
+
+  changePassword: (data: { currentPassword: string; newPassword: string }) =>
+    apiService.post('/auth/change-password', data),
 };
 
 // Admin API

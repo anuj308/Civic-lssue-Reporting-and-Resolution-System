@@ -17,6 +17,7 @@ import {
   DialogTitle,
   DialogContent,
   DialogActions,
+  InputAdornment,
 } from "@mui/material";
 import {
   Person,
@@ -30,12 +31,15 @@ import {
   Security,
   Notifications,
   History,
+  Visibility,
+  VisibilityOff,
 } from "@mui/icons-material";
 import { useSelector, useDispatch } from "react-redux";
 import { format } from "date-fns";
 
 import { selectUser, updateUser } from "../../store/slices/authSlice";
 import { setBreadcrumbs } from "../../store/slices/uiSlice";
+import { userApi } from "../../services/api";
 
 interface UserProfile {
   firstName: string;
@@ -50,6 +54,14 @@ interface UserProfile {
   };
   dateOfBirth?: string;
   profileImage?: string;
+}
+
+interface UserStats {
+  totalIssues: number;
+  resolvedIssues: number;
+  upvotesReceived: number;
+  contributionLevel: string;
+  badgesEarned: string[];
 }
 
 const Profile: React.FC = () => {
@@ -74,6 +86,14 @@ const Profile: React.FC = () => {
     dateOfBirth: "",
     profileImage: "",
   });
+  const [userStats, setUserStats] = useState<UserStats>({
+    totalIssues: 0,
+    resolvedIssues: 0,
+    upvotesReceived: 0,
+    contributionLevel: 'Bronze',
+    badgesEarned: [],
+  });
+  const [statsLoading, setStatsLoading] = useState(false);
 
   const [passwordDialogOpen, setPasswordDialogOpen] = useState(false);
   const [passwordData, setPasswordData] = useState({
@@ -82,6 +102,11 @@ const Profile: React.FC = () => {
     confirmPassword: "",
   });
 
+  // Password visibility states
+  const [showCurrentPassword, setShowCurrentPassword] = useState(false);
+  const [showNewPassword, setShowNewPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+
   useEffect(() => {
     dispatch(
       setBreadcrumbs([
@@ -89,26 +114,53 @@ const Profile: React.FC = () => {
         { label: "Profile", path: "/profile" },
       ])
     );
+
+    loadUserProfile();
+    loadUserStats();
   }, [dispatch]);
 
-  useEffect(() => {
-    if (user) {
+  const loadUserProfile = async () => {
+    try {
+      setLoading(true);
+      const response = await userApi.getProfile();
+      const userData = response;
+
+      // Split the name into first and last name for the form
+      const nameParts = userData.name ? userData.name.split(' ') : ['', ''];
       setProfileData({
-        firstName: user.firstName || "",
-        lastName: user.lastName || "",
-        email: user.email || "",
-        phone: user.phone || "",
-        address: user.address || {
+        firstName: nameParts[0] || "",
+        lastName: nameParts.slice(1).join(' ') || "",
+        email: userData.email || "",
+        phone: userData.phone || "",
+        address: userData.address || {
           street: "",
           city: "",
           state: "",
           zipCode: "",
         },
-        dateOfBirth: user.dateOfBirth || "",
-        profileImage: user.profileImage || "",
+        dateOfBirth: userData.dateOfBirth || "",
+        profileImage: userData.profileImage || "",
       });
+    } catch (err: any) {
+      console.error('Error loading profile:', err);
+      setError(err.message || "Failed to load profile data");
+    } finally {
+      setLoading(false);
     }
-  }, [user]);
+  };
+
+  const loadUserStats = async () => {
+    try {
+      setStatsLoading(true);
+      const response = await userApi.getStats();
+      setUserStats(response);
+    } catch (err: any) {
+      console.error('Error loading stats:', err);
+      // Keep default stats on error
+    } finally {
+      setStatsLoading(false);
+    }
+  };
 
   const handleEdit = () => {
     setIsEditing(true);
@@ -120,23 +172,8 @@ const Profile: React.FC = () => {
     setIsEditing(false);
     setError("");
     setSuccess("");
-    // Reset to original data
-    if (user) {
-      setProfileData({
-        firstName: user.firstName || "",
-        lastName: user.lastName || "",
-        email: user.email || "",
-        phone: user.phone || "",
-        address: user.address || {
-          street: "",
-          city: "",
-          state: "",
-          zipCode: "",
-        },
-        dateOfBirth: user.dateOfBirth || "",
-        profileImage: user.profileImage || "",
-      });
-    }
+    // Reload the original data from API
+    loadUserProfile();
   };
 
   const handleSave = async () => {
@@ -160,15 +197,24 @@ const Profile: React.FC = () => {
         throw new Error("Please enter a valid email address");
       }
 
-      // Here you would typically make an API call to update the user profile
-      // For now, we'll simulate the update
-      await new Promise((resolve) => setTimeout(resolve, 1000));
+      // Prepare the data to send to the API
+      const updateData = {
+        name: profileData.firstName && profileData.lastName
+          ? `${profileData.firstName.trim()} ${profileData.lastName.trim()}`
+          : user?.name,
+        phone: profileData.phone || undefined,
+        address: profileData.address,
+        dateOfBirth: profileData.dateOfBirth || undefined,
+      };
 
-      // Update the user in Redux store
+      // Call the real update profile API
+      await userApi.updateProfile(updateData);
+
+      // Update the Redux store with the new user data
       dispatch(
         updateUser({
           ...user,
-          ...profileData,
+          ...updateData,
         })
       );
 
@@ -196,8 +242,11 @@ const Profile: React.FC = () => {
     setError("");
 
     try {
-      // Here you would make an API call to change the password
-      await new Promise((resolve) => setTimeout(resolve, 1000));
+      // Call the real change password API
+      await userApi.changePassword({
+        currentPassword: passwordData.currentPassword,
+        newPassword: passwordData.newPassword,
+      });
 
       setSuccess("Password changed successfully!");
       setPasswordDialogOpen(false);
@@ -206,6 +255,10 @@ const Profile: React.FC = () => {
         newPassword: "",
         confirmPassword: "",
       });
+      // Reset password visibility states
+      setShowCurrentPassword(false);
+      setShowNewPassword(false);
+      setShowConfirmPassword(false);
     } catch (err: any) {
       setError(err.message || "Failed to change password");
     } finally {
@@ -213,23 +266,67 @@ const Profile: React.FC = () => {
     }
   };
 
-  const handleImageUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
+  // Password visibility toggle handlers
+  const handleToggleCurrentPassword = () => {
+    setShowCurrentPassword(!showCurrentPassword);
+  };
+
+  const handleToggleNewPassword = () => {
+    setShowNewPassword(!showNewPassword);
+  };
+
+  const handleToggleConfirmPassword = () => {
+    setShowConfirmPassword(!showConfirmPassword);
+  };
+
+  const handleImageUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
-    if (file) {
-      // Here you would typically upload the image to a cloud service
-      // For now, we'll create a local URL
-      const reader = new FileReader();
-      reader.onload = (e) => {
-        setProfileData((prev) => ({
-          ...prev,
-          profileImage: e.target?.result as string,
-        }));
-      };
-      reader.readAsDataURL(file);
+    if (!file) return;
+
+    // Validate file type
+    if (!file.type.startsWith('image/')) {
+      setError('Please select a valid image file');
+      return;
+    }
+
+    // Validate file size (5MB limit)
+    if (file.size > 5 * 1024 * 1024) {
+      setError('Image size must be less than 5MB');
+      return;
+    }
+
+    setLoading(true);
+    setError('');
+
+    try {
+      // Create FormData for file upload
+      const formData = new FormData();
+      formData.append('avatar', file);
+
+      // Upload avatar to server
+      const response = await userApi.uploadAvatar(formData);
+
+      // Update profile data with new avatar URL
+      setProfileData(prev => ({
+        ...prev,
+        profileImage: response.profileImage || response.avatar,
+      }));
+
+      // Update Redux store
+      dispatch(updateUser({
+        profileImage: response.profileImage || response.avatar,
+      }));
+
+      setSuccess('Avatar updated successfully!');
+    } catch (err: any) {
+      console.error('Avatar upload error:', err);
+      setError(err.message || 'Failed to upload avatar');
+    } finally {
+      setLoading(false);
     }
   };
 
-  if (!user) {
+  if (loading && !profileData.firstName) {
     return (
       <Box
         display="flex"
@@ -331,12 +428,14 @@ const Profile: React.FC = () => {
               </Typography>
 
               <Typography variant="body2" color="text.secondary" gutterBottom>
-                {user.role.replace("_", " ").toUpperCase()}
+                {user?.role?.replace("_", " ").toUpperCase() || "CITIZEN"}
               </Typography>
 
               <Typography variant="body2" color="text.secondary">
                 Member since{" "}
-                {format(new Date(user.createdAt || Date.now()), "MMMM yyyy")}
+                {user?.createdAt
+                  ? format(new Date(user.createdAt), "MMMM yyyy")
+                  : "Unknown"}
               </Typography>
 
               <Divider sx={{ my: 2 }} />
@@ -547,52 +646,82 @@ const Profile: React.FC = () => {
                 Account Statistics
               </Typography>
 
-              <Grid container spacing={3}>
-                <Grid item xs={12} sm={6} md={3}>
-                  <Paper sx={{ p: 2, textAlign: "center" }}>
-                    <Typography variant="h4" color="primary.main">
-                      {/* This would come from API */}
-                      12
-                    </Typography>
-                    <Typography variant="body2" color="text.secondary">
-                      Issues Reported
-                    </Typography>
-                  </Paper>
-                </Grid>
+              {statsLoading ? (
+                <Box display="flex" justifyContent="center" p={3}>
+                  <CircularProgress size={24} />
+                </Box>
+              ) : (
+                <Grid container spacing={3}>
+                  <Grid item xs={12} sm={6} md={3}>
+                    <Paper sx={{ p: 2, textAlign: "center" }}>
+                      <Typography variant="h4" color="primary.main">
+                        {userStats.totalIssues}
+                      </Typography>
+                      <Typography variant="body2" color="text.secondary">
+                        Issues Reported
+                      </Typography>
+                    </Paper>
+                  </Grid>
 
-                <Grid item xs={12} sm={6} md={3}>
-                  <Paper sx={{ p: 2, textAlign: "center" }}>
-                    <Typography variant="h4" color="success.main">
-                      8
-                    </Typography>
-                    <Typography variant="body2" color="text.secondary">
-                      Issues Resolved
-                    </Typography>
-                  </Paper>
-                </Grid>
+                  <Grid item xs={12} sm={6} md={3}>
+                    <Paper sx={{ p: 2, textAlign: "center" }}>
+                      <Typography variant="h4" color="success.main">
+                        {userStats.resolvedIssues}
+                      </Typography>
+                      <Typography variant="body2" color="text.secondary">
+                        Issues Resolved
+                      </Typography>
+                    </Paper>
+                  </Grid>
 
-                <Grid item xs={12} sm={6} md={3}>
-                  <Paper sx={{ p: 2, textAlign: "center" }}>
-                    <Typography variant="h4" color="warning.main">
-                      3
-                    </Typography>
-                    <Typography variant="body2" color="text.secondary">
-                      In Progress
-                    </Typography>
-                  </Paper>
-                </Grid>
+                  <Grid item xs={12} sm={6} md={3}>
+                    <Paper sx={{ p: 2, textAlign: "center" }}>
+                      <Typography variant="h4" color="warning.main">
+                        {userStats.upvotesReceived}
+                      </Typography>
+                      <Typography variant="body2" color="text.secondary">
+                        Upvotes Received
+                      </Typography>
+                    </Paper>
+                  </Grid>
 
-                <Grid item xs={12} sm={6} md={3}>
-                  <Paper sx={{ p: 2, textAlign: "center" }}>
-                    <Typography variant="h4" color="info.main">
-                      1
-                    </Typography>
-                    <Typography variant="body2" color="text.secondary">
-                      Pending
-                    </Typography>
-                  </Paper>
+                  <Grid item xs={12} sm={6} md={3}>
+                    <Paper sx={{ p: 2, textAlign: "center" }}>
+                      <Typography variant="h4" color="info.main">
+                        {userStats.contributionLevel}
+                      </Typography>
+                      <Typography variant="body2" color="text.secondary">
+                        Contribution Level
+                      </Typography>
+                    </Paper>
+                  </Grid>
                 </Grid>
-              </Grid>
+              )}
+
+              {/* Badges Section */}
+              {userStats.badgesEarned.length > 0 && (
+                <Box mt={3}>
+                  <Typography variant="h6" gutterBottom>
+                    Badges Earned
+                  </Typography>
+                  <Box display="flex" flexWrap="wrap" gap={1}>
+                    {userStats.badgesEarned.map((badge, index) => (
+                      <Paper
+                        key={index}
+                        sx={{
+                          px: 2,
+                          py: 1,
+                          bgcolor: "primary.light",
+                          color: "primary.contrastText",
+                          borderRadius: 2,
+                        }}
+                      >
+                        <Typography variant="body2">{badge}</Typography>
+                      </Paper>
+                    ))}
+                  </Box>
+                </Box>
+              )}
             </CardContent>
           </Card>
         </Grid>
@@ -601,7 +730,17 @@ const Profile: React.FC = () => {
       {/* Change Password Dialog */}
       <Dialog
         open={passwordDialogOpen}
-        onClose={() => setPasswordDialogOpen(false)}
+        onClose={() => {
+          setPasswordDialogOpen(false);
+          setPasswordData({
+            currentPassword: "",
+            newPassword: "",
+            confirmPassword: "",
+          });
+          setShowCurrentPassword(false);
+          setShowNewPassword(false);
+          setShowConfirmPassword(false);
+        }}
         maxWidth="sm"
         fullWidth
       >
@@ -609,7 +748,7 @@ const Profile: React.FC = () => {
         <DialogContent>
           <TextField
             fullWidth
-            type="password"
+            type={showCurrentPassword ? "text" : "password"}
             label="Current Password"
             value={passwordData.currentPassword}
             onChange={(e) =>
@@ -619,10 +758,23 @@ const Profile: React.FC = () => {
               }))
             }
             sx={{ mt: 2 }}
+            InputProps={{
+              endAdornment: (
+                <InputAdornment position="end">
+                  <IconButton
+                    aria-label="toggle current password visibility"
+                    onClick={handleToggleCurrentPassword}
+                    edge="end"
+                  >
+                    {showCurrentPassword ? <VisibilityOff /> : <Visibility />}
+                  </IconButton>
+                </InputAdornment>
+              ),
+            }}
           />
           <TextField
             fullWidth
-            type="password"
+            type={showNewPassword ? "text" : "password"}
             label="New Password"
             value={passwordData.newPassword}
             onChange={(e) =>
@@ -632,10 +784,23 @@ const Profile: React.FC = () => {
               }))
             }
             sx={{ mt: 2 }}
+            InputProps={{
+              endAdornment: (
+                <InputAdornment position="end">
+                  <IconButton
+                    aria-label="toggle new password visibility"
+                    onClick={handleToggleNewPassword}
+                    edge="end"
+                  >
+                    {showNewPassword ? <VisibilityOff /> : <Visibility />}
+                  </IconButton>
+                </InputAdornment>
+              ),
+            }}
           />
           <TextField
             fullWidth
-            type="password"
+            type={showConfirmPassword ? "text" : "password"}
             label="Confirm New Password"
             value={passwordData.confirmPassword}
             onChange={(e) =>
@@ -645,6 +810,19 @@ const Profile: React.FC = () => {
               }))
             }
             sx={{ mt: 2 }}
+            InputProps={{
+              endAdornment: (
+                <InputAdornment position="end">
+                  <IconButton
+                    aria-label="toggle confirm password visibility"
+                    onClick={handleToggleConfirmPassword}
+                    edge="end"
+                  >
+                    {showConfirmPassword ? <VisibilityOff /> : <Visibility />}
+                  </IconButton>
+                </InputAdornment>
+              ),
+            }}
           />
         </DialogContent>
         <DialogActions>
