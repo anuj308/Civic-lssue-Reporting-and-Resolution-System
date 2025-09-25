@@ -6,6 +6,7 @@ const { JWTUtils } = require('../utils/jwt');
 const { LocationService } = require('../utils/locationService');
 const { validationResult } = require('express-validator');
 const { emailService } = require('../utils/emailService');
+const { cloudinaryService } = require('../utils/cloudinaryService');
 
 /**
  * Authentication Controller for user registration, login, and verification
@@ -941,11 +942,13 @@ class AuthController {
       }
 
       // Check if session is still valid
-      if (!session.isValid()) {
-        await session.revoke('session_expired');
+      if (!session || !session.isValid()) {
+        if (session) {
+          await session.revoke('session_expired');
+        }
         res.status(401).json({
           success: false,
-          message: 'Session has expired',
+          message: 'Session has expired or not found',
           error: { code: 'SESSION_EXPIRED' }
         });
         return;
@@ -1123,11 +1126,14 @@ class AuthController {
       const saltRounds = 12;
       const hashedPassword = await bcrypt.hash(newPassword, saltRounds);
 
-      // Update password and clear reset token
-      user.password = hashedPassword;
-      user.resetPasswordToken = undefined;
-      user.resetPasswordExpiry = undefined;
-      await user.save();
+      // Update password and clear reset token using findByIdAndUpdate to avoid pre-save middleware
+      await User.findByIdAndUpdate(user._id, {
+        $set: {
+          password: hashedPassword,
+          resetPasswordToken: undefined,
+          resetPasswordExpiry: undefined
+        }
+      });
 
       res.status(200).json({
         success: true,
@@ -1193,9 +1199,10 @@ class AuthController {
       const saltRounds = 12;
       const hashedNewPassword = await bcrypt.hash(newPassword, saltRounds);
 
-      // Update password
-      user.password = hashedNewPassword;
-      await user.save();
+      // Update password using findByIdAndUpdate to avoid pre-save middleware
+      await User.findByIdAndUpdate(userId, {
+        $set: { password: hashedNewPassword }
+      });
 
       res.status(200).json({
         success: true,
@@ -1705,27 +1712,30 @@ class AuthController {
   }
 
   /**
-   * Debug endpoint to check OTP status for a user (development only)
+   * Upload user avatar
    * @param {Object} req - Express request object
    * @param {Object} res - Express response object
    */
-  static async debugOTPStatus(req, res) {
+  static async uploadAvatar(req, res) {
     try {
-      if (process.env.NODE_ENV === 'production') {
-        return res.status(404).json({ message: 'Not found' });
-      }
+      const userId = req.user.id;
 
-      const { email } = req.query;
-      
-      if (!email) {
+      if (!req.file) {
         return res.status(400).json({
           success: false,
-          message: 'Email is required'
+          message: 'No avatar file provided'
         });
       }
 
-      const user = await User.findOne({ email: email.toLowerCase() })
-        .select('+otpCode +otpExpiry +otpAttempts');
+      // Upload to Cloudinary
+      const cloudinaryUrl = await cloudinaryService.uploadAvatar(req.file.buffer, userId);
+
+      // Update user with avatar URL
+      const user = await User.findByIdAndUpdate(
+        userId,
+        { profileImage: cloudinaryUrl },
+        { new: true }
+      ).select('-password -otpCode -resetPasswordToken');
 
       if (!user) {
         return res.status(404).json({
@@ -1734,27 +1744,19 @@ class AuthController {
         });
       }
 
-      const now = new Date();
-      const isExpired = user.otpExpiry < now;
-
       res.status(200).json({
         success: true,
+        message: 'Avatar uploaded successfully',
         data: {
-          email: user.email,
-          otpCode: user.otpCode,
-          otpExpiry: user.otpExpiry,
-          currentTime: now,
-          isExpired: isExpired,
-          otpAttempts: user.otpAttempts,
-          isVerified: user.isVerified
+          profileImage: cloudinaryUrl
         }
       });
 
     } catch (error) {
-      console.error('❌ Debug OTP status error:', error);
+      console.error('❌ Upload avatar error:', error);
       res.status(500).json({
         success: false,
-        message: 'Internal server error'
+        message: 'Internal server error during avatar upload'
       });
     }
   }

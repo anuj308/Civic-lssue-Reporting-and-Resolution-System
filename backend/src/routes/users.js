@@ -2,6 +2,7 @@ const { Router } = require('express');
 const { body } = require('express-validator');
 const { AuthController } = require('../controllers/authController');
 const { authenticateToken } = require('../middleware/auth');
+const { upload } = require('../middleware/upload');
 
 const router = Router();
 
@@ -56,5 +57,12 @@ router.patch('/profile', authenticateToken, updateProfileValidation, AuthControl
  * @access  Private
  */
 router.get('/stats', authenticateToken, AuthController.getUserStats);
+
+/**
+ * @route   POST /api/users/avatar
+ * @desc    Upload user avatar
+ * @access  Private
+ */
+router.post('/avatar', authenticateToken, upload.single('avatar'), AuthController.uploadAvatar);
 
 module.exports = router;

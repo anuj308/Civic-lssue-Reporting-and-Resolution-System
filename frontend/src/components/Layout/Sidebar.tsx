@@ -39,7 +39,6 @@ import {
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useSelector } from 'react-redux';
 import { selectUser } from '../../store/slices/authSlice';
-
 interface SidebarProps {
   open: boolean;
   onToggle: () => void;

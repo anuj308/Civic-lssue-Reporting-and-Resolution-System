@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useRef } from "react";
 import {
   Box,
   Card,
@@ -11,6 +11,11 @@ import {
   IconButton,
   Link,
   Divider,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
+  Alert,
 } from "@mui/material";
 import {
   Visibility,
@@ -32,6 +37,7 @@ import {
 } from "../../store/slices/authSlice";
 import { AppDispatch } from "../../store/store";
 import { showToast } from "../../utils/toast";
+import { authAPI } from "../../services/api";
 
 // Validation schema
 const loginSchema = yup.object({
@@ -42,16 +48,31 @@ const loginSchema = yup.object({
   password: yup.string().required("Password is required"),
 });
 
+const forgotPasswordSchema = yup.object({
+  email: yup
+    .string()
+    .email("Please enter a valid email address")
+    .required("Email is required"),
+});
+
 interface LoginFormData {
   email: string;
   password: string;
 }
 
+interface ForgotPasswordFormData {
+  email: string;
+}
+
 const Login: React.FC = () => {
   const [showPassword, setShowPassword] = useState(false);
+  const [forgotPasswordDialogOpen, setForgotPasswordDialogOpen] = useState(false);
+  const [forgotPasswordLoading, setForgotPasswordLoading] = useState(false);
+  const [forgotPasswordSuccess, setForgotPasswordSuccess] = useState(false);
   const dispatch = useDispatch<AppDispatch>();
   const navigate = useNavigate();
   const location = useLocation();
+  const forgotPasswordFormRef = useRef<HTMLFormElement>(null);
 
   const {
     loading,
@@ -72,6 +93,18 @@ const Login: React.FC = () => {
     defaultValues: {
       email: "",
       password: "",
+    },
+  });
+
+  const {
+    control: forgotPasswordControl,
+    handleSubmit: handleForgotPasswordSubmit,
+    formState: { errors: forgotPasswordErrors },
+    reset: resetForgotPasswordForm,
+  } = useForm<ForgotPasswordFormData>({
+    resolver: yupResolver(forgotPasswordSchema),
+    defaultValues: {
+      email: "",
     },
   });
 
@@ -130,17 +163,38 @@ const Login: React.FC = () => {
     dispatch(clearError());
   };
 
+  const handleForgotPassword = async (data: ForgotPasswordFormData) => {
+    setForgotPasswordLoading(true);
+    try {
+      await authAPI.forgotPassword(data.email);
+      setForgotPasswordSuccess(true);
+      showToast.success("Password reset link sent to your email");
+    } catch (error: any) {
+      console.error("Forgot password failed:", error);
+      showToast.error(error.message || "Failed to send password reset email");
+    } finally {
+      setForgotPasswordLoading(false);
+    }
+  };
+
+  const handleForgotPasswordDialogClose = () => {
+    setForgotPasswordDialogOpen(false);
+    setForgotPasswordSuccess(false);
+    resetForgotPasswordForm();
+  };
+
   return (
-    <Box
-      sx={{
-        minHeight: "100vh",
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-        background: "linear-gradient(135deg, #667eea 0%, #764ba2 100%)",
-        padding: 3,
-      }}
-    >
+    <>
+      <Box
+        sx={{
+          minHeight: "100vh",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          background: "linear-gradient(135deg, #667eea 0%, #764ba2 100%)",
+          padding: 3,
+        }}
+      >
       <Card
         sx={{
           width: "100%",
@@ -239,10 +293,22 @@ const Login: React.FC = () => {
                       </InputAdornment>
                     ),
                   }}
-                  sx={{ mb: 3 }}
+                  sx={{ mb: 2 }}
                 />
               )}
             />
+
+            {/* Forgot Password Link */}
+            <Box sx={{ textAlign: "right", mb: 3 }}>
+              <Link
+                component="button"
+                variant="body2"
+                onClick={() => setForgotPasswordDialogOpen(true)}
+                sx={{ textDecoration: "none" }}
+              >
+                Forgot Password?
+              </Link>
+            </Box>
 
             <Button
               type="submit"
@@ -297,6 +363,77 @@ const Login: React.FC = () => {
         </CardContent>
       </Card>
     </Box>
+
+    {/* Forgot Password Dialog */}
+    <Dialog
+      open={forgotPasswordDialogOpen}
+      onClose={handleForgotPasswordDialogClose}
+      maxWidth="sm"
+      fullWidth
+    >
+      <DialogTitle>
+        <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+          <Lock color="primary" />
+          <Typography variant="h6">
+            Reset Password
+          </Typography>
+        </Box>
+      </DialogTitle>
+      <DialogContent>
+        <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
+          Enter your email address and we'll send you a link to reset your password.
+        </Typography>
+
+        <Box component="form" onSubmit={handleForgotPasswordSubmit(handleForgotPassword)} noValidate>
+          <Controller
+            name="email"
+            control={forgotPasswordControl}
+            render={({ field }) => (
+              <TextField
+                {...field}
+                fullWidth
+                label="Email Address"
+                type="email"
+                autoComplete="email"
+                error={!!forgotPasswordErrors.email}
+                helperText={forgotPasswordErrors.email?.message}
+                disabled={forgotPasswordLoading}
+                InputProps={{
+                  startAdornment: (
+                    <InputAdornment position="start">
+                      <Email color="action" />
+                    </InputAdornment>
+                  ),
+                }}
+                sx={{ mb: 3 }}
+              />
+            )}
+          />
+
+          <DialogActions sx={{ px: 0, pb: 0 }}>
+            <Button
+              onClick={handleForgotPasswordDialogClose}
+              disabled={forgotPasswordLoading}
+            >
+              Cancel
+            </Button>
+            <Button
+              type="submit"
+              variant="contained"
+              disabled={forgotPasswordLoading}
+              startIcon={
+                forgotPasswordLoading ? (
+                  <CircularProgress size={16} color="inherit" />
+                ) : null
+              }
+            >
+              {forgotPasswordLoading ? "Sending..." : "Send Reset Link"}
+            </Button>
+          </DialogActions>
+        </Box>
+      </DialogContent>
+    </Dialog>
+    </>
   );
 };
 

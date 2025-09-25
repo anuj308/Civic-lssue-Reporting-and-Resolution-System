@@ -168,26 +168,64 @@ class EmailService {
    * @param {string} token - Reset token
    */
   async sendPasswordResetEmail(email, token) {
-    const resetUrl = `${process.env.FRONTEND_URL}/reset-password?token=${token}`;
+    const resetUrl = `${process.env.FRONTEND_URL || 'http://localhost:3000'}/reset-password?token=${token}&email=${encodeURIComponent(email)}`;
     
     const mailOptions = {
       from: process.env.FROM_EMAIL || 'noreply@civicissues.com',
       to: email,
-      subject: 'Reset Your Password',
+      subject: 'Reset Your Password - Civic Issues',
       html: `
-        <h1>Password Reset</h1>
-        <p>You requested a password reset. Click the link below to reset your password:</p>
-        <a href="${resetUrl}">Reset Password</a>
-        <p>This link will expire in 1 hour.</p>
-        <p>If you didn't request this, please ignore this email.</p>
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
+          <div style="text-align: center; margin-bottom: 30px;">
+            <h1 style="color: #2196F3; margin-bottom: 10px;">Civic Issues</h1>
+            <h2 style="color: #333; margin-top: 0;">Password Reset</h2>
+          </div>
+          
+          <div style="background-color: #f5f5f5; padding: 20px; border-radius: 8px; margin-bottom: 30px;">
+            <p style="margin: 0; font-size: 16px; color: #333;">
+              You requested a password reset for your Civic Issues account. Click the button below to reset your password:
+            </p>
+          </div>
+          
+          <div style="text-align: center; margin: 30px 0;">
+            <a href="${resetUrl}" 
+               style="display: inline-block; background-color: #2196F3; color: white; text-decoration: none; padding: 15px 30px; border-radius: 8px; font-size: 16px; font-weight: bold;">
+              Reset Password
+            </a>
+          </div>
+          
+          <div style="background-color: #fff3cd; padding: 15px; border-radius: 8px; border-left: 4px solid #ffc107; margin-bottom: 20px;">
+            <p style="margin: 0; color: #856404;">
+              <strong>Security Note:</strong> This link will expire in 1 hour. If you didn't request this password reset, please ignore this email.
+            </p>
+          </div>
+          
+          <div style="background-color: #f8f9fa; padding: 15px; border-radius: 8px; margin-bottom: 20px;">
+            <p style="margin: 0; color: #666; font-size: 14px;">
+              <strong>Alternative:</strong> If the button doesn't work, copy and paste this link into your browser:
+            </p>
+            <p style="margin: 10px 0 0 0; word-break: break-all; font-family: monospace; background: white; padding: 10px; border-radius: 4px; border: 1px solid #dee2e6;">
+              ${resetUrl}
+            </p>
+          </div>
+          
+          <div style="margin-top: 30px; padding-top: 20px; border-top: 1px solid #eee; font-size: 14px; color: #666;">
+            <p>If you didn't create an account with Civic Issues, please ignore this email.</p>
+            <p>This is an automated message, please do not reply to this email.</p>
+            <p style="margin-top: 20px;">
+              <strong>Civic Issues Team</strong><br>
+              Making communities better, one report at a time.
+            </p>
+          </div>
+        </div>
       `
     };
 
     try {
       await this.transporter.sendMail(mailOptions);
-      console.log('Password reset email sent successfully');
+      console.log('✅ Password reset email sent successfully to:', email);
     } catch (error) {
-      console.error('Error sending password reset email:', error);
+      console.error('❌ Error sending password reset email:', error);
       throw error;
     }
   }
