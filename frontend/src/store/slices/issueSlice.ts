@@ -133,9 +133,11 @@ export interface IssueFilters {
 
 export interface IssueState {
   issues: Issue[];
+  mapIssues: Issue[]; // Issues for map display (all public issues)
   selectedIssue: Issue | null;
   totalIssues: number;
   loading: boolean;
+  mapLoading: boolean;
   error: string | null;
   validationErrors: Record<string, string> | null; // Field-specific validation errors
   filters: IssueFilters;
@@ -152,9 +154,11 @@ export interface IssueState {
 // Initial state
 const initialState: IssueState = {
   issues: [],
+  mapIssues: [],
   selectedIssue: null,
   totalIssues: 0,
   loading: false,
+  mapLoading: false,
   error: null,
   validationErrors: null,
   filters: {},
@@ -236,6 +240,26 @@ export const fetchMyIssues = createAsyncThunk(
     } catch (error: any) {
       console.log('❌ Frontend fetchMyIssues thunk - Error:', error);
       return rejectWithValue(error.message || 'Failed to fetch my issues');
+    }
+  }
+);
+
+export const fetchMapIssues = createAsyncThunk(
+  'issues/fetchMapIssues',
+  async (params: { status?: string; category?: string; priority?: string }, { rejectWithValue }) => {
+    try {
+      console.log('🚀 Frontend fetchMapIssues thunk - Called with params:', params);
+      const queryParams: any = {};
+      if (params.status) queryParams.status = params.status;
+      if (params.category) queryParams.category = params.category;
+      if (params.priority) queryParams.priority = params.priority;
+
+      const data = await issuesAPI.getMapIssues(queryParams);
+      console.log('✅ Frontend fetchMapIssues thunk - API returned:', data);
+      return data;
+    } catch (error: any) {
+      console.log('❌ Frontend fetchMapIssues thunk - Error:', error);
+      return rejectWithValue(error.message || 'Failed to fetch map issues');
     }
   }
 );
@@ -478,6 +502,32 @@ const issueSlice = createSlice({
       .addCase(fetchMyIssues.rejected, (state, action) => {
         console.log('❌ Frontend fetchMyIssues.rejected - Error:', action.payload);
         state.loading = false;
+        state.error = action.payload as string;
+      });
+
+    // Fetch map issues
+    builder
+      .addCase(fetchMapIssues.pending, (state) => {
+        state.mapLoading = true;
+        state.error = null;
+      })
+      .addCase(fetchMapIssues.fulfilled, (state, action) => {
+        console.log('✅ Frontend fetchMapIssues.fulfilled - Action payload:', action.payload);
+
+        state.mapLoading = false;
+        state.mapIssues = action.payload.issues.map((issue: any) => ({
+          ...issue,
+          _id: issue.id,
+          commentsCount: issue.comments?.length || 0,
+          upvotes: issue.voteScore || 0,
+        }));
+        state.error = null;
+
+        console.log('✅ Frontend fetchMapIssues.fulfilled - Updated state.mapIssues count:', state.mapIssues.length);
+      })
+      .addCase(fetchMapIssues.rejected, (state, action) => {
+        console.log('❌ Frontend fetchMapIssues.rejected - Error:', action.payload);
+        state.mapLoading = false;
         state.error = action.payload as string;
       });
 
@@ -788,9 +838,11 @@ export const {
 
 // Selectors
 export const selectIssues = (state: { issues: IssueState }) => state.issues.issues;
+export const selectMapIssues = (state: { issues: IssueState }) => state.issues.mapIssues;
 export const selectSelectedIssue = (state: { issues: IssueState }) => state.issues.selectedIssue;
 export const selectTotalIssues = (state: { issues: IssueState }) => state.issues.totalIssues;
 export const selectIssuesLoading = (state: { issues: IssueState }) => state.issues.loading;
+export const selectMapIssuesLoading = (state: { issues: IssueState }) => state.issues.mapLoading;
 export const selectIssuesError = (state: { issues: IssueState }) => state.issues.error;
 export const selectIssuesValidationErrors = (state: { issues: IssueState }) => state.issues.validationErrors;
 export const selectIssuesPagination = (state: { issues: IssueState }) => state.issues.pagination;

@@ -305,6 +305,12 @@ export const issuesAPI = {
     return apiService.get('/issues/my', params);
   },
 
+  getMapIssues: (params?: any) => {
+    console.log('📡 Frontend API: getMapIssues called with params:', params);
+    console.log('📡 Frontend API: Making request to /issues/map');
+    return apiService.get('/issues/map', params);
+  },
+
   getIssueById: (issueId: string) =>
     apiService.get(`/issues/${issueId}`),
 

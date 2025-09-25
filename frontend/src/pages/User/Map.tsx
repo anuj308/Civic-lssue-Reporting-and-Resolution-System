@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useCallback, useRef } from "react";
+import React, { useEffect, useState, useCallback, useRef, useMemo } from "react";
 import {
   Box,
   Card,
@@ -10,12 +10,37 @@ import {
   CircularProgress,
   Alert,
   Button,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
+  List,
+  ListItem,
+  ListItemText,
+  ListItemAvatar,
+  Avatar,
+  IconButton,
+  MenuItem,
+  FormControl,
+  InputLabel,
+  Select,
+  SelectChangeEvent,
+  Divider,
+  Stack,
 } from "@mui/material";
 import {
   LocationOn,
   FilterList,
   MyLocation,
   Refresh,
+  Close,
+  ZoomIn,
+  Add,
+  Visibility,
+  ThumbUp,
+  AccessTime,
+  Category,
+  PriorityHigh,
 } from "@mui/icons-material";
 import { useSelector, useDispatch } from "react-redux";
 import { useNavigate } from "react-router-dom";
@@ -27,13 +52,23 @@ import {
 
 import { selectUser, selectIsAuthenticated, selectAuthLoading } from "../../store/slices/authSlice";
 import {
-  selectIssues,
-  selectIssuesLoading,
+  selectMapIssues,
+  selectMapIssuesLoading,
   selectIssuesError,
-  fetchMyIssues,
+  fetchMapIssues,
   Issue,
 } from "../../store/slices/issueSlice";
 import { setBreadcrumbs } from "../../store/slices/uiSlice";
+import {
+  transformIssueForMap,
+  createIssueClusters,
+  IssueCluster,
+  MapIssue,
+  getPriorityColor,
+  getStatusColor,
+  formatDate,
+  createMarkerIcon,
+} from "../../utils/mapUtils";
 
 const containerStyle = {
   width: "100%",
@@ -42,18 +77,15 @@ const containerStyle = {
 
 const defaultCenter = {
   lat: 40.7128,
-  lng: -74.006, // Default to New York City+
+  lng: -74.006, // Default to New York City
 };
 
 const Map: React.FC = () => {
   const dispatch = useDispatch();
   const navigate = useNavigate();
-  const user = useSelector(selectUser);
-  const issues = useSelector(selectIssues);
-  const isLoading = useSelector(selectIssuesLoading);
+  const mapIssues = useSelector(selectMapIssues);
+  const isLoading = useSelector(selectMapIssuesLoading);
   const error = useSelector(selectIssuesError);
-  const isAuthenticated = useSelector(selectIsAuthenticated);
-  const authLoading = useSelector(selectAuthLoading);
 
   const [mapCenter, setMapCenter] = useState(defaultCenter);
   const [userLocation, setUserLocation] = useState<{
@@ -65,8 +97,9 @@ const Map: React.FC = () => {
     category: "",
     priority: "",
   });
-  const hasFetchedRef = useRef(false);
-  const lastFiltersRef = useRef<string>("");
+  const [selectedCluster, setSelectedCluster] = useState<IssueCluster | null>(null);
+  const [showFilters, setShowFilters] = useState(false);
+  const mapRef = useRef<google.maps.Map | null>(null);
 
   const { isLoaded, loadError } = useLoadScript({
     googleMapsApiKey: import.meta.env.VITE_GOOGLE_MAPS_API_KEY || "",
@@ -81,44 +114,14 @@ const Map: React.FC = () => {
     );
   }, [dispatch]);
 
-  // Memoize the fetch function to prevent unnecessary re-renders
-  const fetchIssuesData = useCallback(() => {
-    // Only fetch if user is authenticated, user object exists, not loading auth
-    if (!isAuthenticated || !user || authLoading) {
-      console.log('🚫 Map: Skipping fetch - Auth status:', { isAuthenticated, hasUser: !!user, authLoading });
-      return;
-    }
-
-    // Create a filter key to check if filters changed
-    const filterKey = `${filters.status}-${filters.category}-${filters.priority}`;
-    
-    // Only fetch if filters changed or we haven't fetched yet
-    if (hasFetchedRef.current && lastFiltersRef.current === filterKey) {
-      console.log('🚫 Map: Skipping fetch - already fetched with same filters');
-      return;
-    }
-    
-    console.log('📡 Map: Fetching user issues with filters:', filters);
-    lastFiltersRef.current = filterKey;
-    hasFetchedRef.current = true;
-    
-    dispatch(
-      fetchMyIssues({
-        ...filters,
-      })
-    );
-  }, [dispatch, isAuthenticated, user, authLoading, filters.status, filters.category, filters.priority]);
-
+  // Fetch map issues on component mount and when filters change
   useEffect(() => {
-    // Only fetch issues when user is fully authenticated
-    if (isAuthenticated && user && !authLoading) {
-      console.log('🔄 Map: Triggering fetch - user authenticated and ready');
-      fetchIssuesData();
-    }
-  }, [isAuthenticated, user, authLoading, fetchIssuesData]); // Only depend on authentication and fetch function
+    console.log('🔄 Map: Fetching map issues with filters:', filters);
+    dispatch(fetchMapIssues(filters));
+  }, [dispatch, filters.status, filters.category, filters.priority]);
 
+  // Get user's current location
   useEffect(() => {
-    // Get user's current location
     if (navigator.geolocation) {
       navigator.geolocation.getCurrentPosition(
         (position) => {
@@ -133,108 +136,88 @@ const Map: React.FC = () => {
     }
   }, []);
 
-  const handleMarkerClick = (issue: Issue) => {
-    navigate(`/issue/${issue._id}`);
-  };
-
-  const handleCenterOnUser = () => {
-    if (userLocation) {
-      setMapCenter(userLocation);
+  // Transform issues and create clusters
+  const { mapIssuesData, clusters } = useMemo(() => {
+    console.log('🔄 Processing map issues:', mapIssues.length);
+    
+    if (mapIssues.length === 0) {
+      console.log('⚠️ No map issues to process');
+      return { mapIssuesData: [], clusters: [] };
     }
-  };
-
-  const handleRefresh = () => {
-    if (!isAuthenticated || !user) {
-      console.log('🚫 Map: Cannot refresh - user not authenticated');
-      return;
-    }
-    hasFetchedRef.current = false; // Reset ref to allow refetch
-    fetchIssuesData();
-  };
-
-  useEffect(() => {
-    // Reset fetch flag when filters change
-    hasFetchedRef.current = false;
-  }, [filters.status, filters.category, filters.priority]);
-
-  // Show loading state while checking authentication
-  if (authLoading || (!isAuthenticated && !user)) {
-    return (
-      <Box
-        display="flex"
-        flexDirection="column"
-        alignItems="center"
-        justifyContent="center"
-        minHeight="400px"
-        textAlign="center"
-      >
-        <CircularProgress size={40} />
-        <Typography variant="body1" sx={{ mt: 2 }}>
-          Verifying authentication...
-        </Typography>
-      </Box>
-    );
-  }
-
-  // Show authentication required if not authenticated
-  if (!isAuthenticated || !user) {
-    return (
-      <Box p={3}>
-        <Alert severity="error">
-          Authentication required. Please log in to view your issues on the map.
-        </Alert>
-      </Box>
-    );
-  }
-
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case "pending":
-        return "#ff9800";
-      case "acknowledged":
-        return "#2196f3";
-      case "in_progress":
-        return "#9c27b0";
-      case "resolved":
-        return "#4caf50";
-      default:
-        return "#757575";
-    }
-  };
-
-  const getPriorityColor = (priority: string) => {
-    switch (priority) {
-      case "low":
-        return "#4caf50";
-      case "medium":
-        return "#ff9800";
-      case "high":
-        return "#f44336";
-      case "critical":
-        return "#d32f2f";
-      default:
-        return "#757575";
-    }
-  };
-
-  const filteredIssues =
-    issues?.filter((issue: Issue) => {
-      if (!issue.location?.coordinates) return false;
+    
+    const mapIssuesData = mapIssues.map(transformIssueForMap);
+    console.log('🔧 Transformed issues:', mapIssuesData.length);
+    
+    // Apply filters
+    const filteredIssues = mapIssuesData.filter(issue => {
       if (filters.status && issue.status !== filters.status) return false;
       if (filters.category && issue.category !== filters.category) return false;
       if (filters.priority && issue.priority !== filters.priority) return false;
       return true;
-    }) || [];
+    });
 
-  if (error && error.includes('unauthorized')) {
-    return (
-      <Box p={3}>
-        <Alert severity="error">
-          Authentication required. Please log in to view your issues on the map.
-        </Alert>
-      </Box>
-    );
-  }
+    console.log('📊 Filtered issues for clustering:', filteredIssues.length);
+    
+    const clusters = createIssueClusters(filteredIssues);
+    console.log('🎯 Created clusters:', clusters.length);
+    
+    // Log first few clusters for debugging
+    clusters.slice(0, 3).forEach((cluster, index) => {
+      console.log(`Cluster ${index}:`, {
+        id: cluster.id,
+        coordinate: cluster.coordinate,
+        count: cluster.count,
+        issues: cluster.issues.map(i => ({ id: i.id, title: i.title, status: i.status }))
+      });
+    });
+    
+    return { mapIssuesData: filteredIssues, clusters };
+  }, [mapIssues, filters]);
+
+  const handleMarkerClick = (cluster: IssueCluster) => {
+    console.log('🗺️ Marker clicked:', cluster);
+    
+    if (cluster.count === 1) {
+      // Single issue - navigate to detail page
+      navigate(`/issue/${cluster.issues[0].id}`);
+    } else {
+      // Multiple issues - show cluster dialog
+      setSelectedCluster(cluster);
+    }
+  };
+
+  const handleIssueClick = (issue: MapIssue) => {
+    setSelectedCluster(null);
+    navigate(`/issue/${issue.id}`);
+  };
+
+  const handleCenterOnUser = () => {
+    if (userLocation && mapRef.current) {
+      setMapCenter(userLocation);
+      mapRef.current.panTo(userLocation);
+      mapRef.current.setZoom(15);
+    }
+  };
+
+  const handleRefresh = () => {
+    console.log('🔄 Map: Refreshing issues');
+    dispatch(fetchMapIssues(filters));
+  };
+
+  const handleFilterChange = (field: string) => (event: SelectChangeEvent<string>) => {
+    setFilters(prev => ({
+      ...prev,
+      [field]: event.target.value
+    }));
+  };
+
+  const handleZoomToCluster = (cluster: IssueCluster) => {
+    if (mapRef.current) {
+      mapRef.current.panTo(cluster.coordinate);
+      mapRef.current.setZoom(16);
+      setSelectedCluster(null);
+    }
+  };
 
   if (loadError) {
     return (
@@ -270,10 +253,10 @@ const Map: React.FC = () => {
       >
         <Box>
           <Typography variant="h4" gutterBottom>
-            Issue Map
+            Civic Issues Map
           </Typography>
           <Typography variant="body2" color="text.secondary">
-            View and explore issues reported in your area
+            View and explore public issues reported across the city
           </Typography>
         </Box>
 
@@ -288,119 +271,132 @@ const Map: React.FC = () => {
           </Button>
           <Button
             variant="outlined"
+            startIcon={<FilterList />}
+            onClick={() => setShowFilters(!showFilters)}
+          >
+            Filters
+          </Button>
+          <Button
+            variant="outlined"
             startIcon={<Refresh />}
             onClick={handleRefresh}
-            disabled={isLoading || !isAuthenticated}
+            disabled={isLoading}
           >
             Refresh
+          </Button>
+          <Button
+            variant="contained"
+            startIcon={<Add />}
+            onClick={() => navigate('/report-issue')}
+          >
+            Report Issue
           </Button>
         </Box>
       </Box>
 
       {/* Filters */}
-      <Card sx={{ mb: 3 }}>
-        <CardContent>
-          <Box display="flex" alignItems="center" gap={2} flexWrap="wrap">
-            <FilterList />
-            <Typography variant="h6">Filters</Typography>
+      {showFilters && (
+        <Card sx={{ mb: 3 }}>
+          <CardContent>
+            <Typography variant="h6" gutterBottom>
+              Filter Issues
+            </Typography>
+            <Grid container spacing={2}>
+              <Grid item xs={12} sm={4}>
+                <FormControl fullWidth size="small">
+                  <InputLabel>Status</InputLabel>
+                  <Select
+                    value={filters.status}
+                    label="Status"
+                    onChange={handleFilterChange('status')}
+                  >
+                    <MenuItem value="">All Status</MenuItem>
+                    <MenuItem value="pending">Pending</MenuItem>
+                    <MenuItem value="acknowledged">Acknowledged</MenuItem>
+                    <MenuItem value="in_progress">In Progress</MenuItem>
+                    <MenuItem value="resolved">Resolved</MenuItem>
+                  </Select>
+                </FormControl>
+              </Grid>
+              <Grid item xs={12} sm={4}>
+                <FormControl fullWidth size="small">
+                  <InputLabel>Category</InputLabel>
+                  <Select
+                    value={filters.category}
+                    label="Category"
+                    onChange={handleFilterChange('category')}
+                  >
+                    <MenuItem value="">All Categories</MenuItem>
+                    <MenuItem value="pothole">Pothole</MenuItem>
+                    <MenuItem value="streetlight">Streetlight</MenuItem>
+                    <MenuItem value="garbage">Garbage</MenuItem>
+                    <MenuItem value="water_supply">Water Supply</MenuItem>
+                    <MenuItem value="sewerage">Sewerage</MenuItem>
+                    <MenuItem value="traffic">Traffic</MenuItem>
+                    <MenuItem value="other">Other</MenuItem>
+                  </Select>
+                </FormControl>
+              </Grid>
+              <Grid item xs={12} sm={4}>
+                <FormControl fullWidth size="small">
+                  <InputLabel>Priority</InputLabel>
+                  <Select
+                    value={filters.priority}
+                    label="Priority"
+                    onChange={handleFilterChange('priority')}
+                  >
+                    <MenuItem value="">All Priorities</MenuItem>
+                    <MenuItem value="low">Low</MenuItem>
+                    <MenuItem value="medium">Medium</MenuItem>
+                    <MenuItem value="high">High</MenuItem>
+                    <MenuItem value="critical">Critical</MenuItem>
+                  </Select>
+                </FormControl>
+              </Grid>
+            </Grid>
+          </CardContent>
+        </Card>
+      )}
 
-            <Box display="flex" gap={2} flexWrap="wrap">
-              <Box>
-                <Typography variant="caption" display="block" gutterBottom>
-                  Status
-                </Typography>
-                <select
-                  value={filters.status}
-                  onChange={(e) =>
-                    setFilters((prev) => ({ ...prev, status: e.target.value }))
-                  }
-                  style={{
-                    padding: "8px 12px",
-                    border: "1px solid #ccc",
-                    borderRadius: "4px",
-                    minWidth: "120px",
-                  }}
-                >
-                  <option value="">All Status</option>
-                  <option value="pending">Pending</option>
-                  <option value="acknowledged">Acknowledged</option>
-                  <option value="in_progress">In Progress</option>
-                  <option value="resolved">Resolved</option>
-                </select>
-              </Box>
+      {/* Loading State */}
+      {isLoading && (
+        <Box display="flex" justifyContent="center" mb={2}>
+          <CircularProgress size={24} />
+          <Typography variant="body2" sx={{ ml: 1 }}>
+            Loading issues...
+          </Typography>
+        </Box>
+      )}
 
-              <Box>
-                <Typography variant="caption" display="block" gutterBottom>
-                  Category
-                </Typography>
-                <select
-                  value={filters.category}
-                  onChange={(e) =>
-                    setFilters((prev) => ({
-                      ...prev,
-                      category: e.target.value,
-                    }))
-                  }
-                  style={{
-                    padding: "8px 12px",
-                    border: "1px solid #ccc",
-                    borderRadius: "4px",
-                    minWidth: "120px",
-                  }}
-                >
-                  <option value="">All Categories</option>
-                  <option value="pothole">Pothole</option>
-                  <option value="streetlight">Streetlight</option>
-                  <option value="garbage">Garbage</option>
-                  <option value="water">Water</option>
-                  <option value="electricity">Electricity</option>
-                  <option value="other">Other</option>
-                </select>
-              </Box>
-
-              <Box>
-                <Typography variant="caption" display="block" gutterBottom>
-                  Priority
-                </Typography>
-                <select
-                  value={filters.priority}
-                  onChange={(e) =>
-                    setFilters((prev) => ({
-                      ...prev,
-                      priority: e.target.value,
-                    }))
-                  }
-                  style={{
-                    padding: "8px 12px",
-                    border: "1px solid #ccc",
-                    borderRadius: "4px",
-                    minWidth: "120px",
-                  }}
-                >
-                  <option value="">All Priorities</option>
-                  <option value="low">Low</option>
-                  <option value="medium">Medium</option>
-                  <option value="high">High</option>
-                  <option value="critical">Critical</option>
-                </select>
-              </Box>
-            </Box>
-          </Box>
-        </CardContent>
-      </Card>
+      {/* Error State */}
+      {error && (
+        <Alert severity="error" sx={{ mb: 2 }}>
+          {error}
+        </Alert>
+      )}
 
       {/* Map */}
-      <Card>
+      <Card sx={{ position: 'relative' }}>
         <CardContent sx={{ p: 0 }}>
           <GoogleMap
             mapContainerStyle={containerStyle}
             center={mapCenter}
             zoom={13}
+            onLoad={(map) => {
+              mapRef.current = map;
+            }}
             options={{
               zoomControl: true,
               streetViewControl: false,
-              mapTypeControl: false,
+              mapTypeControl: true,
               fullscreenControl: true,
+              styles: [
+                {
+                  featureType: "poi",
+                  elementType: "labels",
+                  stylers: [{ visibility: "off" }]
+                }
+              ]
             }}
           >
             {/* User Location Marker */}
@@ -408,39 +404,32 @@ const Map: React.FC = () => {
               <Marker
                 position={userLocation}
                 icon={{
-                  url:
-                    "data:image/svg+xml;charset=UTF-8," +
-                    encodeURIComponent(`
+                  url: `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(`
                     <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
                       <circle cx="12" cy="12" r="8" fill="#2196f3" stroke="white" stroke-width="2"/>
                       <circle cx="12" cy="12" r="3" fill="white"/>
                     </svg>
-                  `),
+                  `)}`,
                   scaledSize: new google.maps.Size(24, 24),
                 }}
                 title="Your Location"
               />
             )}
 
-            {/* Issue Markers */}
-            {filteredIssues.map((issue: Issue) => (
+            {/* Issue/Cluster Markers */}
+            {clusters.map((cluster) => (
               <Marker
-                key={issue._id}
-                position={{
-                  lat: issue.location.coordinates[1],
-                  lng: issue.location.coordinates[0],
-                }}
-                onClick={() => handleMarkerClick(issue)}
+                key={cluster.id}
+                position={cluster.coordinate}
+                onClick={() => handleMarkerClick(cluster)}
                 icon={{
-                  url: `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(`
-                    <svg width="32" height="32" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
-                      <path d="M16 2C11.6 2 8 5.6 8 10c0 8 8 18 8 18s8-10 8-18c0-4.4-3.6-8-8-8z" fill="${getStatusColor(issue.status)}"/>
-                      <circle cx="16" cy="10" r="4" fill="white"/>
-                      <text x="16" y="13" text-anchor="middle" fill="${getStatusColor(issue.status)}" font-size="8" font-weight="bold">${issue.priority.charAt(0).toUpperCase()}</text>
-                    </svg>
-                  `)}`,
-                  scaledSize: new google.maps.Size(32, 32),
+                  url: createMarkerIcon(cluster),
+                  scaledSize: new google.maps.Size(
+                    cluster.count > 1 ? 40 : 32,
+                    cluster.count > 1 ? 40 : 32
+                  ),
                 }}
+                title={cluster.count === 1 ? cluster.issues[0].title : `${cluster.count} issues`}
               />
             ))}
           </GoogleMap>
@@ -452,7 +441,7 @@ const Map: React.FC = () => {
         <Grid item xs={12} sm={6} md={3}>
           <Paper sx={{ p: 2, textAlign: "center" }}>
             <Typography variant="h4" color="primary">
-              {filteredIssues.length}
+              {mapIssuesData.length}
             </Typography>
             <Typography variant="body2" color="text.secondary">
               Total Issues
@@ -462,11 +451,7 @@ const Map: React.FC = () => {
         <Grid item xs={12} sm={6} md={3}>
           <Paper sx={{ p: 2, textAlign: "center" }}>
             <Typography variant="h4" color="warning.main">
-              {
-                filteredIssues.filter(
-                  (issue: Issue) => issue.status === "pending"
-                ).length
-              }
+              {mapIssuesData.filter(issue => issue.status === "pending").length}
             </Typography>
             <Typography variant="body2" color="text.secondary">
               Pending
@@ -476,11 +461,7 @@ const Map: React.FC = () => {
         <Grid item xs={12} sm={6} md={3}>
           <Paper sx={{ p: 2, textAlign: "center" }}>
             <Typography variant="h4" color="info.main">
-              {
-                filteredIssues.filter(
-                  (issue: Issue) => issue.status === "in_progress"
-                ).length
-              }
+              {mapIssuesData.filter(issue => issue.status === "in_progress").length}
             </Typography>
             <Typography variant="body2" color="text.secondary">
               In Progress
@@ -490,11 +471,7 @@ const Map: React.FC = () => {
         <Grid item xs={12} sm={6} md={3}>
           <Paper sx={{ p: 2, textAlign: "center" }}>
             <Typography variant="h4" color="success.main">
-              {
-                filteredIssues.filter(
-                  (issue: Issue) => issue.status === "resolved"
-                ).length
-              }
+              {mapIssuesData.filter(issue => issue.status === "resolved").length}
             </Typography>
             <Typography variant="body2" color="text.secondary">
               Resolved
@@ -502,6 +479,127 @@ const Map: React.FC = () => {
           </Paper>
         </Grid>
       </Grid>
+
+      {/* Cluster Details Dialog */}
+      <Dialog
+        open={selectedCluster !== null}
+        onClose={() => setSelectedCluster(null)}
+        maxWidth="md"
+        fullWidth
+      >
+        <DialogTitle>
+          <Box display="flex" justifyContent="space-between" alignItems="center">
+            <Typography variant="h6">
+              Issues at this location ({selectedCluster?.count})
+            </Typography>
+            <IconButton onClick={() => setSelectedCluster(null)}>
+              <Close />
+            </IconButton>
+          </Box>
+        </DialogTitle>
+        <DialogContent>
+          <List>
+            {selectedCluster?.issues.map((issue, index) => (
+              <React.Fragment key={issue.id}>
+                <ListItem
+                  button
+                  onClick={() => handleIssueClick(issue)}
+                  sx={{
+                    border: 1,
+                    borderColor: 'divider',
+                    borderRadius: 1,
+                    mb: 1,
+                    '&:hover': {
+                      backgroundColor: 'action.hover',
+                    },
+                  }}
+                >
+                  <ListItemAvatar>
+                    <Avatar sx={{ bgcolor: getStatusColor(issue.status) }}>
+                      {issue.priority.charAt(0).toUpperCase()}
+                    </Avatar>
+                  </ListItemAvatar>
+                  <ListItemText
+                    primary={
+                      <Box>
+                        <Typography variant="subtitle1" fontWeight="bold">
+                          {issue.title}
+                        </Typography>
+                        <Stack direction="row" spacing={1} mt={1}>
+                          <Chip
+                            size="small"
+                            label={issue.category}
+                            icon={<Category />}
+                            variant="outlined"
+                          />
+                          <Chip
+                            size="small"
+                            label={issue.status.replace('_', ' ').toUpperCase()}
+                            sx={{
+                              bgcolor: getStatusColor(issue.status) + '20',
+                              color: getStatusColor(issue.status),
+                            }}
+                          />
+                          <Chip
+                            size="small"
+                            label={issue.priority.toUpperCase()}
+                            icon={<PriorityHigh />}
+                            sx={{
+                              bgcolor: getPriorityColor(issue.priority) + '20',
+                              color: getPriorityColor(issue.priority),
+                            }}
+                          />
+                        </Stack>
+                      </Box>
+                    }
+                    secondary={
+                      <Box mt={1}>
+                        <Typography variant="body2" color="text.secondary">
+                          <LocationOn fontSize="small" sx={{ verticalAlign: 'middle', mr: 0.5 }} />
+                          {issue.location.address}
+                        </Typography>
+                        <Box display="flex" alignItems="center" gap={2} mt={0.5}>
+                          <Typography variant="caption" color="text.secondary">
+                            <AccessTime fontSize="small" sx={{ verticalAlign: 'middle', mr: 0.5 }} />
+                            {formatDate(issue.createdAt)}
+                          </Typography>
+                          <Typography variant="caption" color="text.secondary">
+                            <ThumbUp fontSize="small" sx={{ verticalAlign: 'middle', mr: 0.5 }} />
+                            {issue.voteScore || 0} votes
+                          </Typography>
+                          <Typography variant="caption" color="text.secondary">
+                            By: {issue.author}
+                          </Typography>
+                        </Box>
+                      </Box>
+                    }
+                  />
+                  <Box>
+                    <IconButton>
+                      <Visibility />
+                    </IconButton>
+                  </Box>
+                </ListItem>
+                {index < (selectedCluster?.issues.length || 0) - 1 && <Divider />}
+              </React.Fragment>
+            ))}
+          </List>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setSelectedCluster(null)}>
+            Close
+          </Button>
+          {selectedCluster && (
+            <Button
+              startIcon={<ZoomIn />}
+              onClick={() => handleZoomToCluster(selectedCluster)}
+              variant="contained"
+            >
+              Zoom to Area
+            </Button>
+          )}
+        </DialogActions>
+      </Dialog>
     </Box>
   );
 };
