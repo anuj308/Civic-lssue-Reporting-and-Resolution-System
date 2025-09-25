@@ -356,29 +356,32 @@ export const issuesAPI = {
 
 // Departments API
 export const departmentsAPI = {
-  getDepartments: () =>
-    apiService.get('/departments'),
+  getDepartments: (params?: { page?: number; limit?: number; isActive?: boolean; search?: string; category?: string }) =>
+    apiService.get('/departments', params),
 
-  getDepartmentById: (departmentId: string) =>
-    apiService.get(`/departments/${departmentId}`),
+  getById: (id: string) =>
+    apiService.get(`/departments/${id}`),
 
-  createDepartment: (departmentData: any) =>
-    apiService.post('/departments', departmentData),
+  createDepartment: (data: {
+    name: string;
+    code: string;
+    contactEmail: string;
+    contactPhone?: string;
+    categories?: string[];
+    isActive?: boolean;
+  }) => apiService.post('/departments', data),
 
-  updateDepartment: (departmentId: string, departmentData: any) =>
-    apiService.put(`/departments/${departmentId}`, departmentData),
+  updateDepartment: (id: string, data: Partial<{
+    name: string;
+    code: string;
+    contactEmail: string;
+    contactPhone?: string;
+    categories?: string[];
+    isActive?: boolean;
+  }>) => apiService.put(`/departments/${id}`, data),
 
-  deleteDepartment: (departmentId: string) =>
-    apiService.delete(`/departments/${departmentId}`),
-
-  addStaff: (departmentId: string, userId: string) =>
-    apiService.post(`/departments/${departmentId}/staff`, { userId }),
-
-  removeStaff: (departmentId: string, userId: string) =>
-    apiService.delete(`/departments/${departmentId}/staff/${userId}`),
-
-  getStatistics: (departmentId: string) =>
-    apiService.get(`/departments/${departmentId}/statistics`),
+  deleteDepartment: (id: string) =>
+    apiService.delete(`/departments/${id}`),
 };
 
 // Analytics API
@@ -440,20 +443,16 @@ export const userApi = {
 
 // Admin API
 export const adminAPI = {
-  getSystemOverview: () =>
-    apiService.get('/admin/overview'),
+  signup: (data: { name: string; email: string; username?: string; password: string }) =>
+    apiService.post('/admin/signup', data),
 
-  getSystemLogs: (params?: any) =>
-    apiService.get('/admin/logs', params),
+  login: (data: { identifier: string; password: string }) =>
+    apiService.post('/admin/login', data),
 
-  updateSystemConfig: (config: any) =>
-    apiService.put('/admin/config', config),
+  me: () => apiService.get('/admin/me'),
 
-  generateReport: (params: { reportType: string; startDate?: string; endDate?: string; format?: string }) =>
-    apiService.get('/admin/reports', params),
-
-  performMaintenance: (operation: string) =>
-    apiService.post('/admin/maintenance', { operation }),
+  refresh: (data?: { refreshToken?: string }) =>
+    apiService.post('/admin/refresh', data),
 };
 
 export default api;
