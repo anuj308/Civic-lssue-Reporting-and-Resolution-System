@@ -1161,6 +1161,8 @@ function getStatusDisplay(status) {
  * @returns {Object} Department object or null
  */
 async function findDepartmentForCategory(category) {
+  if (!category) return null;
+  // Pick any active department that handles this category
   return Department.findOne({ isActive: true, categories: category }).select('_id').lean();
 }
 
