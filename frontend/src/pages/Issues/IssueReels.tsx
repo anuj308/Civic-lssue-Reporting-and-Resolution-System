@@ -54,7 +54,9 @@ import {
   setLoadMoreMode
 } from "../../store/slices/issueSlice";
 import { selectCurrentUser } from "../../store/slices/authSlice";
+import { setPageTitle, setBreadcrumbs } from "../../store/slices/uiSlice";
 import { IssueListItem } from "../../store/slices/issueSlice";
+import MapComponent from "../../components/Map/Map";
 
 interface Issue extends IssueListItem {
   media?: {
@@ -62,6 +64,9 @@ interface Issue extends IssueListItem {
     videos: string[];
     audio?: string;
   };
+  upvotesCount?: number;
+  downvotesCount?: number;
+  commentsCount?: number;
 }
 
 const IssueReels: React.FC = () => {
@@ -75,10 +80,23 @@ const IssueReels: React.FC = () => {
   const loading = useSelector(selectIssuesLoading);
   const error = useSelector(selectIssuesError);
 
+  // Deduplicate issues by ID to prevent duplicate keys warning
+  const uniqueIssues = React.useMemo(() => {
+    const seen = new Set();
+    return issues.filter(issue => {
+      if (seen.has(issue.id)) {
+        return false;
+      }
+      seen.add(issue.id);
+      return true;
+    });
+  }, [issues]);
+
   const [currentIndex, setCurrentIndex] = useState(0);
   const [playingVideos, setPlayingVideos] = useState<Set<string>>(new Set());
   const [mutedVideos, setMutedVideos] = useState<Set<string>>(new Set());
   const [filterOpen, setFilterOpen] = useState(false);
+  const [mapView, setMapView] = useState(false);
   const [filters, setFilters] = useState({
     category: '',
     radius: 1000, // Default 1km
@@ -110,11 +128,11 @@ const IssueReels: React.FC = () => {
   const loadIssues = useCallback(async (loadMore: boolean = false) => {
     try {
       let queryParams: any = {
-        page: loadMore ? Math.floor(issues.length / 10) + 1 : 1,
+        page: loadMore ? Math.floor(uniqueIssues.length / 10) + 1 : 1,
         limit: 10,
         sortBy: 'createdAt',
         order: 'desc',
-        fields: 'id,title,description,category,priority,status,statusDisplay,location,timeline,reportedBy,voteScore,userVote,daysSinceReported,tags,isPublic,createdAt' // Exclude media for performance
+        fields: 'id,title,description,category,priority,status,statusDisplay,location,timeline,reportedBy,voteScore,upvotesCount,downvotesCount,commentsCount,userVote,daysSinceReported,tags,isPublic,createdAt,media' // Include media for reels display
       };
 
       // Add location-based filtering if enabled
@@ -125,7 +143,7 @@ const IssueReels: React.FC = () => {
             latitude: filters.userLocation.lat,
             longitude: filters.userLocation.lng,
             radius: filters.radius,
-            page: loadMore ? Math.floor(issues.length / 10) + 1 : 1,
+            page: loadMore ? Math.floor(uniqueIssues.length / 10) + 1 : 1,
             limit: 10,
             fields: queryParams.fields
           })).unwrap();
@@ -144,12 +162,12 @@ const IssueReels: React.FC = () => {
       await dispatch(fetchIssues(queryParams)).unwrap();
 
       // Check if there are more issues to load
-      const totalLoaded = loadMore ? issues.length + 10 : 10;
+      const totalLoaded = loadMore ? uniqueIssues.length + 10 : 10;
       setHasMoreIssues(totalLoaded < 1000); // Assume max 1000 issues for now
     } catch (err) {
       console.error('Failed to load issues:', err);
     }
-  }, [dispatch, filters, issues.length]);
+  }, [dispatch, filters, uniqueIssues.length]);
 
   // Get user's current location
   const getCurrentLocation = () => {
@@ -214,6 +232,15 @@ const IssueReels: React.FC = () => {
     });
   };
 
+  // Scroll to specific reel
+  const scrollToReel = (direction: 'next' | 'prev') => {
+    if (direction === 'next' && currentIndex < uniqueIssues.length - 1) {
+      setCurrentIndex(prev => prev + 1);
+    } else if (direction === 'prev' && currentIndex > 0) {
+      setCurrentIndex(prev => prev - 1);
+    }
+  };
+
   // Handle voting
   const handleVote = async (issueId: string, voteType: 'upvote' | 'downvote') => {
     if (!currentUser) {
@@ -223,7 +250,7 @@ const IssueReels: React.FC = () => {
     }
 
     try {
-      const issue = issues.find(i => i.id === issueId);
+      const issue = uniqueIssues.find(i => i.id === issueId);
       if (!issue) return;
 
       if (issue.userVote === voteType) {
@@ -285,11 +312,11 @@ const IssueReels: React.FC = () => {
 
     window.addEventListener('keydown', handleKeyPress);
     return () => window.removeEventListener('keydown', handleKeyPress);
-  }, [currentIndex, issues.length]);
+  }, [currentIndex, uniqueIssues.length]);
 
   // Auto-play visible video
   useEffect(() => {
-    const currentIssue = issues[currentIndex];
+    const currentIssue = uniqueIssues[currentIndex];
     if (currentIssue && currentIssue.media?.videos && currentIssue.media.videos.length > 0) {
       const video = videoRefs.current.get(currentIssue.id);
       if (video && !playingVideos.has(currentIssue.id)) {
@@ -300,7 +327,7 @@ const IssueReels: React.FC = () => {
     }
 
     // Pause other videos
-    issues.forEach((issue, index) => {
+    uniqueIssues.forEach((issue, index) => {
       if (index !== currentIndex) {
         const video = videoRefs.current.get(issue.id);
         if (video && playingVideos.has(issue.id)) {
@@ -313,7 +340,7 @@ const IssueReels: React.FC = () => {
         }
       }
     });
-  }, [currentIndex, issues, playingVideos]);
+  }, [currentIndex, uniqueIssues, playingVideos]);
 
   const categories = [
     "pothole",
@@ -361,7 +388,7 @@ const IssueReels: React.FC = () => {
     other: "Other",
   };
 
-  if (loading && issues.length === 0) {
+  if (loading && uniqueIssues.length === 0) {
     return (
       <Box
         sx={{
@@ -383,7 +410,7 @@ const IssueReels: React.FC = () => {
         height: '100vh',
         overflow: 'hidden',
         position: 'relative',
-        bgcolor: 'black'
+        bgcolor: mapView ? 'white' : 'black'
       }}
     >
       {/* Header */}
@@ -394,7 +421,7 @@ const IssueReels: React.FC = () => {
           left: 0,
           right: 0,
           zIndex: 10,
-          bgcolor: 'rgba(0,0,0,0.7)',
+          bgcolor: mapView ? 'rgba(255,255,255,0.9)' : 'rgba(0,0,0,0.7)',
           backdropFilter: 'blur(10px)',
           px: 2,
           py: 1,
@@ -403,281 +430,310 @@ const IssueReels: React.FC = () => {
           justifyContent: 'space-between'
         }}
       >
-        <Typography variant="h6" sx={{ color: 'white', fontWeight: 'bold' }}>
-          Issue Reels
+        <Typography variant="h6" sx={{ color: mapView ? 'black' : 'white', fontWeight: 'bold' }}>
+          {mapView ? 'Issue Map' : 'Issue Reels'}
         </Typography>
-        <IconButton
-          onClick={() => setFilterOpen(true)}
-          sx={{ color: 'white' }}
-        >
-          <FilterList />
-        </IconButton>
+        <Box sx={{ display: 'flex', gap: 1 }}>
+          <IconButton
+            onClick={() => setMapView(!mapView)}
+            sx={{ color: mapView ? 'primary.main' : 'white' }}
+          >
+            <MyLocation />
+          </IconButton>
+          <IconButton
+            onClick={() => setFilterOpen(true)}
+            sx={{ color: mapView ? 'black' : 'white' }}
+          >
+            <FilterList />
+          </IconButton>
+        </Box>
       </Box>
 
-      {/* Reels Container */}
-      <Box
-        sx={{
-          height: '100%',
-          display: 'flex',
-          flexDirection: 'column',
-          position: 'relative'
-        }}
-      >
-        {issues.map((issue, index) => (
+      {mapView ? (
+        /* Map View */
+        <Box sx={{ height: '100%', pt: 8 }}>
+          <MapComponent
+            issues={uniqueIssues}
+            onIssueClick={(issue) => navigate(`/issues/${issue.id}`)}
+            userLocation={filters.userLocation}
+            showUserLocation={filters.locationEnabled}
+            height="calc(100vh - 64px)"
+          />
+        </Box>
+      ) : (
+        /* Reels View */
+        <>
+          {/* Reels Container */}
           <Box
-            key={issue.id}
             sx={{
-              flex: 1,
-              display: index === currentIndex ? 'flex' : 'none',
+              height: '100%',
+              display: 'flex',
               flexDirection: 'column',
-              position: 'relative',
-              bgcolor: 'black'
+              position: 'relative'
             }}
           >
-            {/* Media Content */}
-            <Box sx={{ flex: 1, position: 'relative' }}>
-              {issue.media?.videos && issue.media.videos.length > 0 ? (
-                <video
-                  ref={el => {
-                    if (el) videoRefs.current.set(issue.id, el);
-                  }}
-                  src={issue.media.videos[0]}
-                  style={{
-                    width: '100%',
-                    height: '100%',
-                    objectFit: 'cover'
-                  }}
-                  loop
-                  playsInline
-                  onPlay={() => setPlayingVideos(prev => new Set(prev).add(issue.id))}
-                  onPause={() => setPlayingVideos(prev => {
-                    const newSet = new Set(prev);
-                    newSet.delete(issue.id);
-                    return newSet;
-                  })}
-                />
-              ) : issue.media?.images && issue.media.images.length > 0 ? (
-                <Box
-                  component="img"
-                  src={issue.media.images[0]}
-                  sx={{
-                    width: '100%',
-                    height: '100%',
-                    objectFit: 'cover'
-                  }}
-                />
-              ) : (
-                <Box
-                  sx={{
-                    width: '100%',
-                    height: '100%',
-                    bgcolor: 'grey.900',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center'
-                  }}
-                >
-                  <Typography variant="h6" sx={{ color: 'white' }}>
-                    No Media
-                  </Typography>
-                </Box>
-              )}
+            {uniqueIssues.map((issue, index) => (
+              <Box
+                key={issue.id}
+                sx={{
+                  flex: 1,
+                  display: index === currentIndex ? 'flex' : 'none',
+                  flexDirection: 'column',
+                  position: 'relative',
+                  bgcolor: 'black'
+                }}
+              >
+                {/* Media Content */}
+                <Box sx={{ flex: 1, position: 'relative' }}>
+                  {issue.media?.videos && issue.media.videos.length > 0 ? (
+                    <video
+                      ref={el => {
+                        if (el) videoRefs.current.set(issue.id, el);
+                      }}
+                      src={issue.media.videos[0]}
+                      style={{
+                        width: '100%',
+                        height: '100%',
+                        objectFit: 'cover'
+                      }}
+                      loop
+                      playsInline
+                      onPlay={() => setPlayingVideos(prev => new Set(prev).add(issue.id))}
+                      onPause={() => setPlayingVideos(prev => {
+                        const newSet = new Set(prev);
+                        newSet.delete(issue.id);
+                        return newSet;
+                      })}
+                    />
+                  ) : issue.media?.images && issue.media.images.length > 0 ? (
+                    <Box
+                      component="img"
+                      src={issue.media.images[0]}
+                      sx={{
+                        width: '100%',
+                        height: '100%',
+                        objectFit: 'cover'
+                      }}
+                    />
+                  ) : (
+                    <Box
+                      sx={{
+                        width: '100%',
+                        height: '100%',
+                        bgcolor: 'grey.900',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center'
+                      }}
+                    >
+                      <Typography variant="h6" sx={{ color: 'white' }}>
+                        No Media
+                      </Typography>
+                    </Box>
+                  )}
 
-              {/* Video Controls */}
-              {issue.media?.videos && issue.media.videos.length > 0 && (
+                  {/* Video Controls */}
+                  {issue.media?.videos && issue.media.videos.length > 0 && (
+                    <Box
+                      sx={{
+                        position: 'absolute',
+                        bottom: 120,
+                        right: 16,
+                        display: 'flex',
+                        flexDirection: 'column',
+                        gap: 2
+                      }}
+                    >
+                      <IconButton
+                        onClick={() => toggleVideoPlayback(issue.id)}
+                        sx={{
+                          bgcolor: 'rgba(0,0,0,0.5)',
+                          color: 'white',
+                          '&:hover': { bgcolor: 'rgba(0,0,0,0.7)' }
+                        }}
+                      >
+                        {playingVideos.has(issue.id) ? <Pause /> : <PlayArrow />}
+                      </IconButton>
+                      <IconButton
+                        onClick={() => toggleVideoMute(issue.id)}
+                        sx={{
+                          bgcolor: 'rgba(0,0,0,0.5)',
+                          color: 'white',
+                          '&:hover': { bgcolor: 'rgba(0,0,0,0.7)' }
+                        }}
+                      >
+                        {mutedVideos.has(issue.id) ? <VolumeOff /> : <VolumeUp />}
+                      </IconButton>
+                    </Box>
+                  )}
+                </Box>
+
+                {/* Issue Info Overlay */}
                 <Box
                   sx={{
                     position: 'absolute',
-                    bottom: 120,
-                    right: 16,
-                    display: 'flex',
-                    flexDirection: 'column',
-                    gap: 2
+                    bottom: 0,
+                    left: 0,
+                    right: 0,
+                    bgcolor: 'linear-gradient(transparent, rgba(0,0,0,0.8))',
+                    p: 3,
+                    color: 'white'
                   }}
                 >
-                  <IconButton
-                    onClick={() => toggleVideoPlayback(issue.id)}
-                    sx={{
-                      bgcolor: 'rgba(0,0,0,0.5)',
-                      color: 'white',
-                      '&:hover': { bgcolor: 'rgba(0,0,0,0.7)' }
-                    }}
-                  >
-                    {playingVideos.has(issue.id) ? <Pause /> : <PlayArrow />}
-                  </IconButton>
-                  <IconButton
-                    onClick={() => toggleVideoMute(issue.id)}
-                    sx={{
-                      bgcolor: 'rgba(0,0,0,0.5)',
-                      color: 'white',
-                      '&:hover': { bgcolor: 'rgba(0,0,0,0.7)' }
-                    }}
-                  >
-                    {mutedVideos.has(issue.id) ? <VolumeOff /> : <VolumeUp />}
-                  </IconButton>
-                </Box>
-              )}
-            </Box>
+                  {/* User Info */}
+                  <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
+                    <Avatar sx={{ mr: 2, bgcolor: 'primary.main' }}>
+                      {issue.reportedBy?.name?.charAt(0)?.toUpperCase() || 'U'}
+                    </Avatar>
+                    <Box>
+                      <Typography variant="subtitle1" fontWeight="bold">
+                        {issue.reportedBy?.name || 'Anonymous'}
+                      </Typography>
+                      <Typography variant="caption" sx={{ opacity: 0.8 }}>
+                        {issue.daysSinceReported} days ago • {issue.location.city || 'Unknown location'}
+                      </Typography>
+                    </Box>
+                    <Box sx={{ ml: 'auto' }}>
+                      {issue.isPublic ? (
+                        <Public sx={{ fontSize: 16, opacity: 0.7 }} />
+                      ) : (
+                        <Lock sx={{ fontSize: 16, opacity: 0.7 }} />
+                      )}
+                    </Box>
+                  </Box>
 
-            {/* Issue Info Overlay */}
-            <Box
+                  {/* Issue Details */}
+                  <Typography variant="h6" fontWeight="bold" sx={{ mb: 1 }}>
+                    {issue.title}
+                  </Typography>
+                  <Typography variant="body2" sx={{ mb: 2, opacity: 0.9 }}>
+                    {issue.description.length > 150
+                      ? `${issue.description.substring(0, 150)}...`
+                      : issue.description
+                    }
+                  </Typography>
+
+                  {/* Category and Status */}
+                  <Box sx={{ display: 'flex', gap: 1, mb: 2 }}>
+                    <Chip
+                      label={categoryDisplayNames[issue.category] || issue.category}
+                      size="small"
+                      sx={{ bgcolor: 'primary.main', color: 'white' }}
+                    />
+                    <Chip
+                      label={issue.statusDisplay}
+                      size="small"
+                      variant="outlined"
+                      sx={{ borderColor: 'white', color: 'white' }}
+                    />
+                  </Box>
+
+                  {/* Action Buttons */}
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                    <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                      <IconButton
+                        onClick={() => handleVote(issue.id, 'upvote')}
+                        sx={{ color: issue.userVote === 'upvote' ? 'red' : 'white' }}
+                        disabled={!currentUser}
+                      >
+                        {issue.userVote === 'upvote' ? <Favorite /> : <FavoriteBorder />}
+                      </IconButton>
+                      <Typography variant="body2" sx={{ ml: 1 }}>
+                        {issue.upvotesCount || issue.voteScore || 0}
+                      </Typography>
+                    </Box>
+
+                    <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                      <IconButton
+                        onClick={() => navigate(`/issues/${issue.id}`)}
+                        sx={{ color: 'white' }}
+                      >
+                        <Comment />
+                      </IconButton>
+                      <Typography variant="body2" sx={{ ml: 1 }}>
+                        {issue.commentsCount || 0}
+                      </Typography>
+                    </Box>
+
+                    <IconButton
+                      onClick={() => handleShare(issue)}
+                      sx={{ color: 'white' }}
+                    >
+                      <Share />
+                    </IconButton>
+
+                    <Box sx={{ display: 'flex', alignItems: 'center', ml: 'auto' }}>
+                      <LocationOn sx={{ fontSize: 16, mr: 0.5 }} />
+                      <Typography variant="caption">
+                        {issue.location.city || 'Location'}
+                      </Typography>
+                    </Box>
+                  </Box>
+                </Box>
+              </Box>
+            ))}
+          </Box>
+
+          {/* Navigation Arrows */}
+          {currentIndex > 0 && (
+            <Fab
+              onClick={() => scrollToReel('prev')}
               sx={{
                 position: 'absolute',
-                bottom: 0,
-                left: 0,
-                right: 0,
-                bgcolor: 'linear-gradient(transparent, rgba(0,0,0,0.8))',
-                p: 3,
-                color: 'white'
+                top: '50%',
+                left: 16,
+                transform: 'translateY(-50%)',
+                bgcolor: 'rgba(0,0,0,0.5)',
+                color: 'white',
+                '&:hover': { bgcolor: 'rgba(0,0,0,0.7)' }
               }}
             >
-              {/* User Info */}
-              <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
-                <Avatar sx={{ mr: 2, bgcolor: 'primary.main' }}>
-                  {issue.reportedBy?.name?.charAt(0)?.toUpperCase() || 'U'}
-                </Avatar>
-                <Box>
-                  <Typography variant="subtitle1" fontWeight="bold">
-                    {issue.reportedBy?.name || 'Anonymous'}
-                  </Typography>
-                  <Typography variant="caption" sx={{ opacity: 0.8 }}>
-                    {issue.daysSinceReported} days ago • {issue.location.city || 'Unknown location'}
-                  </Typography>
-                </Box>
-                <Box sx={{ ml: 'auto' }}>
-                  {issue.isPublic ? (
-                    <Public sx={{ fontSize: 16, opacity: 0.7 }} />
-                  ) : (
-                    <Lock sx={{ fontSize: 16, opacity: 0.7 }} />
-                  )}
-                </Box>
-              </Box>
+              ↑
+            </Fab>
+          )}
 
-              {/* Issue Details */}
-              <Typography variant="h6" fontWeight="bold" sx={{ mb: 1 }}>
-                {issue.title}
-              </Typography>
-              <Typography variant="body2" sx={{ mb: 2, opacity: 0.9 }}>
-                {issue.description.length > 150
-                  ? `${issue.description.substring(0, 150)}...`
-                  : issue.description
-                }
-              </Typography>
+          {currentIndex < uniqueIssues.length - 1 && (
+            <Fab
+              onClick={() => scrollToReel('next')}
+              sx={{
+                position: 'absolute',
+                top: '50%',
+                right: 16,
+                transform: 'translateY(-50%)',
+                bgcolor: 'rgba(0,0,0,0.5)',
+                color: 'white',
+                '&:hover': { bgcolor: 'rgba(0,0,0,0.7)' }
+              }}
+            >
+              ↓
+            </Fab>
+          )}
 
-              {/* Category and Status */}
-              <Box sx={{ display: 'flex', gap: 1, mb: 2 }}>
-                <Chip
-                  label={categoryDisplayNames[issue.category] || issue.category}
-                  size="small"
-                  sx={{ bgcolor: 'primary.main', color: 'white' }}
-                />
-                <Chip
-                  label={issue.statusDisplay}
-                  size="small"
-                  variant="outlined"
-                  sx={{ borderColor: 'white', color: 'white' }}
-                />
-              </Box>
-
-              {/* Action Buttons */}
-              <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-                <Box sx={{ display: 'flex', alignItems: 'center' }}>
-                  <IconButton
-                    onClick={() => handleVote(issue.id, 'upvote')}
-                    sx={{ color: issue.userVote === 'upvote' ? 'red' : 'white' }}
-                    disabled={!currentUser}
-                  >
-                    {issue.userVote === 'upvote' ? <Favorite /> : <FavoriteBorder />}
-                  </IconButton>
-                  <Typography variant="body2" sx={{ ml: 1 }}>
-                    {issue.voteScore}
-                  </Typography>
-                </Box>
-
-                <IconButton
-                  onClick={() => navigate(`/issues/${issue.id}`)}
-                  sx={{ color: 'white' }}
-                >
-                  <Comment />
-                </IconButton>
-
-                <IconButton
-                  onClick={() => handleShare(issue)}
-                  sx={{ color: 'white' }}
-                >
-                  <Share />
-                </IconButton>
-
-                <Box sx={{ display: 'flex', alignItems: 'center', ml: 'auto' }}>
-                  <LocationOn sx={{ fontSize: 16, mr: 0.5 }} />
-                  <Typography variant="caption">
-                    {issue.location.city || 'Location'}
-                  </Typography>
-                </Box>
-              </Box>
-            </Box>
-          </Box>
-        ))}
-      </Box>
-
-      {/* Navigation Arrows */}
-      {currentIndex > 0 && (
-        <Fab
-          onClick={() => scrollToReel('prev')}
-          sx={{
-            position: 'absolute',
-            top: '50%',
-            left: 16,
-            transform: 'translateY(-50%)',
-            bgcolor: 'rgba(0,0,0,0.5)',
-            color: 'white',
-            '&:hover': { bgcolor: 'rgba(0,0,0,0.7)' }
-          }}
-        >
-          ↑
-        </Fab>
-      )}
-
-      {currentIndex < issues.length - 1 && (
-        <Fab
-          onClick={() => scrollToReel('next')}
-          sx={{
-            position: 'absolute',
-            top: '50%',
-            right: 16,
-            transform: 'translateY(-50%)',
-            bgcolor: 'rgba(0,0,0,0.5)',
-            color: 'white',
-            '&:hover': { bgcolor: 'rgba(0,0,0,0.7)' }
-          }}
-        >
-          ↓
-        </Fab>
-      )}
-
-      {/* Progress Indicators */}
-      <Box
-        sx={{
-          position: 'absolute',
-          top: 80,
-          left: 16,
-          right: 16,
-          display: 'flex',
-          gap: 1
-        }}
-      >
-        {issues.slice(0, 10).map((_, index) => (
+          {/* Progress Indicators */}
           <Box
-            key={index}
             sx={{
-              flex: 1,
-              height: 2,
-              bgcolor: index === currentIndex ? 'white' : 'rgba(255,255,255,0.3)',
-              borderRadius: 1
+              position: 'absolute',
+              top: 80,
+              left: 16,
+              right: 16,
+              display: 'flex',
+              gap: 1
             }}
-          />
-        ))}
-      </Box>
+          >
+            {uniqueIssues.slice(0, 10).map((_, index) => (
+              <Box
+                key={index}
+                sx={{
+                  flex: 1,
+                  height: 2,
+                  bgcolor: index === currentIndex ? 'white' : 'rgba(255,255,255,0.3)',
+                  borderRadius: 1
+                }}
+              />
+            ))}
+          </Box>
+        </>
+      )}
 
       {/* Filter Dialog */}
       <Dialog open={filterOpen} onClose={() => setFilterOpen(false)} maxWidth="sm" fullWidth>
@@ -783,8 +839,8 @@ const IssueReels: React.FC = () => {
         </Alert>
       )}
 
-      {/* Load More Button */}
-      {hasMoreIssues && issues.length >= 10 && (
+      {/* Load More Button - Only show in reels view */}
+      {!mapView && hasMoreIssues && uniqueIssues.length >= 10 && (
         <Fab
           onClick={handleLoadMore}
           sx={{
