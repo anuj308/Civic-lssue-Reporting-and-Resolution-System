@@ -1,9 +1,10 @@
-import React, { useState } from 'react';
-import { adminAPI, setAdminToken } from '../../services/api';
+import React, { useEffect, useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
+import { useAdminAuth } from '../../store/auth';
 
 const AdminLogin = () => {
   const navigate = useNavigate();
+  const { token, login, signup } = useAdminAuth() || {};
 
   const [mode, setMode] = useState('login'); // 'login' | 'register'
   const [loading, setLoading] = useState(false);
@@ -23,15 +24,16 @@ const AdminLogin = () => {
   const [showRegPwd, setShowRegPwd] = useState(false);
   const [showRegConfirm, setShowRegConfirm] = useState(false);
 
+  useEffect(() => {
+    if (token) navigate('/admin', { replace: true });
+  }, [token, navigate]);
+
   const onLogin = async (e) => {
     e.preventDefault();
     setLoading(true);
     setError('');
     try {
-      const res = await adminAPI.login({ identifier, password });
-      const token = res?.accessToken || res?.token;
-      if (!token) throw new Error('No access token returned');
-      setAdminToken(token);
+      await login({ identifier, password });
       navigate('/admin', { replace: true });
     } catch (err) {
       setError(err?.message || 'Login failed');
@@ -46,24 +48,8 @@ const AdminLogin = () => {
     setError('');
     try {
       if (regPassword !== confirm) throw new Error('Passwords do not match');
-      await adminAPI.signup({
-        name,
-        email: regEmail,
-        username: username || undefined,
-        password: regPassword,
-      });
-
-      // Auto-login after signup
-      const ident = username || regEmail;
-      const res = await adminAPI.login({ identifier: ident, password: regPassword });
-      const token = res?.accessToken || res?.token;
-      if (!token) {
-        setMode('login');
-        setIdentifier(ident);
-        setPassword('');
-        return;
-      }
-      setAdminToken(token);
+      await signup({ name, email: regEmail, username: username || undefined, password: regPassword });
+      await login({ identifier: username || regEmail, password: regPassword });
       navigate('/admin', { replace: true });
     } catch (err) {
       setError(err?.message || 'Registration failed');
@@ -146,12 +132,6 @@ const AdminLogin = () => {
                     required
                     autoComplete="current-password"
                   />
-                </div>
-                <div className="flex items-center justify-between text-sm">
-                  <div />
-                  <button type="button" className="text-indigo-600 hover:text-indigo-700">
-                    Forgot password?
-                  </button>
                 </div>
                 <button
                   type="submit"

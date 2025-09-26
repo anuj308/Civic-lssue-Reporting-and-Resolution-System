@@ -1,9 +1,11 @@
-import React, { useState } from 'react';
-import { departmentAuthAPI, setDeptToken } from '../../services/api';
+import React, { useEffect, useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
+import { useDeptAuth } from '../../store/auth';
 
 const DepartmentLogin = () => {
   const navigate = useNavigate();
+  const { token, login, register } = useDeptAuth() || {};
+
   const [mode, setMode] = useState('login'); // 'login' | 'register'
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -21,15 +23,16 @@ const DepartmentLogin = () => {
   const [showRegPwd, setShowRegPwd] = useState(false);
   const [showRegConfirm, setShowRegConfirm] = useState(false);
 
+  useEffect(() => {
+    if (token) navigate('/department', { replace: true });
+  }, [token, navigate]);
+
   const onLogin = async (e) => {
     e.preventDefault();
     setLoading(true);
     setError('');
     try {
-      const res = await departmentAuthAPI.login({ identifier, password });
-      const token = res?.accessToken || res?.token;
-      if (!token) throw new Error('No access token returned');
-      setDeptToken(token);
+      await login({ identifier, password });
       navigate('/department', { replace: true });
     } catch (err) {
       setError(err?.message || 'Login failed');
@@ -43,23 +46,9 @@ const DepartmentLogin = () => {
     setLoading(true);
     setError('');
     try {
-      if (!departmentAuthAPI.register) {
-        throw new Error('Department registration is not enabled on the server');
-      }
       if (regPassword !== confirm) throw new Error('Passwords do not match');
-
-      await departmentAuthAPI.register({ name, email, password: regPassword });
-
-      // Auto-login using email
-      const res = await departmentAuthAPI.login({ identifier: email, password: regPassword });
-      const token = res?.accessToken || res?.token;
-      if (!token) {
-        setMode('login');
-        setIdentifier(email);
-        setPassword('');
-        return;
-      }
-      setDeptToken(token);
+      await register({ name, email, password: regPassword });
+      await login({ identifier: email, password: regPassword });
       navigate('/department', { replace: true });
     } catch (err) {
       setError(err?.message || 'Registration failed');
@@ -142,12 +131,6 @@ const DepartmentLogin = () => {
                     required
                     autoComplete="current-password"
                   />
-                </div>
-                <div className="flex items-center justify-between text-sm">
-                  <div />
-                  <button type="button" className="text-indigo-600 hover:text-indigo-700">
-                    Forgot password?
-                  </button>
                 </div>
                 <button
                   type="submit"
