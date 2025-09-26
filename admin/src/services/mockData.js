@@ -392,150 +392,60 @@ export const mockDepartmentIssues = [
 ];
 
 export const mockStats = {
-    totalIssues: 156,
-    resolvedIssues: 89,
-    pendingIssues: 45,
-    inProgressIssues: 22,
-    departments: 12,
-    activeDepartments: 10,
-    totalUsers: 1250,
-    issuesByCategory: {
-        roads: 45,
-        water: 32,
-        electricity: 28,
-        sanitation: 25,
-        others: 26
+  issueBreakdown: {
+    thisMonth: {
+      total: 248,
+      resolved: 156,
+      pending: 62,
+      inProgress: 30,
+      highPriority: 45,
+      avgResolutionTime: '2.3 days',
+      satisfaction: 87
     },
-    recentActivity: [
-        {
-            type: 'status_change',
-            issueId: '1',
-            title: 'Pothole repair',
-            oldStatus: 'pending',
-            newStatus: 'in_progress',
-            timestamp: '2023-09-26T15:45:00Z'
-        },
-        {
-            type: 'new_issue',
-            issueId: '2',
-            title: 'Water leakage near Park Avenue',
-            timestamp: '2023-09-27T09:00:00Z'
-        },
-        {
-            type: 'status_change',
-            issueId: '3',
-            title: 'Streetlight not working at 5th Cross',
-            oldStatus: 'acknowledged',
-            newStatus: 'resolved',
-            timestamp: '2023-09-22T10:00:00Z'
-        },
-        {
-            type: 'new_issue',
-            issueId: '4',
-            title: 'Garbage not collected in Sector 7',
-            timestamp: '2023-09-28T07:30:00Z'
-        }
-    ],
-    trendingIssues: [
-        {
-            category: 'roads',
-            count: 15,
-            trend: 'up',
-            percentage: 23
-        },
-        {
-            category: 'water_supply',
-            count: 12,
-            trend: 'down',
-            percentage: 8
-        },
-        {
-            category: 'electricity',
-            count: 9,
-            trend: 'stable',
-            percentage: 0
-        }
-    ],
-    departmentPerformance: [
-        {
-            id: '1',
-            name: 'Public Works',
-            resolvedCount: 45,
-            averageResolutionTime: '2.5 days',
-            satisfactionRate: 92
-        },
-        {
-            id: '2',
-            name: 'Water Supply',
-            resolvedCount: 38,
-            averageResolutionTime: '1.8 days',
-            satisfactionRate: 88
-        }
-    ],
-    weeklyTrends: {
-        labels: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'],
-        reported: [12, 15, 8, 10, 14, 5, 7],
-        resolved: [10, 12, 7, 9, 11, 4, 6]
-    },
-    issueBreakdown: {
-      thisMonth: {
-        total: 248,
-        resolved: 156,
-        pending: 62,
-        inProgress: 30,
-        highPriority: 45,
-        avgResolutionTime: '2.3 days',
-        satisfaction: 87
-      },
-      trends: {
-        dailyReports: [12, 15, 18, 14, 22, 16, 19], // Last 7 days
-        resolutionTimes: [2.1, 1.8, 2.4, 2.0, 2.3], // Last 5 days avg
-        satisfaction: [85, 88, 86, 89, 87] // Last 5 days %
-      }
-    },
-    departmentInsights: [
-      {
-        id: '1',
-        name: 'Public Works',
-        stats: {
-          activeIssues: 45,
-          resolvedThisWeek: 28,
-          avgResponseTime: '1.2 hours',
-          avgResolutionTime: '2.1 days',
-          satisfaction: 92,
-          trend: 'up'
-        },
-        performance: {
-          efficiency: 94,
-          quality: 88,
-          responsiveness: 90
-        }
-      },
-      // ...more departments
-    ],
-    hotspots: [
-      {
-        area: 'Downtown',
-        issues: 45,
-        mostCommon: 'roads',
-        trend: 'up',
-        coordinates: [73.856743, 18.520430]
-      }
-      // ...more hotspots
-    ],
-    citizenEngagement: {
-      totalUsers: 12500,
-      activeUsers: 3200,
-      newUsersThisMonth: 450,
-      reportingRate: 78, // % of active users who reported issues
-      topContributors: [
-        {
-          id: 'user1',
-          name: 'John Doe',
-          reportsSubmitted: 12,
-          upvotes: 156
-        }
-        // ...more users
-      ]
+    trends: {
+      resolutionTimes: [2.1, 1.8, 2.4, 2.0, 2.3]
     }
+  },
+  departmentInsights: [
+    {
+      id: '1',
+      name: 'Public Works',
+      stats: {
+        activeIssues: 45,
+        resolvedThisWeek: 28,
+        avgResponseTime: '1.2 hours',
+        avgResolutionTime: '2.1 days',
+        satisfaction: 92,
+        trend: 'up'
+      },
+      performance: {
+        efficiency: 94,
+        quality: 88,
+        responsiveness: 90
+      }
+    },
+    {
+      id: '2',
+      name: 'Water Supply',
+      stats: {
+        activeIssues: 32,
+        resolvedThisWeek: 18,
+        avgResponseTime: '1.5 hours',
+        avgResolutionTime: '2.5 days',
+        satisfaction: 88,
+        trend: 'down'
+      },
+      performance: {
+        efficiency: 86,
+        quality: 82,
+        responsiveness: 85
+      }
+    }
+  ],
+  resolvedIssues: 156,
+  resolvedIssuesChange: 12,
+  inProgressIssues: 30,
+  inProgressIssuesChange: -5,
+  pendingIssues: 62,
+  pendingIssuesChange: 8
 };

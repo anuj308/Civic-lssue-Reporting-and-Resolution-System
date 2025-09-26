@@ -1,17 +1,45 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import { Link } from 'react-router-dom';
 import { adminAPI } from '../../services/api';
 import { mockDepartments, mockIssues, mockStats } from '../../services/mockData';
 import { Line, Bar } from 'react-chartjs-2';
 import { FiTrendingUp, FiTrendingDown, FiAlertTriangle, FiCheckCircle } from 'react-icons/fi';
+import {
+  Chart as ChartJS,
+  CategoryScale,
+  LinearScale,
+  PointElement,
+  LineElement,
+  BarElement,
+  Title,
+  Tooltip,
+  Legend
+} from 'chart.js';
+
+// Register ChartJS components
+ChartJS.register(
+  CategoryScale,
+  LinearScale,
+  PointElement,
+  LineElement,
+  BarElement,
+  Title,
+  Tooltip,
+  Legend
+);
 
 const AdminDashboard = () => {
-  const [departments, setDepartments] = useState([]);
-  const [issues, setIssues] = useState([]);
-  const [stats, setStats] = useState(null);
+  // Initialize with proper structure matching mockStats
+  const [stats, setStats] = useState(mockStats); // Use mockStats as initial state
+  const [departments, setDepartments] = useState(mockDepartments);
+  const [issues, setIssues] = useState(mockIssues);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
-  const [usingMockData, setUsingMockData] = useState(false);
+  const [usingMockData, setUsingMockData] = useState(true);
+
+  // Add refs for charts
+  const resolutionTimeChartRef = useRef(null);
+  const departmentPerformanceChartRef = useRef(null);
 
   useEffect(() => {
     const fetchDashboardData = async () => {
@@ -19,27 +47,15 @@ const AdminDashboard = () => {
         setLoading(true);
         setError('');
 
-        // Fetch all data in parallel
-        const [issuesResponse, departmentsResponse, statsResponse] = await Promise.all([
-          // adminAPI.listIssues({ limit: 10, sort: '-createdAt' }),
-          // adminAPI.listDepartments({ isActive: true }),
-          // adminAPI.getStats()
-        ]);
-
-        setIssues(issuesResponse);
-        setDepartments(departmentsResponse);
-        setStats(statsResponse);
-        setUsingMockData(false);
-
-      } catch (err) {
-        console.warn('Failed to fetch data from backend, using mock data:', err);
-        setError('Using demo data - Backend not available');
-        
-        // Fallback to mock data
+        // For now, just use mock data
         setIssues(mockIssues);
         setDepartments(mockDepartments);
         setStats(mockStats);
         setUsingMockData(true);
+
+      } catch (err) {
+        console.warn('Failed to fetch data from backend:', err);
+        setError('Using demo data - Backend not available');
       } finally {
         setLoading(false);
       }
@@ -65,6 +81,142 @@ const AdminDashboard = () => {
       </div>
     </div>
   );
+
+  // Add safe checks for department insights rendering
+  const renderDepartmentInsights = () => {
+    if (!stats?.departmentInsights?.length) {
+      return (
+        <div className="col-span-full text-center py-8 text-slate-400">
+          No department insights available
+        </div>
+      );
+    }
+
+    return stats.departmentInsights.map(dept => (
+      <div key={dept.id} className="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
+        <div className="flex items-center justify-between mb-4">
+          <h3 className="font-semibold">{dept.name}</h3>
+          <span className={`px-2 py-1 text-xs rounded-full ${
+            dept?.stats?.trend === 'up' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
+          }`}>
+            {dept?.stats?.trend === 'up' ? '↑' : '↓'} Performance
+          </span>
+        </div>
+        <div className="space-y-3">
+          <div className="flex justify-between text-sm">
+            <span className="text-slate-600">Active Issues</span>
+            <span className="font-medium">{dept?.stats?.activeIssues || 0}</span>
+          </div>
+          <div className="flex justify-between text-sm">
+            <span className="text-slate-600">Avg Response</span>
+            <span className="font-medium">{dept?.stats?.avgResponseTime || 'N/A'}</span>
+          </div>
+          <div className="flex justify-between text-sm">
+            <span className="text-slate-600">Satisfaction</span>
+            <span className="font-medium">{dept?.stats?.satisfaction || 0}%</span>
+          </div>
+          <div className="pt-3">
+            <div className="flex justify-between text-xs text-slate-600 mb-1">
+              <span>Efficiency Score</span>
+              <span>{dept?.performance?.efficiency || 0}%</span>
+            </div>
+            <div className="h-1.5 bg-slate-100 rounded-full overflow-hidden">
+              <div 
+                className="h-full bg-indigo-600 rounded-full"
+                style={{ width: `${dept?.performance?.efficiency || 0}%` }}
+              />
+            </div>
+          </div>
+        </div>
+      </div>
+    ));
+  };
+
+  // Modify the renderCharts function
+  const renderCharts = () => {
+    const hasResolutionTimes = stats?.issueBreakdown?.trends?.resolutionTimes?.length > 0;
+    const hasDepartmentInsights = stats?.departmentInsights?.length > 0;
+
+    const chartOptions = {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: {
+        legend: {
+          position: 'bottom'
+        }
+      }
+    };
+
+    return (
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">
+        {/* Resolution Time Trends */}
+        <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
+          <h3 className="text-lg font-semibold mb-4">Resolution Time Trends</h3>
+          <div className="h-[300px]"> {/* Fixed height container */}
+            {hasResolutionTimes ? (
+              <Line
+                ref={resolutionTimeChartRef}
+                id="resolution-time-chart" // Add unique ID
+                data={{
+                  labels: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri'],
+                  datasets: [{
+                    label: 'Avg. Resolution Time (days)',
+                    data: stats.issueBreakdown.trends.resolutionTimes,
+                    borderColor: '#6366f1',
+                    tension: 0.4
+                  }]
+                }}
+                options={chartOptions}
+              />
+            ) : (
+              <div className="flex items-center justify-center h-full text-slate-400">
+                No trend data available
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Department Performance */}
+        <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
+          <h3 className="text-lg font-semibold mb-4">Department Performance</h3>
+          <div className="h-[300px]"> {/* Fixed height container */}
+            {hasDepartmentInsights ? (
+              <Bar
+                ref={departmentPerformanceChartRef}
+                id="department-performance-chart" // Add unique ID
+                data={{
+                  labels: stats.departmentInsights.map(d => d.name),
+                  datasets: [{
+                    label: 'Efficiency Score',
+                    data: stats.departmentInsights.map(d => d.performance.efficiency),
+                    backgroundColor: '#6366f1'
+                  }]
+                }}
+                options={chartOptions}
+              />
+            ) : (
+              <div className="flex items-center justify-center h-full text-slate-400">
+                No department data available
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+    );
+  };
+
+  // Add cleanup effect for charts
+  useEffect(() => {
+    return () => {
+      // Cleanup charts on component unmount
+      if (resolutionTimeChartRef.current) {
+        resolutionTimeChartRef.current.destroy();
+      }
+      if (departmentPerformanceChartRef.current) {
+        departmentPerformanceChartRef.current.destroy();
+      }
+    };
+  }, []);
 
   if (loading) {
     return (
@@ -118,7 +270,7 @@ const AdminDashboard = () => {
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
           {renderTrendCard(
             'Total Active Issues',
-            stats?.issueBreakdown.thisMonth.total || 0,
+            stats?.issueBreakdown?.thisMonth?.total || 0,
             8,
             <FiAlertTriangle className="w-6 h-6 text-amber-500" />
           )}
@@ -143,81 +295,11 @@ const AdminDashboard = () => {
         </div>
 
         {/* Charts Section */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">
-          {/* Resolution Time Trends */}
-          <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
-            <h3 className="text-lg font-semibold mb-4">Resolution Time Trends</h3>
-            <Line
-              data={{
-                labels: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri'],
-                datasets: [{
-                  label: 'Avg. Resolution Time (days)',
-                  data: stats?.issueBreakdown.trends.resolutionTimes || [],
-                  borderColor: '#6366f1',
-                  tension: 0.4
-                }]
-              }}
-              options={{ responsive: true }}
-            />
-          </div>
-
-          {/* Department Performance */}
-          <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
-            <h3 className="text-lg font-semibold mb-4">Department Performance</h3>
-            <Bar
-              data={{
-                labels: stats?.departmentInsights.map(d => d.name) || [],
-                datasets: [{
-                  label: 'Efficiency Score',
-                  data: stats?.departmentInsights.map(d => d.performance.efficiency) || [],
-                  backgroundColor: '#6366f1'
-                }]
-              }}
-              options={{ responsive: true }}
-            />
-          </div>
-        </div>
+        {renderCharts()}
 
         {/* Department Cards */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
-          {(stats?.departmentInsights || []).map(dept => (
-            <div key={dept.id} className="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
-              <div className="flex items-center justify-between mb-4">
-                <h3 className="font-semibold">{dept.name}</h3>
-                <span className={`px-2 py-1 text-xs rounded-full ${
-                  dept?.stats?.trend === 'up' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
-                }`}>
-                  {dept?.stats?.trend === 'up' ? '↑' : '↓'} Performance
-                </span>
-              </div>
-              <div className="space-y-3">
-                <div className="flex justify-between text-sm">
-                  <span className="text-slate-600">Active Issues</span>
-                  <span className="font-medium">{dept?.stats?.activeIssues || 0}</span>
-                </div>
-                <div className="flex justify-between text-sm">
-                  <span className="text-slate-600">Avg Response</span>
-                  <span className="font-medium">{dept?.stats?.avgResponseTime || 'N/A'}</span>
-                </div>
-                <div className="flex justify-between text-sm">
-                  <span className="text-slate-600">Satisfaction</span>
-                  <span className="font-medium">{dept?.stats?.satisfaction || 0}%</span>
-                </div>
-                <div className="pt-3">
-                  <div className="flex justify-between text-xs text-slate-600 mb-1">
-                    <span>Efficiency Score</span>
-                    <span>{dept?.performance?.efficiency || 0}%</span>
-                  </div>
-                  <div className="h-1.5 bg-slate-100 rounded-full overflow-hidden">
-                    <div 
-                      className="h-full bg-indigo-600 rounded-full"
-                      style={{ width: `${dept?.performance?.efficiency || 0}%` }}
-                    />
-                  </div>
-                </div>
-              </div>
-            </div>
-          ))}
+          {renderDepartmentInsights()}
         </div>
 
         {/* Latest Issues Table */}
