@@ -13,10 +13,11 @@ import './App.css'
 const App = () => {
   return (
     <div>
-      <nav style={{ padding: 12, borderBottom: '1px solid #eee' }}>
-        <Link to="/admin/login" style={{ marginRight: 12 }}>Admin</Link>
+      <nav style={{ padding: 12, borderBottom: '1px solid #eee', display: 'flex', gap: 12 }}>
+        <Link to="/admin/login">Admin</Link>
         <Link to="/department/login">Department</Link>
       </nav>
+
       <Routes>
         <Route path="/" element={<Navigate to="/admin/login" replace />} />
 
@@ -46,4 +47,4 @@ const App = () => {
   );
 };
 
-export default App
+export default App;

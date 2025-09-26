@@ -20,28 +20,38 @@ export const clearDeptToken = () => localStorage.removeItem(DEPT_TOKEN_KEY);
 
 // Core request
 async function request(path, { method = 'GET', body, headers = {}, token } = {}) {
-  const res = await fetch(`${BASE_URL}${path}`, {
-    method,
-    headers: {
-      'Content-Type': body instanceof FormData ? undefined : 'application/json',
-      ...(token ? { Authorization: `Bearer ${token}` } : {}),
-      ...headers,
-    },
-    body: body
-      ? body instanceof FormData
-        ? body
-        : JSON.stringify(body)
-      : undefined,
-  });
+  const url = `${BASE_URL}${path}`;
+
+  const finalHeaders = {
+    ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    ...headers,
+  };
+  if (!(body instanceof FormData)) {
+    finalHeaders['Content-Type'] = 'application/json';
+  }
+
+  let res;
+  try {
+    res = await fetch(url, {
+      method,
+      headers: finalHeaders,
+      body: body
+        ? body instanceof FormData
+          ? body
+          : JSON.stringify(body)
+        : undefined,
+    });
+  } catch (networkErr) {
+    throw new Error(`Network error: ${networkErr?.message || 'failed to fetch'}`);
+  }
 
   const isJSON = res.headers.get('content-type')?.includes('application/json');
   const data = isJSON ? await res.json().catch(() => null) : await res.text();
 
   if (!res.ok) {
     const msg = (isJSON && (data?.message || data?.error)) || res.statusText || 'Request failed';
-    throw new Error(msg);
+    throw new Error(`${res.status} ${msg}`);
   }
-  // Most of your backend responses are { success, data }, so unwrap if present
   return data?.data !== undefined ? data.data : data;
 }
 
