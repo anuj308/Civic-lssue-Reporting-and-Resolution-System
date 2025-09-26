@@ -5,6 +5,7 @@ const BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000/api
 // Optional overrides for department auth endpoints
 const DEPT_LOGIN_PATH = import.meta.env.VITE_DEPT_LOGIN_PATH || '/auth/login';
 const DEPT_ME_PATH = import.meta.env.VITE_DEPT_ME_PATH || '/auth/me';
+const DEPT_REGISTER_PATH = import.meta.env.VITE_DEPT_REGISTER_PATH || '/auth/register'; // add
 
 const ADMIN_TOKEN_KEY = 'admin_access_token';
 const DEPT_TOKEN_KEY = 'department_access_token';
@@ -75,6 +76,7 @@ export const adminAPI = {
 export const departmentAuthAPI = {
   login: (payload) => request(DEPT_LOGIN_PATH, { method: 'POST', body: payload }),
   me: () => request(DEPT_ME_PATH, { token: getDeptToken() }),
+  register: (payload) => request(DEPT_REGISTER_PATH, { method: 'POST', body: payload }), // add
 };
 
 // Department portal APIs (authorized as department user)

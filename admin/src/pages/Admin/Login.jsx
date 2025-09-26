@@ -12,6 +12,7 @@ const AdminLogin = () => {
   // Login fields
   const [identifier, setIdentifier] = useState('');
   const [password, setPassword] = useState('');
+  const [showPwd, setShowPwd] = useState(false);
 
   // Register fields
   const [name, setName] = useState('');
@@ -19,6 +20,8 @@ const AdminLogin = () => {
   const [username, setUsername] = useState('');
   const [regPassword, setRegPassword] = useState('');
   const [confirm, setConfirm] = useState('');
+  const [showRegPwd, setShowRegPwd] = useState(false);
+  const [showRegConfirm, setShowRegConfirm] = useState(false);
 
   const onLogin = async (e) => {
     e.preventDefault();
@@ -42,9 +45,7 @@ const AdminLogin = () => {
     setLoading(true);
     setError('');
     try {
-      if (regPassword !== confirm) {
-        throw new Error('Passwords do not match');
-      }
+      if (regPassword !== confirm) throw new Error('Passwords do not match');
       await adminAPI.signup({
         name,
         email: regEmail,
@@ -52,12 +53,11 @@ const AdminLogin = () => {
         password: regPassword,
       });
 
-      // Auto-login after successful signup
+      // Auto-login after signup
       const ident = username || regEmail;
       const res = await adminAPI.login({ identifier: ident, password: regPassword });
       const token = res?.accessToken || res?.token;
       if (!token) {
-        // Fallback: switch to login with prefilled identifier
         setMode('login');
         setIdentifier(ident);
         setPassword('');
@@ -80,7 +80,7 @@ const AdminLogin = () => {
           <p className="text-slate-600 text-sm mt-1">Sign in to manage departments and issues</p>
         </div>
 
-        <div className="rounded-xl border border-slate-200 bg-white shadow-lg">
+        <div className="rounded-xl border border-slate-200 bg-white shadow-lg overflow-hidden">
           <div className="flex">
             <button
               type="button"
@@ -127,9 +127,18 @@ const AdminLogin = () => {
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-slate-700">Password</label>
+                  <div className="flex items-center justify-between">
+                    <label className="block text-sm font-medium text-slate-700">Password</label>
+                    <button
+                      type="button"
+                      className="text-xs text-slate-500 hover:text-slate-700"
+                      onClick={() => setShowPwd((s) => !s)}
+                    >
+                      {showPwd ? 'Hide' : 'Show'}
+                    </button>
+                  </div>
                   <input
-                    type="password"
+                    type={showPwd ? 'text' : 'password'}
                     className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-slate-900 placeholder-slate-400 focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500"
                     placeholder="••••••••"
                     value={password}
@@ -137,6 +146,12 @@ const AdminLogin = () => {
                     required
                     autoComplete="current-password"
                   />
+                </div>
+                <div className="flex items-center justify-between text-sm">
+                  <div />
+                  <button type="button" className="text-indigo-600 hover:text-indigo-700">
+                    Forgot password?
+                  </button>
                 </div>
                 <button
                   type="submit"
@@ -183,9 +198,18 @@ const AdminLogin = () => {
                 </div>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div>
-                    <label className="block text-sm font-medium text-slate-700">Password</label>
+                    <div className="flex items-center justify-between">
+                      <label className="block text-sm font-medium text-slate-700">Password</label>
+                      <button
+                        type="button"
+                        className="text-xs text-slate-500 hover:text-slate-700"
+                        onClick={() => setShowRegPwd((s) => !s)}
+                      >
+                        {showRegPwd ? 'Hide' : 'Show'}
+                      </button>
+                    </div>
                     <input
-                      type="password"
+                      type={showRegPwd ? 'text' : 'password'}
                       className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-slate-900 placeholder-slate-400 focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500"
                       placeholder="••••••••"
                       value={regPassword}
@@ -195,9 +219,18 @@ const AdminLogin = () => {
                     />
                   </div>
                   <div>
-                    <label className="block text-sm font-medium text-slate-700">Confirm Password</label>
+                    <div className="flex items-center justify-between">
+                      <label className="block text-sm font-medium text-slate-700">Confirm Password</label>
+                      <button
+                        type="button"
+                        className="text-xs text-slate-500 hover:text-slate-700"
+                        onClick={() => setShowRegConfirm((s) => !s)}
+                      >
+                        {showRegConfirm ? 'Hide' : 'Show'}
+                      </button>
+                    </div>
                     <input
-                      type="password"
+                      type={showRegConfirm ? 'text' : 'password'}
                       className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-slate-900 placeholder-slate-400 focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500"
                       placeholder="••••••••"
                       value={confirm}
