@@ -90,7 +90,7 @@ const IssueDetail: React.FC = () => {
       console.log('🔄 IssueDetail - issue updated:', {
         _id: issue._id,
         userVote: issue.userVote,
-        upvotes: issue.upvotes,
+        upvotes: issue.upvotesCount,
         downvotes: issue.votes?.downvotes?.length || 0,
         voteScore: issue.voteScore
       });
@@ -172,7 +172,7 @@ const IssueDetail: React.FC = () => {
 
     console.log('🚀 IssueDetail - handleVote called with:', voteType);
     console.log('🚀 IssueDetail - current issue.userVote:', issue?.userVote);
-    console.log('🚀 IssueDetail - current issue.upvotes:', issue?.upvotes);
+    console.log('🚀 IssueDetail - current issue.upvotes:', issue?.upvotesCount);
     console.log('🚀 IssueDetail - current issue.downvotes:', issue?.votes?.downvotes?.length || 0);
 
     setIsVoting(true);
@@ -307,27 +307,6 @@ const IssueDetail: React.FC = () => {
             <Typography color="text.primary">{issue.title}</Typography>
           </Breadcrumbs>
         </Box>
-        {canEdit && (
-          <Box display="flex" gap={1}>
-            <Button
-              variant="outlined"
-              startIcon={<Edit />}
-              onClick={handleEdit}
-              disabled={isUpdating}
-            >
-              Edit
-            </Button>
-            <Button
-              variant="outlined"
-              color="error"
-              startIcon={<Delete />}
-              onClick={handleDelete}
-              disabled={isDeleting}
-            >
-              Delete
-            </Button>
-          </Box>
-        )}
       </Box>
 
       <Grid container spacing={3}>
@@ -678,7 +657,7 @@ const IssueDetail: React.FC = () => {
                     }}
                     disabled={isVoting}
                   >
-                    {issue.upvotes || 0}
+                    {issue.upvotesCount || 0}
                   </Button>
                   <Button
                     size="small"
@@ -742,86 +721,6 @@ const IssueDetail: React.FC = () => {
         </DialogActions>
       </Dialog>
 
-      {/* Edit Dialog */}
-      <Dialog
-        open={editDialogOpen}
-        onClose={() => setEditDialogOpen(false)}
-        maxWidth="sm"
-        fullWidth
-      >
-        <DialogTitle>Edit Issue</DialogTitle>
-        <DialogContent>
-          <TextField
-            fullWidth
-            label="Title"
-            value={editForm.title}
-            onChange={(e) =>
-              setEditForm((prev) => ({ ...prev, title: e.target.value }))
-            }
-            sx={{ mt: 2 }}
-          />
-          <TextField
-            fullWidth
-            multiline
-            rows={4}
-            label="Description"
-            value={editForm.description}
-            onChange={(e) =>
-              setEditForm((prev) => ({ ...prev, description: e.target.value }))
-            }
-            sx={{ mt: 2 }}
-          />
-          <TextField
-            select
-            fullWidth
-            label="Category"
-            value={editForm.category}
-            onChange={(e) =>
-              setEditForm((prev) => ({ ...prev, category: e.target.value }))
-            }
-            sx={{ mt: 2 }}
-          >
-            {[
-              "pothole",
-              "streetlight",
-              "garbage",
-              "water",
-              "electricity",
-              "other",
-            ].map((option) => (
-              <option key={option} value={option}>
-                {option.replace("_", " ").toUpperCase()}
-              </option>
-            ))}
-          </TextField>
-          <TextField
-            select
-            fullWidth
-            label="Priority"
-            value={editForm.priority}
-            onChange={(e) =>
-              setEditForm((prev) => ({ ...prev, priority: e.target.value }))
-            }
-            sx={{ mt: 2 }}
-          >
-            {["low", "medium", "high", "critical"].map((option) => (
-              <option key={option} value={option}>
-                {option.toUpperCase()}
-              </option>
-            ))}
-          </TextField>
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={() => setEditDialogOpen(false)}>Cancel</Button>
-          <Button
-            onClick={handleEditSubmit}
-            variant="contained"
-            disabled={isUpdating}
-          >
-            {isUpdating ? <CircularProgress size={20} /> : "Update"}
-          </Button>
-        </DialogActions>
-      </Dialog>
     </Box>
   );
 };

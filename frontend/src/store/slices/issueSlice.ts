@@ -122,7 +122,8 @@ export interface Issue {
   createdAt: string;
   updatedAt: string;
   commentsCount?: number;
-  upvotes?: number;
+  upvotesCount?: number;
+  downvotesCount?: number;
 }
 
 export interface CreateIssueData {
@@ -509,7 +510,9 @@ const issueSlice = createSlice({
           ...issue,
           _id: issue.id,
           commentsCount: issue.comments?.length || 0,
-          upvotes: issue.votes?.upvotes?.length || 0,
+          upvotesCount: issue.votes?.upvotes?.length || 0,
+          downvotesCount: issue.votes?.downvotes?.length || 0,
+          userVote: issue.userVote || null, // Explicitly handle userVote
         }));
 
         if (state.loadMoreMode) {
@@ -551,7 +554,9 @@ const issueSlice = createSlice({
           ...issue,
           _id: issue.id,
           commentsCount: issue.comments?.length || 0,
-          upvotes: issue.votes?.upvotes?.length || 0,
+          upvotesCount: issue.votes?.upvotes?.length || 0,
+          downvotesCount: issue.votes?.downvotes?.length || 0,
+          userVote: issue.userVote || null, // Explicitly handle userVote
         }));
 
         if (state.loadMoreMode) {
@@ -592,7 +597,9 @@ const issueSlice = createSlice({
           ...issue,
           _id: issue.id,
           commentsCount: issue.comments?.length || 0,
-          upvotes: issue.voteScore || 0,
+          upvotesCount: issue.votes?.upvotes?.length || 0,
+          downvotesCount: issue.votes?.downvotes?.length || 0,
+          userVote: issue.userVote || null, // Explicitly handle userVote
         }));
 
         if (state.loadMoreMode) {
@@ -628,7 +635,9 @@ const issueSlice = createSlice({
           ...issue,
           _id: issue.id,
           commentsCount: issue.comments?.length || 0,
-          upvotes: issue.voteScore || 0,
+          upvotesCount: issue.votes?.upvotes?.length || 0,
+          downvotesCount: issue.votes?.downvotes?.length || 0,
+          userVote: issue.userVote || null, // Explicitly handle userVote
         }));
         state.error = null;
 
@@ -653,7 +662,8 @@ const issueSlice = createSlice({
           ...issue,
           _id: issue.id,
           commentsCount: issue.comments?.length || 0,
-          upvotes: issue.votes?.upvotes?.length || 0,
+          upvotesCount: issue.votes?.upvotes?.length || 0,
+          downvotesCount: issue.votes?.downvotes?.length || 0,
           userVote: issue.userVote || null,
         };
         state.error = null;
@@ -677,7 +687,8 @@ const issueSlice = createSlice({
           ...issue,
           _id: issue.id,
           commentsCount: issue.comments?.length || 0,
-          upvotes: issue.votes?.upvotes?.length || 0,
+          upvotesCount: issue.votes?.upvotes?.length || 0,
+          downvotesCount: issue.votes?.downvotes?.length || 0,
         };
         state.issues.unshift(normalizedIssue);
         state.totalIssues += 1;
@@ -791,9 +802,9 @@ const issueSlice = createSlice({
             ...state.issues[index],
             ...updatedIssue,
             _id: updatedIssue.id || updatedIssue._id,
-            upvotes: updatedIssue.votes?.upvotes?.length || 0,
-            downvotes: updatedIssue.votes?.downvotes?.length || 0,
-            userVote: action.payload.userVote,
+            upvotesCount: updatedIssue.votes?.upvotes?.length || 0,
+            downvotesCount: updatedIssue.votes?.downvotes?.length || 0,
+            userVote: action.payload.data?.userVote || action.payload.userVote,
           };
         }
 
@@ -814,9 +825,9 @@ const issueSlice = createSlice({
             timeline: updatedIssue.timeline,
             comments: updatedIssue.comments,
             _id: updatedIssue.id || updatedIssue._id,
-            upvotes: updatedIssue.votes?.upvotes?.length || 0,
-            downvotes: updatedIssue.votes?.downvotes?.length || 0,
-            userVote: action.payload?.userVote ?? null,
+            upvotesCount: updatedIssue.votes?.upvotes?.length || 0,
+            downvotesCount: updatedIssue.votes?.downvotes?.length || 0,
+            userVote: action.payload.data?.userVote || action.payload.userVote,
           } as any;
           console.log('✅ Vote fulfilled - new selectedIssue:', state.selectedIssue);
         }
@@ -850,9 +861,9 @@ const issueSlice = createSlice({
             ...state.issues[index],
             ...updatedIssue,
             _id: updatedIssue.id || updatedIssue._id,
-            upvotes: updatedIssue.votes?.upvotes?.length || 0,
-            downvotes: updatedIssue.votes?.downvotes?.length || 0,
-            userVote: action.payload.userVote,
+            upvotesCount: updatedIssue.votes?.upvotes?.length || 0,
+            downvotesCount: updatedIssue.votes?.downvotes?.length || 0,
+            userVote: action.payload.data?.userVote || action.payload.userVote,
           };
         }
 
@@ -873,9 +884,9 @@ const issueSlice = createSlice({
             timeline: updatedIssue.timeline,
             comments: updatedIssue.comments,
             _id: updatedIssue.id || updatedIssue._id,
-            upvotes: updatedIssue.votes?.upvotes?.length || 0,
-            downvotes: updatedIssue.votes?.downvotes?.length || 0,
-            userVote: action.payload?.userVote ?? null,
+            upvotesCount: updatedIssue.votes?.upvotes?.length || 0,
+            downvotesCount: updatedIssue.votes?.downvotes?.length || 0,
+            userVote: action.payload.data?.userVote || action.payload.userVote,
           } as any;
           console.log('✅ Remove vote fulfilled - new selectedIssue:', state.selectedIssue);
         }

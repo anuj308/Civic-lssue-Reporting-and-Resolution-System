@@ -136,11 +136,11 @@ const IssueCard: React.FC<IssueCardProps> = ({ issue, onViewDetails }) => {
           </Typography>
 
           <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
-            {issue.upvotes > 0 && (
+            {issue.upvotesCount > 0 && (
               <Box sx={{ display: "flex", alignItems: "center", gap: 0.5 }}>
                 <ThumbUp fontSize="small" color="action" />
                 <Typography variant="caption" color="text.secondary">
-                  {issue.upvotes}
+                  {issue.upvotesCount}
                 </Typography>
               </Box>
             )}

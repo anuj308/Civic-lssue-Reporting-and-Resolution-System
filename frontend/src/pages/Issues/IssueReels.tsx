@@ -23,6 +23,7 @@ import {
   MenuItem,
   Slider,
   Stack,
+  TextField,
 } from "@mui/material";
 import {
   Favorite,
@@ -38,6 +39,7 @@ import {
   MyLocation,
   Public,
   Lock,
+  Send,
 } from "@mui/icons-material";
 import { useDispatch, useSelector } from "react-redux";
 import { useNavigate } from "react-router-dom";
@@ -47,6 +49,7 @@ import {
   fetchNearbyIssues,
   voteOnIssue,
   removeVoteFromIssue,
+  addIssueComment,
   selectIssues,
   selectIssuesLoading,
   selectIssuesError,
@@ -58,6 +61,8 @@ import { setPageTitle, setBreadcrumbs } from "../../store/slices/uiSlice";
 import { IssueListItem } from "../../store/slices/issueSlice";
 import MapComponent from "../../components/Map/Map";
 import CommentsModal from "../../components/CommentsModal";
+import { showToast } from '../../utils/toast';
+import { getAccessToken } from '../../services/api';
 
 interface Issue extends IssueListItem {
   media?: {
@@ -85,10 +90,10 @@ const IssueReels: React.FC = () => {
   const uniqueIssues = React.useMemo(() => {
     const seen = new Set();
     return issues.filter(issue => {
-      if (seen.has(issue.id)) {
+      if (seen.has(issue._id)) {
         return false;
       }
-      seen.add(issue.id);
+      seen.add(issue._id);
       return true;
     });
   }, [issues]);
@@ -100,7 +105,7 @@ const IssueReels: React.FC = () => {
   const [mapView, setMapView] = useState(false);
   const [filters, setFilters] = useState({
     category: '',
-    radius: 1000, // Default 1km
+    radius: 100000, // Default 100km
     locationEnabled: false,
     userLocation: null as { lat: number; lng: number } | null,
     scope: 'nearby' as 'nearby' | 'city' | 'state' | 'nationwide'
@@ -108,6 +113,13 @@ const IssueReels: React.FC = () => {
   const [hasMoreIssues, setHasMoreIssues] = useState(true);
   const [commentsModalOpen, setCommentsModalOpen] = useState(false);
   const [selectedIssueForComments, setSelectedIssueForComments] = useState<Issue | null>(null);
+  const [commentsVisible, setCommentsVisible] = useState<string | null>(null);
+  const [reelComments, setReelComments] = useState<{[key: string]: any[]}>({});
+  const [loadingComments, setLoadingComments] = useState<{[key: string]: boolean}>({});
+  const [newComment, setNewComment] = useState('');
+  const [submittingComment, setSubmittingComment] = useState(false);
+  const [locationSliderOpen, setLocationSliderOpen] = useState(false);
+  const [initialLoadComplete, setInitialLoadComplete] = useState(false);
 
   const videoRefs = useRef<Map<string, HTMLVideoElement>>(new Map());
   const containerRef = useRef<HTMLDivElement>(null);
@@ -147,6 +159,7 @@ const IssueReels: React.FC = () => {
             limit: 10,
             fields: queryParams.fields
           })).unwrap();
+          if (!loadMore) setInitialLoadComplete(true);
           return;
         }
       }
@@ -159,13 +172,27 @@ const IssueReels: React.FC = () => {
       // Set load more mode
       dispatch(setLoadMoreMode(loadMore));
 
-      await dispatch(fetchIssues(queryParams)).unwrap();
-
+      const result = await dispatch(fetchIssues(queryParams)).unwrap();
+      
       // Check if there are more issues to load
-      const totalLoaded = loadMore ? uniqueIssues.length + 10 : 10;
-      setHasMoreIssues(totalLoaded < 1000); // Assume max 1000 issues for now
+      const newIssuesCount = result.issues?.length || 0;
+      const hasMore = newIssuesCount === 10; // If we got a full page, there might be more
+      
+      if (loadMore && newIssuesCount === 0) {
+        // No more issues available, show toast and don't modify the list
+        setHasMoreIssues(false);
+        showToast.info("No more reels available");
+        return;
+      }
+      
+      setHasMoreIssues(hasMore);
+      
+      if (!loadMore) setInitialLoadComplete(true);
+
+      console.log(`Loaded ${newIssuesCount} issues, hasMore: ${hasMore}, total: ${loadMore ? uniqueIssues.length + newIssuesCount : newIssuesCount}`);
     } catch (err) {
       console.error('Failed to load issues:', err);
+      setHasMoreIssues(false); // Stop loading on error
     }
   }, [dispatch, filters, uniqueIssues.length]);
 
@@ -250,6 +277,14 @@ const IssueReels: React.FC = () => {
     }
   };
 
+  // Auto-load more issues when reaching the last reel
+  useEffect(() => {
+    if (currentIndex === uniqueIssues.length - 1 && hasMoreIssues && !loading) {
+      console.log('Reached last reel, loading more issues...');
+      loadIssues(true);
+    }
+  }, [currentIndex, uniqueIssues.length, hasMoreIssues, loading]);;
+
   // Handle voting
   const handleVote = async (issueId: string, voteType: 'upvote' | 'downvote') => {
     if (!currentUser) {
@@ -259,7 +294,7 @@ const IssueReels: React.FC = () => {
     }
 
     try {
-      const issue = uniqueIssues.find(i => i.id === issueId);
+      const issue = uniqueIssues.find(i => i._id === issueId);
       if (!issue) return;
 
       if (issue.userVote === voteType) {
@@ -271,6 +306,87 @@ const IssueReels: React.FC = () => {
       }
     } catch (err) {
       console.error('Failed to vote:', err);
+    }
+  };
+
+  // Handle comment input toggle
+  const handleCommentClick = async (issueId: string) => {
+    if (commentsVisible === issueId) {
+      // Close comments
+      setCommentsVisible(null);
+      setNewComment('');
+    } else {
+      // Open comments and load them
+      setCommentsVisible(issueId);
+      setNewComment('');
+      await loadCommentsForIssue(issueId);
+    }
+  };
+
+  // Load comments for a specific issue
+  const loadCommentsForIssue = async (issueId: string) => {
+    if (reelComments[issueId]) return; // Already loaded
+
+    setLoadingComments(prev => ({ ...prev, [issueId]: true }));
+    try {
+      const response = await fetch(`${import.meta.env.VITE_API_URL || '/api'}/issues/${issueId}/comments?page=1&limit=5`, {
+        headers: {
+          'Authorization': getAccessToken() ? `Bearer ${getAccessToken()}` : '',
+        },
+      });
+      const data = await response.json();
+      if (data.success) {
+        setReelComments(prev => ({ ...prev, [issueId]: data.data.comments || [] }));
+      }
+    } catch (error) {
+      console.error('Failed to load comments:', error);
+    } finally {
+      setLoadingComments(prev => ({ ...prev, [issueId]: false }));
+    }
+  };
+
+  // Handle adding comment
+  const handleAddComment = async (issueId: string) => {
+    if (!currentUser || !newComment.trim()) return;
+
+    setSubmittingComment(true);
+    try {
+      await dispatch(addIssueComment({ 
+        issueId, 
+        content: newComment.trim(), 
+        isInternal: false 
+      })).unwrap();
+      
+      // Add the new comment to the local state
+      const newCommentObj = {
+        id: Date.now().toString(), // Temporary ID
+        user: {
+          _id: currentUser.id,
+          name: `${currentUser.firstName} ${currentUser.lastName}`.trim(),
+        },
+        message: newComment.trim(),
+        timestamp: new Date().toISOString(),
+        isOfficial: false
+      };
+      
+      setReelComments(prev => ({
+        ...prev,
+        [issueId]: [...(prev[issueId] || []), newCommentObj].slice(-5) // Keep only last 5
+      }));
+      
+      setNewComment('');
+    } catch (err) {
+      console.error('Failed to add comment:', err);
+    } finally {
+      setSubmittingComment(false);
+    }
+  };
+
+  // Handle comment input key press
+  const handleCommentKeyPress = (e: React.KeyboardEvent, issueId: string) => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      handleAddComment(issueId);
     }
   };
 
@@ -323,33 +439,11 @@ const IssueReels: React.FC = () => {
     return () => window.removeEventListener('keydown', handleKeyPress);
   }, [currentIndex, uniqueIssues.length]);
 
-  // Auto-play visible video
+  // Close comments when navigating to different reel
   useEffect(() => {
-    const currentIssue = uniqueIssues[currentIndex];
-    if (currentIssue && currentIssue.media?.videos && currentIssue.media.videos.length > 0) {
-      const video = videoRefs.current.get(currentIssue.id);
-      if (video && !playingVideos.has(currentIssue.id)) {
-        video.play().catch(() => {
-          // Auto-play failed, user interaction required
-        });
-      }
-    }
-
-    // Pause other videos
-    uniqueIssues.forEach((issue, index) => {
-      if (index !== currentIndex) {
-        const video = videoRefs.current.get(issue.id);
-        if (video && playingVideos.has(issue.id)) {
-          video.pause();
-          setPlayingVideos(prev => {
-            const newSet = new Set(prev);
-            newSet.delete(issue.id);
-            return newSet;
-          });
-        }
-      }
-    });
-  }, [currentIndex, uniqueIssues, playingVideos]);
+    setCommentsVisible(null);
+    setNewComment('');
+  }, [currentIndex]);
 
   const categories = [
     "pothole",
@@ -397,17 +491,25 @@ const IssueReels: React.FC = () => {
     other: "Other",
   };
 
-  if (loading && uniqueIssues.length === 0) {
+  if (!initialLoadComplete) {
     return (
       <Box
         sx={{
           display: 'flex',
+          flexDirection: 'column',
           justifyContent: 'center',
           alignItems: 'center',
-          height: '100vh'
+          height: '100vh',
+          bgcolor: 'black'
         }}
       >
-        <CircularProgress size={60} />
+        <CircularProgress size={80} sx={{ color: 'primary.main', mb: 3 }} />
+        <Typography variant="h6" sx={{ color: 'white', mb: 1 }}>
+          Loading Issue Reels
+        </Typography>
+        <Typography variant="body2" sx={{ color: 'rgba(255,255,255,0.7)' }}>
+          Discovering community issues near you...
+        </Typography>
       </Box>
     );
   }
@@ -427,6 +529,13 @@ const IssueReels: React.FC = () => {
         justifyContent: 'center',
         margin: 0,
         padding: 0
+      }}
+      onClick={() => {
+        // Close comments when clicking outside
+        if (commentsVisible) {
+          setCommentsVisible(null);
+          setNewComment('');
+        }
       }}
     >
       {/* Header */}
@@ -467,6 +576,122 @@ const IssueReels: React.FC = () => {
         </Box>
       </Box>
 
+      {/* Location Filter Button and Slider - Absolute positioned */}
+      {!mapView && (
+        <Box
+          sx={{
+            position: 'absolute',
+            top: 70,
+            right: 16,
+            zIndex: 11,
+            display: 'flex',
+            flexDirection: 'column',
+            gap: 0.5
+          }}
+        >
+          {/* Location Button */}
+          <Button
+            size="small"
+            variant={filters.locationEnabled ? "contained" : "outlined"}
+            onClick={() => {
+              if (!filters.locationEnabled) {
+                getCurrentLocation();
+              }
+              setLocationSliderOpen(!locationSliderOpen);
+            }}
+            sx={{
+              minWidth: 'auto',
+              px: 1,
+              py: 0.5,
+              fontSize: '0.7rem',
+              bgcolor: filters.locationEnabled ? 'primary.main' : 'rgba(0,0,0,0.7)',
+              color: 'white',
+              border: '1px solid rgba(255,255,255,0.3)',
+              '&:hover': {
+                bgcolor: filters.locationEnabled ? 'primary.dark' : 'rgba(0,0,0,0.9)',
+                border: '1px solid rgba(255,255,255,0.5)',
+              },
+              borderRadius: 1
+            }}
+          >
+            📍 {filters.locationEnabled ? `${filters.radius / 1000}km` : 'Location'}
+          </Button>
+
+          {/* Location Slider */}
+          {locationSliderOpen && (
+            <Box
+              sx={{
+                position: 'absolute',
+                top: 35,
+                right: 0,
+                bgcolor: 'rgba(0,0,0,0.9)',
+                borderRadius: 1,
+                p: 2,
+                minWidth: 200,
+                backdropFilter: 'blur(10px)',
+                border: '1px solid rgba(255,255,255,0.2)',
+                zIndex: 12
+              }}
+            >
+              <Typography variant="subtitle2" sx={{ color: 'white', mb: 1 }}>
+                Location Radius: {filters.radius / 1000}km
+              </Typography>
+              <Slider
+                value={filters.radius / 1000}
+                onChange={(_, value) => {
+                  const newRadius = (value as number) * 1000;
+                  setFilters(prev => ({ ...prev, radius: newRadius }));
+                }}
+                min={1}
+                max={4000}
+                step={10}
+                marks={[
+                  { value: 1, label: '1km' },
+                  { value: 100, label: '100km' },
+                  { value: 1000, label: '1000km' },
+                  { value: 4000, label: '4000km' }
+                ]}
+                sx={{
+                  color: 'primary.main',
+                  '& .MuiSlider-markLabel': {
+                    color: 'rgba(255,255,255,0.7)',
+                    fontSize: '0.7rem'
+                  }
+                }}
+              />
+              <Box sx={{ display: 'flex', justifyContent: 'space-between', mt: 1 }}>
+                <Button
+                  size="small"
+                  onClick={() => {
+                    setFilters(prev => ({ ...prev, locationEnabled: false, userLocation: null }));
+                    setLocationSliderOpen(false);
+                    // Reload issues without location filter
+                    dispatch(setLoadMoreMode(false));
+                    loadIssues(false);
+                  }}
+                  sx={{ color: 'white', fontSize: '0.7rem' }}
+                >
+                  Disable
+                </Button>
+                <Button
+                  size="small"
+                  variant="contained"
+                  onClick={() => {
+                    setLocationSliderOpen(false);
+                    // Reload issues with new radius
+                    dispatch(setLoadMoreMode(false));
+                    loadIssues(false);
+                  }}
+                  sx={{ fontSize: '0.7rem' }}
+                >
+                  Apply
+                </Button>
+              </Box>
+            </Box>
+          )}
+        </Box>
+      )}
+
       {mapView ? (
         /* Map View */
         <Box sx={{ height: '100%', pt: 8 }}>
@@ -495,7 +720,7 @@ const IssueReels: React.FC = () => {
           >
             {uniqueIssues.map((issue, index) => (
               <Box
-                key={issue.id}
+                key={issue._id}
                 sx={{
                   flex: 1,
                   display: index === currentIndex ? 'flex' : 'none',
@@ -511,8 +736,8 @@ const IssueReels: React.FC = () => {
                     <video
                       ref={el => {
                         if (el) {
-                          videoRefs.current.set(issue.id, el);
-                          console.log('Video ref set for issue:', issue.id, el);
+                          videoRefs.current.set(issue._id, el);
+                          console.log('Video ref set for issue:', issue._id, el);
                         }
                       }}
                       src={issue.media.videos[0]}
@@ -524,14 +749,14 @@ const IssueReels: React.FC = () => {
                       loop
                       playsInline
                       onPlay={() => {
-                        console.log('Video onPlay triggered for issue:', issue.id);
-                        setPlayingVideos(prev => new Set(prev).add(issue.id));
+                        console.log('Video onPlay triggered for issue:', issue._id);
+                        setPlayingVideos(prev => new Set(prev).add(issue._id));
                       }}
                       onPause={() => {
-                        console.log('Video onPause triggered for issue:', issue.id);
+                        console.log('Video onPause triggered for issue:', issue._id);
                         setPlayingVideos(prev => {
                           const newSet = new Set(prev);
-                          newSet.delete(issue.id);
+                          newSet.delete(issue._id);
                           return newSet;
                         });
                       }}
@@ -578,7 +803,7 @@ const IssueReels: React.FC = () => {
                       }}
                     >
                       <IconButton
-                        onClick={() => toggleVideoPlayback(issue.id)}
+                        onClick={() => toggleVideoPlayback(issue._id)}
                         sx={{
                           bgcolor: 'rgba(0,0,0,0.5)',
                           color: 'white',
@@ -588,7 +813,7 @@ const IssueReels: React.FC = () => {
                           zIndex: 21
                         }}
                       >
-                        {playingVideos.has(issue.id) ? <Pause sx={{ fontSize: 30 }} /> : <PlayArrow sx={{ fontSize: 30 }} />}
+                        {playingVideos.has(issue._id) ? <Pause sx={{ fontSize: 30 }} /> : <PlayArrow sx={{ fontSize: 30 }} />}
                       </IconButton>
                     </Box>
                   )}
@@ -608,7 +833,7 @@ const IssueReels: React.FC = () => {
                   >
                     <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
                       <IconButton
-                        onClick={() => handleVote(issue.id, 'upvote')}
+                        onClick={() => handleVote(issue._id, 'upvote')}
                         sx={{
                           color: issue.userVote === 'upvote' ? 'red' : 'white',
                           bgcolor: 'rgba(0,0,0,0.5)',
@@ -628,12 +853,9 @@ const IssueReels: React.FC = () => {
 
                     <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
                       <IconButton
-                        onClick={() => {
-                          setSelectedIssueForComments(issue);
-                          setCommentsModalOpen(true);
-                        }}
+                        onClick={() => handleCommentClick(issue._id)}
                         sx={{
-                          color: 'white',
+                          color: commentsVisible === issue._id ? 'primary.main' : 'white',
                           bgcolor: 'rgba(0,0,0,0.5)',
                           '&:hover': { bgcolor: 'rgba(0,0,0,0.7)' },
                           width: 50,
@@ -663,6 +885,127 @@ const IssueReels: React.FC = () => {
                     </IconButton>
                   </Box>
                 </Box>
+
+                {/* Comments Display Box */}
+                {commentsVisible === issue._id && (
+                  <Box
+                    sx={{
+                      position: 'absolute',
+                      bottom: 120,
+                      left: 16,
+                      right: 16,
+                      bgcolor: 'rgba(0,0,0,0.9)',
+                      borderRadius: 2,
+                      p: 2,
+                      zIndex: 25,
+                      backdropFilter: 'blur(10px)',
+                      maxHeight: '300px',
+                      display: 'flex',
+                      flexDirection: 'column'
+                    }}
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    {/* Comments List */}
+                    <Box sx={{ flex: 1, overflowY: 'auto', mb: 2 }}>
+                      {loadingComments[issue._id] ? (
+                        <Box sx={{ display: 'flex', justifyContent: 'center', py: 2 }}>
+                          <CircularProgress size={20} sx={{ color: 'white' }} />
+                        </Box>
+                      ) : reelComments[issue._id]?.length > 0 ? (
+                        reelComments[issue._id].map((comment, index) => (
+                          <Box key={comment.id || index} sx={{ mb: 1.5 }}>
+                            <Box sx={{ display: 'flex', alignItems: 'center', mb: 0.5 }}>
+                              <Typography variant="caption" sx={{ color: 'primary.main', fontWeight: 'bold', mr: 1 }}>
+                                {comment.user?.name || 'Anonymous'}
+                              </Typography>
+                              <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.6)' }}>
+                                {new Date(comment.timestamp).toLocaleDateString()}
+                              </Typography>
+                            </Box>
+                            <Typography variant="body2" sx={{ color: 'white', lineHeight: 1.3 }}>
+                              {comment.message}
+                            </Typography>
+                          </Box>
+                        ))
+                      ) : (
+                        <Typography variant="body2" sx={{ color: 'rgba(255,255,255,0.6)', textAlign: 'center', py: 2 }}>
+                          No comments yet. Be the first to comment!
+                        </Typography>
+                      )}
+                    </Box>
+
+                    {/* Comment Input */}
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                      <TextField
+                        fullWidth
+                        size="small"
+                        placeholder="Add a comment..."
+                        value={newComment}
+                        onChange={(e) => setNewComment(e.target.value)}
+                        onKeyPress={(e) => handleCommentKeyPress(e, issue._id)}
+                        disabled={submittingComment}
+                        sx={{
+                          '& .MuiOutlinedInput-root': {
+                            bgcolor: 'rgba(255,255,255,0.1)',
+                            color: 'white',
+                            '& fieldset': {
+                              borderColor: 'rgba(255,255,255,0.3)',
+                            },
+                            '&:hover fieldset': {
+                              borderColor: 'rgba(255,255,255,0.5)',
+                            },
+                            '&.Mui-focused fieldset': {
+                              borderColor: 'primary.main',
+                            },
+                          },
+                          '& .MuiOutlinedInput-input': {
+                            '&::placeholder': {
+                              color: 'rgba(255,255,255,0.7)',
+                              opacity: 1,
+                            },
+                          },
+                        }}
+                        inputProps={{
+                          style: { color: 'white' }
+                        }}
+                      />
+                      <IconButton
+                        onClick={() => handleAddComment(issue._id)}
+                        disabled={!newComment.trim() || submittingComment || !currentUser}
+                        sx={{
+                          color: 'primary.main',
+                          bgcolor: 'rgba(255,255,255,0.1)',
+                          '&:hover': { bgcolor: 'rgba(255,255,255,0.2)' },
+                          '&:disabled': { color: 'rgba(255,255,255,0.3)' }
+                        }}
+                      >
+                        {submittingComment ? <CircularProgress size={20} /> : <Send />}
+                      </IconButton>
+                    </Box>
+
+                    {/* View All Comments Link */}
+                    <Box sx={{ display: 'flex', justifyContent: 'center', mt: 1 }}>
+                      <Button
+                        size="small"
+                        onClick={() => {
+                          setSelectedIssueForComments(issue);
+                          setCommentsModalOpen(true);
+                          setCommentsVisible(null);
+                          setNewComment('');
+                        }}
+                        sx={{
+                          color: 'primary.main',
+                          fontSize: '0.7rem',
+                          minWidth: 'auto',
+                          p: 0.5,
+                          textTransform: 'none'
+                        }}
+                      >
+                        View all comments ({issue.commentsCount || 0})
+                      </Button>
+                    </Box>
+                  </Box>
+                )}
 
                 {/* Issue Info Overlay */}
                 <Box
@@ -769,7 +1112,7 @@ const IssueReels: React.FC = () => {
               width: '90%'
             }}
           >
-            {uniqueIssues.slice(0, 10).map((_, index) => (
+            {Array.from({ length: Math.min(uniqueIssues.length, 20) }, (_, index) => (
               <Box
                 key={index}
                 sx={{
@@ -900,7 +1243,7 @@ const IssueReels: React.FC = () => {
             setCommentsModalOpen(false);
             setSelectedIssueForComments(null);
           }}
-          issueId={selectedIssueForComments.id}
+          issueId={selectedIssueForComments._id}
           issueTitle={selectedIssueForComments.title}
           totalComments={selectedIssueForComments.commentsCount || 0}
         />
