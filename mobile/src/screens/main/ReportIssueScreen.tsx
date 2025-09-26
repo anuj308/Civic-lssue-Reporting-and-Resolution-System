@@ -26,6 +26,7 @@ import { useSelector } from 'react-redux';
 import { useForm, Controller } from 'react-hook-form';
 import * as ImagePicker from 'expo-image-picker';
 import * as Location from 'expo-location';
+import { readAsStringAsync, EncodingType } from 'expo-file-system/legacy';
 import { RootState, useAppDispatch } from '../../store/store';
 import { createIssue } from '../../store/slices/issueSlice';
 import { theme } from '../../theme/index';
@@ -298,6 +299,22 @@ const ReportIssueScreen: React.FC = () => {
     setVideos(prev => prev.filter((_, i) => i !== index));
   };
 
+  const convertVideoToBase64 = async (videoUri: string): Promise<string> => {
+    try {
+      console.log('🎥 Converting video to base64:', videoUri);
+      const base64 = await readAsStringAsync(videoUri, {
+        encoding: EncodingType.Base64,
+      });
+      const mimeType = 'video/mp4'; // You can detect this from the asset if needed
+      const dataUri = `data:${mimeType};base64,${base64}`;
+      console.log('🎥 Video converted to base64, length:', dataUri.length);
+      return dataUri;
+    } catch (error) {
+      console.error('❌ Error converting video to base64:', error);
+      throw error;
+    }
+  };
+
   const onSubmit = async (data: IssueFormData) => {
     if (!location) {
       Alert.alert('Location Required', 'Please enable location services or enter your location manually.');
@@ -330,6 +347,20 @@ const ReportIssueScreen: React.FC = () => {
 
       console.log(`📊 Validated ${validImages.length} out of ${images.length} images`);
 
+      // Convert videos to base64
+      const processedVideos = await Promise.all(
+        videos.map(async (video) => {
+          try {
+            return await convertVideoToBase64(video.uri);
+          } catch (error) {
+            console.error('❌ Error converting video to base64:', error);
+            throw error;
+          }
+        })
+      );
+
+      console.log(`📊 Processed ${processedVideos.length} out of ${videos.length} videos`);
+
       // Ensure clean data by deep cloning and ensuring strings
       const issueData = {
         title: data.title.trim(),
@@ -350,7 +381,7 @@ const ReportIssueScreen: React.FC = () => {
         },
         media: {
           images: validImages, // Send base64 data URIs to backend
-          videos: videos, // Send video assets to backend
+          videos: processedVideos, // Send base64 data URIs to backend
           audio: null
         },
         tags: [],
@@ -369,6 +400,8 @@ const ReportIssueScreen: React.FC = () => {
       console.log('  - Images are base64:', issueData.media.images.every(img => img.startsWith('data:')));
       console.log('  - Sample image data:', issueData.media.images[0]?.substring(0, 100) + '...');
       console.log('  - Videos count:', issueData.media.videos.length);
+      console.log('  - Videos are base64:', issueData.media.videos.every(vid => vid.startsWith('data:')));
+      console.log('  - Sample video data:', issueData.media.videos[0]?.substring(0, 100) + '...');
       
       await dispatch(createIssue(issueData)).unwrap();
       
