@@ -93,6 +93,7 @@ export interface IssueState {
   issues: Issue[];
   myIssues: Issue[];
   nearbyIssues: Issue[];
+  publicIssues: Issue[];
   currentIssue: Issue | null;
   isLoading: boolean;
   isSubmitting: boolean;
@@ -110,6 +111,7 @@ const initialState: IssueState = {
   issues: [],
   myIssues: [],
   nearbyIssues: [],
+  publicIssues: [],
   currentIssue: null,
   isLoading: false,
   isSubmitting: false,
@@ -168,6 +170,18 @@ export const fetchNearbyIssues = createAsyncThunk(
       return response.data;
     } catch (error: any) {
       return rejectWithValue(error.response?.data?.message || 'Failed to fetch nearby issues');
+    }
+  }
+);
+
+export const fetchPublicIssues = createAsyncThunk(
+  'issues/fetchPublic',
+  async (params: { page?: number; limit?: number; fields?: string } = {}, { rejectWithValue }) => {
+    try {
+      const response = await issueApi.getPublicIssues(params);
+      return response.data;
+    } catch (error: any) {
+      return rejectWithValue(error.response?.data?.message || 'Failed to fetch public issues');
     }
   }
 );
@@ -360,6 +374,35 @@ const issueSlice = createSlice({
         state.error = action.payload as string;
       });
 
+    // Fetch Public Issues
+    builder
+      .addCase(fetchPublicIssues.pending, (state) => {
+        state.isLoading = true;
+        state.error = null;
+      })
+      .addCase(fetchPublicIssues.fulfilled, (state, action) => {
+        state.isLoading = false;
+        const { issues, pagination } = action.payload.data;
+        
+        if (pagination.currentPage === 1) {
+          state.publicIssues = issues;
+        } else {
+          state.publicIssues.push(...issues);
+        }
+        
+        state.pagination = {
+          page: pagination.currentPage,
+          limit: 10,
+          total: pagination.totalIssues,
+          hasMore: pagination.hasNextPage,
+        };
+        state.error = null;
+      })
+      .addCase(fetchPublicIssues.rejected, (state, action) => {
+        state.isLoading = false;
+        state.error = action.payload as string;
+      });
+
     // Fetch Issue By ID
     builder
       .addCase(fetchIssueById.pending, (state) => {
@@ -434,6 +477,13 @@ const issueSlice = createSlice({
           state.nearbyIssues[nearbyIssueIndex].voteScore = voteScore;
           state.nearbyIssues[nearbyIssueIndex].userVote = userVote;
         }
+        
+        // Update in publicIssues
+        const publicIssueIndex = state.publicIssues.findIndex(issue => issue.id === issueId);
+        if (publicIssueIndex !== -1) {
+          state.publicIssues[publicIssueIndex].voteScore = voteScore;
+          state.publicIssues[publicIssueIndex].userVote = userVote;
+        }
       });
 
     // Remove Vote
@@ -459,6 +509,13 @@ const issueSlice = createSlice({
         if (nearbyIssueIndex !== -1) {
           state.nearbyIssues[nearbyIssueIndex].voteScore = voteScore;
           state.nearbyIssues[nearbyIssueIndex].userVote = userVote;
+        }
+        
+        // Update in publicIssues
+        const publicIssueIndex = state.publicIssues.findIndex(issue => issue.id === issueId);
+        if (publicIssueIndex !== -1) {
+          state.publicIssues[publicIssueIndex].voteScore = voteScore;
+          state.publicIssues[publicIssueIndex].userVote = userVote;
         }
       });
 

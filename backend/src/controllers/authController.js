@@ -277,7 +277,7 @@ class AuthController {
           },
           accessToken: tokens.accessToken,
           refreshToken: tokens.refreshToken, // Add refreshToken for mobile apps
-          expiresIn: '1h'
+          expiresIn: '20s'
         }
       });
 
@@ -437,7 +437,7 @@ class AuthController {
           },
           accessToken: tokens.accessToken,
           refreshToken: tokens.refreshToken, // Add refreshToken for mobile apps
-          expiresIn: '1h'
+          expiresIn: '20s'
         }
       });
 
@@ -562,9 +562,7 @@ class AuthController {
         role: user.role
       }, refreshTokenFamily);
 
-      // Create session record with user's timeout preference
-      const userTimeoutMs = user.preferences?.sessionTimeoutMs || (7 * 24 * 60 * 60 * 1000); // Default 7 days in milliseconds
-      
+      // Create session record (long expiration - tied to refresh token lifecycle)
       const sessionData = {
         userId: user._id,
         refreshTokenFamily,
@@ -587,8 +585,7 @@ class AuthController {
         },
         isActive: true,
         lastActiveAt: new Date(),
-        expiresAt: new Date(Date.now() + userTimeoutMs) // Use user's timeout preference in milliseconds
-        // expiresAt explicitly set to avoid validation error
+        expiresAt: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000) // 1 year from now
       };
 
       // Analyze security risk
@@ -775,7 +772,7 @@ class AuthController {
           },
           accessToken: tokens.accessToken,
           refreshToken: tokens.refreshToken, // Add refreshToken for mobile apps
-          expiresIn: '1h',
+          expiresIn: '20s',
           session: {
             id: session._id,
             device: `${deviceInfo.type} - ${deviceInfo.os}`,
@@ -941,20 +938,32 @@ class AuthController {
         });
       }
 
-      // Check if session is still valid
-      if (!session || !session.isValid()) {
-        if (session) {
-          await session.revoke('session_expired');
-        }
+      // Check if session is still valid (allow refresh as long as session exists and is active)
+      // Sessions have long expiration dates but we check active status for security
+      if (!session) {
+        console.log('  - Session not found in database');
         res.status(401).json({
           success: false,
-          message: 'Session has expired or not found',
+          message: 'Session not found',
           error: { code: 'SESSION_EXPIRED' }
         });
         return;
       }
 
-      // Update session activity
+      // If session exists but is inactive, don't allow refresh
+      if (!session.isActive) {
+        console.log('  - Session is inactive/revoked');
+        res.status(401).json({
+          success: false,
+          message: 'Session has been revoked',
+          error: { code: 'SESSION_REVOKED' }
+        });
+        return;
+      }
+
+      console.log('  - Session is valid for refresh (active and exists)');
+
+      // Update session activity (don't check expiration since we allow refresh indefinitely)
       session.lastActiveAt = new Date();
       session.metadata = {
         ...session.metadata,
@@ -1012,7 +1021,7 @@ class AuthController {
         data: {
           accessToken: tokens.accessToken,
           refreshToken: tokens.refreshToken, // Add refreshToken for mobile apps
-          expiresIn: '15m',
+          expiresIn: '20s',
           session: {
             id: session._id,
             device: `${session.deviceInfo.type} - ${session.deviceInfo.os}`,

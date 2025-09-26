@@ -28,6 +28,7 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 import { RouteProp, useRoute, useNavigation } from "@react-navigation/native";
 import Icon from "react-native-vector-icons/MaterialCommunityIcons";
+import { Video, ResizeMode, Audio, InterruptionModeIOS, InterruptionModeAndroid } from "expo-av";
 import { theme } from "../../theme";
 import { useAppDispatch, useAppSelector } from "../../store/store";
 import {
@@ -94,6 +95,30 @@ export default function IssueDetailScreen() {
   useEffect(() => {
     loadIssue();
   }, [issueId]);
+
+  // Video setup
+  useEffect(() => {
+    const setupAudio = async () => {
+      try {
+        await Audio.setAudioModeAsync({
+          allowsRecordingIOS: false,
+          interruptionModeIOS: InterruptionModeIOS.DoNotMix,
+          playsInSilentModeIOS: true,
+          shouldDuckAndroid: true,
+          interruptionModeAndroid: InterruptionModeAndroid.DoNotMix,
+          playThroughEarpieceAndroid: false,
+        });
+      } catch (error) {
+        console.warn("Failed to setup audio mode:", error);
+      }
+    };
+
+    setupAudio();
+
+    return () => {
+      // Cleanup audio mode when component unmounts
+    };
+  }, []);
 
   const loadIssue = async () => {
     try {
@@ -313,6 +338,25 @@ export default function IssueDetailScreen() {
                   ))}
                 </View>
               )}
+            </View>
+          )}
+
+          {/* Video Section */}
+          {issue.media?.videos && issue.media.videos.length > 0 && (
+            <View style={styles.videoSection}>
+              <Text style={styles.sectionTitle}>Videos</Text>
+              {issue.media.videos.map((videoUrl: string, index: number) => (
+                <View key={`video-${index}`} style={styles.videoContainer}>
+                  <Video
+                    source={{ uri: videoUrl }}
+                    style={styles.video}
+                    useNativeControls
+                    resizeMode={ResizeMode.CONTAIN}
+                    isLooping={false}
+                  />
+                  <Text style={styles.videoLabel}>Video {index + 1}</Text>
+                </View>
+              ))}
             </View>
           )}
 
@@ -718,6 +762,30 @@ const styles = StyleSheet.create({
   },
   activePhotoIndicator: {
     backgroundColor: "rgba(255,255,255,0.9)",
+  },
+  videoSection: {
+    marginBottom: 16,
+  },
+  videoContainer: {
+    marginBottom: 15,
+    backgroundColor: '#000',
+    borderRadius: 8,
+    overflow: 'hidden',
+  },
+  video: {
+    width: '100%',
+    height: 250,
+  },
+  videoLabel: {
+    position: 'absolute',
+    top: 10,
+    left: 10,
+    backgroundColor: 'rgba(0, 0, 0, 0.7)',
+    color: '#fff',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 4,
+    fontSize: 12,
   },
   content: {
     padding: 16,

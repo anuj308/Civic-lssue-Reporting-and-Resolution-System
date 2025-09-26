@@ -224,7 +224,17 @@ const issueSchema = new mongoose.Schema({
     downvotes: [{
       type: mongoose.Schema.Types.ObjectId,
       ref: 'User'
-    }]
+    }],
+    upvotesCount: {
+      type: Number,
+      default: 0,
+      min: [0, 'Upvotes count cannot be negative']
+    },
+    downvotesCount: {
+      type: Number,
+      default: 0,
+      min: [0, 'Downvotes count cannot be negative']
+    }
   },
   comments: [{
     user: {
@@ -246,6 +256,11 @@ const issueSchema = new mongoose.Schema({
       default: false
     }
   }],
+  commentsCount: {
+    type: Number,
+    default: 0,
+    min: [0, 'Comments count cannot be negative']
+  },
   tags: [{
     type: String,
     lowercase: true,
@@ -313,6 +328,9 @@ issueSchema.index({ 'location.pincode': 1 });
 issueSchema.index({ tags: 1 });
 issueSchema.index({ urgencyScore: -1 });
 issueSchema.index({ duplicateOf: 1 });
+issueSchema.index({ commentsCount: -1 }); // Index for sorting by comment count
+issueSchema.index({ 'votes.upvotesCount': -1 }); // Index for sorting by upvotes
+issueSchema.index({ 'votes.downvotesCount': -1 }); // Index for sorting by downvotes
 
 // Compound indexes for common queries
 issueSchema.index({ status: 1, priority: -1, createdAt: -1 });
@@ -321,7 +339,7 @@ issueSchema.index({ category: 1, 'location.coordinates': '2dsphere' });
 
 // Virtual for vote score
 issueSchema.virtual('voteScore').get(function() {
-  return this.votes.upvotes.length - this.votes.downvotes.length;
+  return this.votes.upvotesCount - this.votes.downvotesCount;
 });
 
 // Virtual for days since reported

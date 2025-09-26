@@ -626,7 +626,7 @@ export default function MapScreen() {
                             <View style={styles.issueListStats}>
                               <View style={styles.miniStatItem}>
                                 <Icon name="thumb-up-outline" size={12} color={theme.colors.onSurfaceVariant} />
-                                <Text style={styles.miniStatText}>{issue.upvotes}</Text>
+                                <Text style={styles.miniStatText}>{issue.upvotesCount}</Text>
                               </View>
                             </View>
                           </View>
@@ -699,7 +699,7 @@ export default function MapScreen() {
                       <View style={styles.statsRow}>
                         <View style={styles.statItem}>
                           <Icon name="thumb-up-outline" size={14} color={theme.colors.onSurfaceVariant} />
-                          <Text style={styles.statText}>{selectedIssue.upvotes}</Text>
+                          <Text style={styles.statText}>{selectedIssue.upvotesCount}</Text>
                         </View>
                         <View style={styles.statItem}>
                           <Icon name="comment-outline" size={14} color={theme.colors.onSurfaceVariant} />

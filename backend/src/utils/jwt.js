@@ -7,8 +7,8 @@ const { v4: uuidv4 } = require('uuid');
 class JWTUtils {
   static ACCESS_TOKEN_SECRET = process.env.JWT_ACCESS_SECRET || 'your_access_token_secret';
   static REFRESH_TOKEN_SECRET = process.env.JWT_REFRESH_SECRET || 'your_refresh_token_secret';
-  static ACCESS_TOKEN_EXPIRES_IN = '15m';
-  static REFRESH_TOKEN_EXPIRES_IN = '7d';
+  static ACCESS_TOKEN_EXPIRES_IN = process.env.JWT_ACCESS_EXPIRES_IN || '20s';
+  static REFRESH_TOKEN_EXPIRES_IN = process.env.JWT_REFRESH_EXPIRES_IN || '7d';
 
   /**
    * Generate a unique token family ID for session tracking
@@ -122,7 +122,7 @@ class JWTUtils {
       httpOnly: true,
       secure: isProduction,
       sameSite: isProduction ? 'strict' : 'lax',
-      maxAge: 15 * 60 * 1000, // 15 minutes
+      maxAge: 20 * 1000, // 20 seconds
       path: '/',
     });
 

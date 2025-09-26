@@ -23,6 +23,7 @@ import {
   MenuItem,
   Slider,
   Stack,
+  TextField,
 } from "@mui/material";
 import {
   Favorite,
@@ -38,6 +39,7 @@ import {
   MyLocation,
   Public,
   Lock,
+  Send,
 } from "@mui/icons-material";
 import { useDispatch, useSelector } from "react-redux";
 import { useNavigate } from "react-router-dom";
@@ -47,6 +49,7 @@ import {
   fetchNearbyIssues,
   voteOnIssue,
   removeVoteFromIssue,
+  addIssueComment,
   selectIssues,
   selectIssuesLoading,
   selectIssuesError,
@@ -57,6 +60,9 @@ import { selectCurrentUser } from "../../store/slices/authSlice";
 import { setPageTitle, setBreadcrumbs } from "../../store/slices/uiSlice";
 import { IssueListItem } from "../../store/slices/issueSlice";
 import MapComponent from "../../components/Map/Map";
+import CommentsModal from "../../components/CommentsModal";
+import { showToast } from '../../utils/toast';
+import { getAccessToken } from '../../services/api';
 
 interface Issue extends IssueListItem {
   media?: {
@@ -84,10 +90,10 @@ const IssueReels: React.FC = () => {
   const uniqueIssues = React.useMemo(() => {
     const seen = new Set();
     return issues.filter(issue => {
-      if (seen.has(issue.id)) {
+      if (seen.has(issue._id)) {
         return false;
       }
-      seen.add(issue.id);
+      seen.add(issue._id);
       return true;
     });
   }, [issues]);
@@ -99,12 +105,21 @@ const IssueReels: React.FC = () => {
   const [mapView, setMapView] = useState(false);
   const [filters, setFilters] = useState({
     category: '',
-    radius: 1000, // Default 1km
+    radius: 100000, // Default 100km
     locationEnabled: false,
     userLocation: null as { lat: number; lng: number } | null,
     scope: 'nearby' as 'nearby' | 'city' | 'state' | 'nationwide'
   });
   const [hasMoreIssues, setHasMoreIssues] = useState(true);
+  const [commentsModalOpen, setCommentsModalOpen] = useState(false);
+  const [selectedIssueForComments, setSelectedIssueForComments] = useState<Issue | null>(null);
+  const [commentsVisible, setCommentsVisible] = useState<string | null>(null);
+  const [reelComments, setReelComments] = useState<{[key: string]: any[]}>({});
+  const [loadingComments, setLoadingComments] = useState<{[key: string]: boolean}>({});
+  const [newComment, setNewComment] = useState('');
+  const [submittingComment, setSubmittingComment] = useState(false);
+  const [locationSliderOpen, setLocationSliderOpen] = useState(false);
+  const [initialLoadComplete, setInitialLoadComplete] = useState(false);
 
   const videoRefs = useRef<Map<string, HTMLVideoElement>>(new Map());
   const containerRef = useRef<HTMLDivElement>(null);
@@ -112,10 +127,7 @@ const IssueReels: React.FC = () => {
   useEffect(() => {
     dispatch(setPageTitle("Issue Reels"));
     dispatch(
-      setBreadcrumbs([
-        { label: "Dashboard", path: "/dashboard" },
-        { label: "Issue Reels", path: "/reels" },
-      ])
+      setBreadcrumbs([])
     );
 
     // Clear any existing errors
@@ -147,6 +159,7 @@ const IssueReels: React.FC = () => {
             limit: 10,
             fields: queryParams.fields
           })).unwrap();
+          if (!loadMore) setInitialLoadComplete(true);
           return;
         }
       }
@@ -159,13 +172,27 @@ const IssueReels: React.FC = () => {
       // Set load more mode
       dispatch(setLoadMoreMode(loadMore));
 
-      await dispatch(fetchIssues(queryParams)).unwrap();
-
+      const result = await dispatch(fetchIssues(queryParams)).unwrap();
+      
       // Check if there are more issues to load
-      const totalLoaded = loadMore ? uniqueIssues.length + 10 : 10;
-      setHasMoreIssues(totalLoaded < 1000); // Assume max 1000 issues for now
+      const newIssuesCount = result.issues?.length || 0;
+      const hasMore = newIssuesCount === 10; // If we got a full page, there might be more
+      
+      if (loadMore && newIssuesCount === 0) {
+        // No more issues available, show toast and don't modify the list
+        setHasMoreIssues(false);
+        showToast.info("No more reels available");
+        return;
+      }
+      
+      setHasMoreIssues(hasMore);
+      
+      if (!loadMore) setInitialLoadComplete(true);
+
+      console.log(`Loaded ${newIssuesCount} issues, hasMore: ${hasMore}, total: ${loadMore ? uniqueIssues.length + newIssuesCount : newIssuesCount}`);
     } catch (err) {
       console.error('Failed to load issues:', err);
+      setHasMoreIssues(false); // Stop loading on error
     }
   }, [dispatch, filters, uniqueIssues.length]);
 
@@ -199,10 +226,16 @@ const IssueReels: React.FC = () => {
 
   // Handle video play/pause
   const toggleVideoPlayback = (issueId: string) => {
+    console.log('Toggle video playback called for issue:', issueId);
     const video = videoRefs.current.get(issueId);
-    if (!video) return;
+    console.log('Video element:', video);
+    if (!video) {
+      console.log('No video element found for issue:', issueId);
+      return;
+    }
 
     if (playingVideos.has(issueId)) {
+      console.log('Pausing video');
       video.pause();
       setPlayingVideos(prev => {
         const newSet = new Set(prev);
@@ -210,7 +243,10 @@ const IssueReels: React.FC = () => {
         return newSet;
       });
     } else {
-      video.play();
+      console.log('Playing video');
+      video.play().catch(err => {
+        console.error('Error playing video:', err);
+      });
       setPlayingVideos(prev => new Set(prev).add(issueId));
     }
   };
@@ -241,6 +277,14 @@ const IssueReels: React.FC = () => {
     }
   };
 
+  // Auto-load more issues when reaching the last reel
+  useEffect(() => {
+    if (currentIndex === uniqueIssues.length - 1 && hasMoreIssues && !loading) {
+      console.log('Reached last reel, loading more issues...');
+      loadIssues(true);
+    }
+  }, [currentIndex, uniqueIssues.length, hasMoreIssues, loading]);;
+
   // Handle voting
   const handleVote = async (issueId: string, voteType: 'upvote' | 'downvote') => {
     if (!currentUser) {
@@ -250,7 +294,7 @@ const IssueReels: React.FC = () => {
     }
 
     try {
-      const issue = uniqueIssues.find(i => i.id === issueId);
+      const issue = uniqueIssues.find(i => i._id === issueId);
       if (!issue) return;
 
       if (issue.userVote === voteType) {
@@ -265,12 +309,93 @@ const IssueReels: React.FC = () => {
     }
   };
 
+  // Handle comment input toggle
+  const handleCommentClick = async (issueId: string) => {
+    if (commentsVisible === issueId) {
+      // Close comments
+      setCommentsVisible(null);
+      setNewComment('');
+    } else {
+      // Open comments and load them
+      setCommentsVisible(issueId);
+      setNewComment('');
+      await loadCommentsForIssue(issueId);
+    }
+  };
+
+  // Load comments for a specific issue
+  const loadCommentsForIssue = async (issueId: string) => {
+    if (reelComments[issueId]) return; // Already loaded
+
+    setLoadingComments(prev => ({ ...prev, [issueId]: true }));
+    try {
+      const response = await fetch(`${import.meta.env.VITE_API_URL || '/api'}/issues/${issueId}/comments?page=1&limit=5`, {
+        headers: {
+          'Authorization': getAccessToken() ? `Bearer ${getAccessToken()}` : '',
+        },
+      });
+      const data = await response.json();
+      if (data.success) {
+        setReelComments(prev => ({ ...prev, [issueId]: data.data.comments || [] }));
+      }
+    } catch (error) {
+      console.error('Failed to load comments:', error);
+    } finally {
+      setLoadingComments(prev => ({ ...prev, [issueId]: false }));
+    }
+  };
+
+  // Handle adding comment
+  const handleAddComment = async (issueId: string) => {
+    if (!currentUser || !newComment.trim()) return;
+
+    setSubmittingComment(true);
+    try {
+      await dispatch(addIssueComment({ 
+        issueId, 
+        content: newComment.trim(), 
+        isInternal: false 
+      })).unwrap();
+      
+      // Add the new comment to the local state
+      const newCommentObj = {
+        id: Date.now().toString(), // Temporary ID
+        user: {
+          _id: currentUser.id,
+          name: `${currentUser.firstName} ${currentUser.lastName}`.trim(),
+        },
+        message: newComment.trim(),
+        timestamp: new Date().toISOString(),
+        isOfficial: false
+      };
+      
+      setReelComments(prev => ({
+        ...prev,
+        [issueId]: [...(prev[issueId] || []), newCommentObj].slice(-5) // Keep only last 5
+      }));
+      
+      setNewComment('');
+    } catch (err) {
+      console.error('Failed to add comment:', err);
+    } finally {
+      setSubmittingComment(false);
+    }
+  };
+
+  // Handle comment input key press
+  const handleCommentKeyPress = (e: React.KeyboardEvent, issueId: string) => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      handleAddComment(issueId);
+    }
+  };
+
   // Handle sharing
   const handleShare = async (issue: Issue) => {
     const shareData = {
       title: issue.title,
       text: `Check out this civic issue: ${issue.title}`,
-      url: `${window.location.origin}/issues/${issue.id}`
+      url: `${window.location.origin}/issue/${issue.id}`
     };
 
     if (navigator.share) {
@@ -314,33 +439,11 @@ const IssueReels: React.FC = () => {
     return () => window.removeEventListener('keydown', handleKeyPress);
   }, [currentIndex, uniqueIssues.length]);
 
-  // Auto-play visible video
+  // Close comments when navigating to different reel
   useEffect(() => {
-    const currentIssue = uniqueIssues[currentIndex];
-    if (currentIssue && currentIssue.media?.videos && currentIssue.media.videos.length > 0) {
-      const video = videoRefs.current.get(currentIssue.id);
-      if (video && !playingVideos.has(currentIssue.id)) {
-        video.play().catch(() => {
-          // Auto-play failed, user interaction required
-        });
-      }
-    }
-
-    // Pause other videos
-    uniqueIssues.forEach((issue, index) => {
-      if (index !== currentIndex) {
-        const video = videoRefs.current.get(issue.id);
-        if (video && playingVideos.has(issue.id)) {
-          video.pause();
-          setPlayingVideos(prev => {
-            const newSet = new Set(prev);
-            newSet.delete(issue.id);
-            return newSet;
-          });
-        }
-      }
-    });
-  }, [currentIndex, uniqueIssues, playingVideos]);
+    setCommentsVisible(null);
+    setNewComment('');
+  }, [currentIndex]);
 
   const categories = [
     "pothole",
@@ -388,17 +491,25 @@ const IssueReels: React.FC = () => {
     other: "Other",
   };
 
-  if (loading && uniqueIssues.length === 0) {
+  if (!initialLoadComplete) {
     return (
       <Box
         sx={{
           display: 'flex',
+          flexDirection: 'column',
           justifyContent: 'center',
           alignItems: 'center',
-          height: '100vh'
+          height: '100vh',
+          bgcolor: 'black'
         }}
       >
-        <CircularProgress size={60} />
+        <CircularProgress size={80} sx={{ color: 'primary.main', mb: 3 }} />
+        <Typography variant="h6" sx={{ color: 'white', mb: 1 }}>
+          Loading Issue Reels
+        </Typography>
+        <Typography variant="body2" sx={{ color: 'rgba(255,255,255,0.7)' }}>
+          Discovering community issues near you...
+        </Typography>
       </Box>
     );
   }
@@ -408,9 +519,23 @@ const IssueReels: React.FC = () => {
       ref={containerRef}
       sx={{
         height: '100vh',
+        width: '100vw',
         overflow: 'hidden',
-        position: 'relative',
-        bgcolor: mapView ? 'white' : 'black'
+        position: 'fixed',
+        top: 0,
+        left: 0,
+        bgcolor: mapView ? 'white' : 'black',
+        display: 'flex',
+        justifyContent: 'center',
+        margin: 0,
+        padding: 0
+      }}
+      onClick={() => {
+        // Close comments when clicking outside
+        if (commentsVisible) {
+          setCommentsVisible(null);
+          setNewComment('');
+        }
       }}
     >
       {/* Header */}
@@ -427,7 +552,9 @@ const IssueReels: React.FC = () => {
           py: 1,
           display: 'flex',
           alignItems: 'center',
-          justifyContent: 'space-between'
+          justifyContent: 'space-between',
+          maxWidth: '600px',
+          mx: 'auto'
         }}
       >
         <Typography variant="h6" sx={{ color: mapView ? 'black' : 'white', fontWeight: 'bold' }}>
@@ -449,6 +576,122 @@ const IssueReels: React.FC = () => {
         </Box>
       </Box>
 
+      {/* Location Filter Button and Slider - Absolute positioned */}
+      {!mapView && (
+        <Box
+          sx={{
+            position: 'absolute',
+            top: 70,
+            right: 16,
+            zIndex: 11,
+            display: 'flex',
+            flexDirection: 'column',
+            gap: 0.5
+          }}
+        >
+          {/* Location Button */}
+          <Button
+            size="small"
+            variant={filters.locationEnabled ? "contained" : "outlined"}
+            onClick={() => {
+              if (!filters.locationEnabled) {
+                getCurrentLocation();
+              }
+              setLocationSliderOpen(!locationSliderOpen);
+            }}
+            sx={{
+              minWidth: 'auto',
+              px: 1,
+              py: 0.5,
+              fontSize: '0.7rem',
+              bgcolor: filters.locationEnabled ? 'primary.main' : 'rgba(0,0,0,0.7)',
+              color: 'white',
+              border: '1px solid rgba(255,255,255,0.3)',
+              '&:hover': {
+                bgcolor: filters.locationEnabled ? 'primary.dark' : 'rgba(0,0,0,0.9)',
+                border: '1px solid rgba(255,255,255,0.5)',
+              },
+              borderRadius: 1
+            }}
+          >
+            📍 {filters.locationEnabled ? `${filters.radius / 1000}km` : 'Location'}
+          </Button>
+
+          {/* Location Slider */}
+          {locationSliderOpen && (
+            <Box
+              sx={{
+                position: 'absolute',
+                top: 35,
+                right: 0,
+                bgcolor: 'rgba(0,0,0,0.9)',
+                borderRadius: 1,
+                p: 2,
+                minWidth: 200,
+                backdropFilter: 'blur(10px)',
+                border: '1px solid rgba(255,255,255,0.2)',
+                zIndex: 12
+              }}
+            >
+              <Typography variant="subtitle2" sx={{ color: 'white', mb: 1 }}>
+                Location Radius: {filters.radius / 1000}km
+              </Typography>
+              <Slider
+                value={filters.radius / 1000}
+                onChange={(_, value) => {
+                  const newRadius = (value as number) * 1000;
+                  setFilters(prev => ({ ...prev, radius: newRadius }));
+                }}
+                min={1}
+                max={4000}
+                step={10}
+                marks={[
+                  { value: 1, label: '1km' },
+                  { value: 100, label: '100km' },
+                  { value: 1000, label: '1000km' },
+                  { value: 4000, label: '4000km' }
+                ]}
+                sx={{
+                  color: 'primary.main',
+                  '& .MuiSlider-markLabel': {
+                    color: 'rgba(255,255,255,0.7)',
+                    fontSize: '0.7rem'
+                  }
+                }}
+              />
+              <Box sx={{ display: 'flex', justifyContent: 'space-between', mt: 1 }}>
+                <Button
+                  size="small"
+                  onClick={() => {
+                    setFilters(prev => ({ ...prev, locationEnabled: false, userLocation: null }));
+                    setLocationSliderOpen(false);
+                    // Reload issues without location filter
+                    dispatch(setLoadMoreMode(false));
+                    loadIssues(false);
+                  }}
+                  sx={{ color: 'white', fontSize: '0.7rem' }}
+                >
+                  Disable
+                </Button>
+                <Button
+                  size="small"
+                  variant="contained"
+                  onClick={() => {
+                    setLocationSliderOpen(false);
+                    // Reload issues with new radius
+                    dispatch(setLoadMoreMode(false));
+                    loadIssues(false);
+                  }}
+                  sx={{ fontSize: '0.7rem' }}
+                >
+                  Apply
+                </Button>
+              </Box>
+            </Box>
+          )}
+        </Box>
+      )}
+
       {mapView ? (
         /* Map View */
         <Box sx={{ height: '100%', pt: 8 }}>
@@ -467,20 +710,24 @@ const IssueReels: React.FC = () => {
           <Box
             sx={{
               height: '100%',
+              width: '100%',
+              maxWidth: '600px', // Increased width for web viewing
               display: 'flex',
               flexDirection: 'column',
-              position: 'relative'
+              position: 'relative',
+              mx: 'auto' // Center horizontally
             }}
           >
             {uniqueIssues.map((issue, index) => (
               <Box
-                key={issue.id}
+                key={issue._id}
                 sx={{
                   flex: 1,
                   display: index === currentIndex ? 'flex' : 'none',
                   flexDirection: 'column',
                   position: 'relative',
-                  bgcolor: 'black'
+                  bgcolor: 'black',
+                  width: '100%'
                 }}
               >
                 {/* Media Content */}
@@ -488,7 +735,10 @@ const IssueReels: React.FC = () => {
                   {issue.media?.videos && issue.media.videos.length > 0 ? (
                     <video
                       ref={el => {
-                        if (el) videoRefs.current.set(issue.id, el);
+                        if (el) {
+                          videoRefs.current.set(issue._id, el);
+                          console.log('Video ref set for issue:', issue._id, el);
+                        }
                       }}
                       src={issue.media.videos[0]}
                       style={{
@@ -498,12 +748,18 @@ const IssueReels: React.FC = () => {
                       }}
                       loop
                       playsInline
-                      onPlay={() => setPlayingVideos(prev => new Set(prev).add(issue.id))}
-                      onPause={() => setPlayingVideos(prev => {
-                        const newSet = new Set(prev);
-                        newSet.delete(issue.id);
-                        return newSet;
-                      })}
+                      onPlay={() => {
+                        console.log('Video onPlay triggered for issue:', issue._id);
+                        setPlayingVideos(prev => new Set(prev).add(issue._id));
+                      }}
+                      onPause={() => {
+                        console.log('Video onPause triggered for issue:', issue._id);
+                        setPlayingVideos(prev => {
+                          const newSet = new Set(prev);
+                          newSet.delete(issue._id);
+                          return newSet;
+                        });
+                      }}
                     />
                   ) : issue.media?.images && issue.media.images.length > 0 ? (
                     <Box
@@ -532,41 +788,224 @@ const IssueReels: React.FC = () => {
                     </Box>
                   )}
 
-                  {/* Video Controls */}
+                  {/* Video Controls - Center positioned */}
                   {issue.media?.videos && issue.media.videos.length > 0 && (
                     <Box
                       sx={{
                         position: 'absolute',
-                        bottom: 120,
-                        right: 16,
+                        top: '50%',
+                        left: '50%',
+                        transform: 'translate(-50%, -50%)',
                         display: 'flex',
-                        flexDirection: 'column',
-                        gap: 2
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        zIndex: 20
                       }}
                     >
                       <IconButton
-                        onClick={() => toggleVideoPlayback(issue.id)}
+                        onClick={() => toggleVideoPlayback(issue._id)}
                         sx={{
                           bgcolor: 'rgba(0,0,0,0.5)',
                           color: 'white',
-                          '&:hover': { bgcolor: 'rgba(0,0,0,0.7)' }
+                          '&:hover': { bgcolor: 'rgba(0,0,0,0.7)' },
+                          width: 60,
+                          height: 60,
+                          zIndex: 21
                         }}
                       >
-                        {playingVideos.has(issue.id) ? <Pause /> : <PlayArrow />}
-                      </IconButton>
-                      <IconButton
-                        onClick={() => toggleVideoMute(issue.id)}
-                        sx={{
-                          bgcolor: 'rgba(0,0,0,0.5)',
-                          color: 'white',
-                          '&:hover': { bgcolor: 'rgba(0,0,0,0.7)' }
-                        }}
-                      >
-                        {mutedVideos.has(issue.id) ? <VolumeOff /> : <VolumeUp />}
+                        {playingVideos.has(issue._id) ? <Pause sx={{ fontSize: 30 }} /> : <PlayArrow sx={{ fontSize: 30 }} />}
                       </IconButton>
                     </Box>
                   )}
+
+                  {/* Action Buttons - Right side */}
+                  <Box
+                    sx={{
+                      position: 'absolute',
+                      right: 16,
+                      bottom: 140,
+                      display: 'flex',
+                      flexDirection: 'column',
+                      gap: 2,
+                      alignItems: 'center',
+                      zIndex: 20
+                    }}
+                  >
+                    <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+                      <IconButton
+                        onClick={() => handleVote(issue._id, 'upvote')}
+                        sx={{
+                          color: issue.userVote === 'upvote' ? 'red' : 'white',
+                          bgcolor: 'rgba(0,0,0,0.5)',
+                          '&:hover': { bgcolor: 'rgba(0,0,0,0.7)' },
+                          width: 50,
+                          height: 50,
+                          zIndex: 21
+                        }}
+                        disabled={!currentUser}
+                      >
+                        {issue.userVote === 'upvote' ? <Favorite /> : <FavoriteBorder />}
+                      </IconButton>
+                      <Typography variant="caption" sx={{ color: 'white', mt: 0.5, fontSize: '0.7rem' }}>
+                        {issue.upvotesCount || issue.voteScore || 0}
+                      </Typography>
+                    </Box>
+
+                    <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+                      <IconButton
+                        onClick={() => handleCommentClick(issue._id)}
+                        sx={{
+                          color: commentsVisible === issue._id ? 'primary.main' : 'white',
+                          bgcolor: 'rgba(0,0,0,0.5)',
+                          '&:hover': { bgcolor: 'rgba(0,0,0,0.7)' },
+                          width: 50,
+                          height: 50,
+                          zIndex: 21
+                        }}
+                      >
+                        <Comment />
+                      </IconButton>
+                      <Typography variant="caption" sx={{ color: 'white', mt: 0.5, fontSize: '0.7rem' }}>
+                        {issue.commentsCount || 0}
+                      </Typography>
+                    </Box>
+
+                    <IconButton
+                      onClick={() => handleShare(issue)}
+                      sx={{
+                        color: 'white',
+                        bgcolor: 'rgba(0,0,0,0.5)',
+                        '&:hover': { bgcolor: 'rgba(0,0,0,0.7)' },
+                        width: 50,
+                        height: 50,
+                        zIndex: 21
+                      }}
+                    >
+                      <Share />
+                    </IconButton>
+                  </Box>
                 </Box>
+
+                {/* Comments Display Box */}
+                {commentsVisible === issue._id && (
+                  <Box
+                    sx={{
+                      position: 'absolute',
+                      bottom: 120,
+                      left: 16,
+                      right: 16,
+                      bgcolor: 'rgba(0,0,0,0.9)',
+                      borderRadius: 2,
+                      p: 2,
+                      zIndex: 25,
+                      backdropFilter: 'blur(10px)',
+                      maxHeight: '300px',
+                      display: 'flex',
+                      flexDirection: 'column'
+                    }}
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    {/* Comments List */}
+                    <Box sx={{ flex: 1, overflowY: 'auto', mb: 2 }}>
+                      {loadingComments[issue._id] ? (
+                        <Box sx={{ display: 'flex', justifyContent: 'center', py: 2 }}>
+                          <CircularProgress size={20} sx={{ color: 'white' }} />
+                        </Box>
+                      ) : reelComments[issue._id]?.length > 0 ? (
+                        reelComments[issue._id].map((comment, index) => (
+                          <Box key={comment.id || index} sx={{ mb: 1.5 }}>
+                            <Box sx={{ display: 'flex', alignItems: 'center', mb: 0.5 }}>
+                              <Typography variant="caption" sx={{ color: 'primary.main', fontWeight: 'bold', mr: 1 }}>
+                                {comment.user?.name || 'Anonymous'}
+                              </Typography>
+                              <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.6)' }}>
+                                {new Date(comment.timestamp).toLocaleDateString()}
+                              </Typography>
+                            </Box>
+                            <Typography variant="body2" sx={{ color: 'white', lineHeight: 1.3 }}>
+                              {comment.message}
+                            </Typography>
+                          </Box>
+                        ))
+                      ) : (
+                        <Typography variant="body2" sx={{ color: 'rgba(255,255,255,0.6)', textAlign: 'center', py: 2 }}>
+                          No comments yet. Be the first to comment!
+                        </Typography>
+                      )}
+                    </Box>
+
+                    {/* Comment Input */}
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                      <TextField
+                        fullWidth
+                        size="small"
+                        placeholder="Add a comment..."
+                        value={newComment}
+                        onChange={(e) => setNewComment(e.target.value)}
+                        onKeyPress={(e) => handleCommentKeyPress(e, issue._id)}
+                        disabled={submittingComment}
+                        sx={{
+                          '& .MuiOutlinedInput-root': {
+                            bgcolor: 'rgba(255,255,255,0.1)',
+                            color: 'white',
+                            '& fieldset': {
+                              borderColor: 'rgba(255,255,255,0.3)',
+                            },
+                            '&:hover fieldset': {
+                              borderColor: 'rgba(255,255,255,0.5)',
+                            },
+                            '&.Mui-focused fieldset': {
+                              borderColor: 'primary.main',
+                            },
+                          },
+                          '& .MuiOutlinedInput-input': {
+                            '&::placeholder': {
+                              color: 'rgba(255,255,255,0.7)',
+                              opacity: 1,
+                            },
+                          },
+                        }}
+                        inputProps={{
+                          style: { color: 'white' }
+                        }}
+                      />
+                      <IconButton
+                        onClick={() => handleAddComment(issue._id)}
+                        disabled={!newComment.trim() || submittingComment || !currentUser}
+                        sx={{
+                          color: 'primary.main',
+                          bgcolor: 'rgba(255,255,255,0.1)',
+                          '&:hover': { bgcolor: 'rgba(255,255,255,0.2)' },
+                          '&:disabled': { color: 'rgba(255,255,255,0.3)' }
+                        }}
+                      >
+                        {submittingComment ? <CircularProgress size={20} /> : <Send />}
+                      </IconButton>
+                    </Box>
+
+                    {/* View All Comments Link */}
+                    <Box sx={{ display: 'flex', justifyContent: 'center', mt: 1 }}>
+                      <Button
+                        size="small"
+                        onClick={() => {
+                          setSelectedIssueForComments(issue);
+                          setCommentsModalOpen(true);
+                          setCommentsVisible(null);
+                          setNewComment('');
+                        }}
+                        sx={{
+                          color: 'primary.main',
+                          fontSize: '0.7rem',
+                          minWidth: 'auto',
+                          p: 0.5,
+                          textTransform: 'none'
+                        }}
+                      >
+                        View all comments ({issue.commentsCount || 0})
+                      </Button>
+                    </Box>
+                  </Box>
+                )}
 
                 {/* Issue Info Overlay */}
                 <Box
@@ -575,99 +1014,48 @@ const IssueReels: React.FC = () => {
                     bottom: 0,
                     left: 0,
                     right: 0,
-                    bgcolor: 'linear-gradient(transparent, rgba(0,0,0,0.8))',
-                    p: 3,
-                    color: 'white'
+                    bgcolor: 'linear-gradient(transparent, rgba(0,0,0,0.9))',
+                    p: 2,
+                    color: 'white',
+                    minHeight: '120px'
                   }}
                 >
                   {/* User Info */}
-                  <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
-                    <Avatar sx={{ mr: 2, bgcolor: 'primary.main' }}>
+                  <Box sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
+                    <Avatar sx={{ mr: 1.5, bgcolor: 'primary.main', width: 32, height: 32 }}>
                       {issue.reportedBy?.name?.charAt(0)?.toUpperCase() || 'U'}
                     </Avatar>
-                    <Box>
-                      <Typography variant="subtitle1" fontWeight="bold">
+                    <Box sx={{ flex: 1 }}>
+                      <Typography variant="subtitle2" fontWeight="bold" sx={{ lineHeight: 1.2 }}>
                         {issue.reportedBy?.name || 'Anonymous'}
                       </Typography>
-                      <Typography variant="caption" sx={{ opacity: 0.8 }}>
+                      <Typography variant="caption" sx={{ opacity: 0.8, lineHeight: 1.2 }}>
                         {issue.daysSinceReported} days ago • {issue.location.city || 'Unknown location'}
                       </Typography>
-                    </Box>
-                    <Box sx={{ ml: 'auto' }}>
-                      {issue.isPublic ? (
-                        <Public sx={{ fontSize: 16, opacity: 0.7 }} />
-                      ) : (
-                        <Lock sx={{ fontSize: 16, opacity: 0.7 }} />
-                      )}
                     </Box>
                   </Box>
 
                   {/* Issue Details */}
-                  <Typography variant="h6" fontWeight="bold" sx={{ mb: 1 }}>
+                  <Typography variant="subtitle1" fontWeight="bold" sx={{ mb: 0.5, lineHeight: 1.3 }}>
                     {issue.title}
                   </Typography>
-                  <Typography variant="body2" sx={{ mb: 2, opacity: 0.9 }}>
-                    {issue.description.length > 150
-                      ? `${issue.description.substring(0, 150)}...`
-                      : issue.description
-                    }
+                  <Typography variant="body2" sx={{ mb: 1, opacity: 0.9, lineHeight: 1.3, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>
+                    {issue.description}
                   </Typography>
 
                   {/* Category and Status */}
-                  <Box sx={{ display: 'flex', gap: 1, mb: 2 }}>
+                  <Box sx={{ display: 'flex', gap: 0.5, mb: 1 }}>
                     <Chip
                       label={categoryDisplayNames[issue.category] || issue.category}
                       size="small"
-                      sx={{ bgcolor: 'primary.main', color: 'white' }}
+                      sx={{ bgcolor: 'primary.main', color: 'white', fontSize: '0.7rem', height: 24 }}
                     />
                     <Chip
                       label={issue.statusDisplay}
                       size="small"
                       variant="outlined"
-                      sx={{ borderColor: 'white', color: 'white' }}
+                      sx={{ borderColor: 'white', color: 'white', fontSize: '0.7rem', height: 24 }}
                     />
-                  </Box>
-
-                  {/* Action Buttons */}
-                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-                    <Box sx={{ display: 'flex', alignItems: 'center' }}>
-                      <IconButton
-                        onClick={() => handleVote(issue.id, 'upvote')}
-                        sx={{ color: issue.userVote === 'upvote' ? 'red' : 'white' }}
-                        disabled={!currentUser}
-                      >
-                        {issue.userVote === 'upvote' ? <Favorite /> : <FavoriteBorder />}
-                      </IconButton>
-                      <Typography variant="body2" sx={{ ml: 1 }}>
-                        {issue.upvotesCount || issue.voteScore || 0}
-                      </Typography>
-                    </Box>
-
-                    <Box sx={{ display: 'flex', alignItems: 'center' }}>
-                      <IconButton
-                        onClick={() => navigate(`/issues/${issue.id}`)}
-                        sx={{ color: 'white' }}
-                      >
-                        <Comment />
-                      </IconButton>
-                      <Typography variant="body2" sx={{ ml: 1 }}>
-                        {issue.commentsCount || 0}
-                      </Typography>
-                    </Box>
-
-                    <IconButton
-                      onClick={() => handleShare(issue)}
-                      sx={{ color: 'white' }}
-                    >
-                      <Share />
-                    </IconButton>
-
-                    <Box sx={{ display: 'flex', alignItems: 'center', ml: 'auto' }}>
-                      <LocationOn sx={{ fontSize: 16, mr: 0.5 }} />
-                      <Typography variant="caption">
-                        {issue.location.city || 'Location'}
-                      </Typography>
-                    </Box>
                   </Box>
                 </Box>
               </Box>
@@ -681,11 +1069,12 @@ const IssueReels: React.FC = () => {
               sx={{
                 position: 'absolute',
                 top: '50%',
-                left: 16,
-                transform: 'translateY(-50%)',
+                left: '50%',
+                transform: 'translate(-50%, -50%) translateX(-320px)', // Position to the left of the wider reel
                 bgcolor: 'rgba(0,0,0,0.5)',
                 color: 'white',
-                '&:hover': { bgcolor: 'rgba(0,0,0,0.7)' }
+                '&:hover': { bgcolor: 'rgba(0,0,0,0.7)' },
+                zIndex: 15
               }}
             >
               ↑
@@ -698,11 +1087,12 @@ const IssueReels: React.FC = () => {
               sx={{
                 position: 'absolute',
                 top: '50%',
-                right: 16,
-                transform: 'translateY(-50%)',
+                right: '50%',
+                transform: 'translate(50%, -50%) translateX(320px)', // Position to the right of the wider reel
                 bgcolor: 'rgba(0,0,0,0.5)',
                 color: 'white',
-                '&:hover': { bgcolor: 'rgba(0,0,0,0.7)' }
+                '&:hover': { bgcolor: 'rgba(0,0,0,0.7)' },
+                zIndex: 15
               }}
             >
               ↓
@@ -714,13 +1104,15 @@ const IssueReels: React.FC = () => {
             sx={{
               position: 'absolute',
               top: 80,
-              left: 16,
-              right: 16,
+              left: '50%',
+              transform: 'translateX(-50%)',
               display: 'flex',
-              gap: 1
+              gap: 1,
+              maxWidth: '580px',
+              width: '90%'
             }}
           >
-            {uniqueIssues.slice(0, 10).map((_, index) => (
+            {Array.from({ length: Math.min(uniqueIssues.length, 20) }, (_, index) => (
               <Box
                 key={index}
                 sx={{
@@ -830,8 +1222,10 @@ const IssueReels: React.FC = () => {
           sx={{
             position: 'absolute',
             bottom: 16,
-            left: 16,
-            right: 16,
+            left: '50%',
+            transform: 'translateX(-50%)',
+            maxWidth: '580px',
+            width: '90%',
             zIndex: 10
           }}
         >
@@ -839,22 +1233,20 @@ const IssueReels: React.FC = () => {
         </Alert>
       )}
 
-      {/* Load More Button - Only show in reels view */}
-      {!mapView && hasMoreIssues && uniqueIssues.length >= 10 && (
-        <Fab
-          onClick={handleLoadMore}
-          sx={{
-            position: 'absolute',
-            bottom: 100,
-            right: 16,
-            bgcolor: 'primary.main',
-            color: 'white',
-            '&:hover': { bgcolor: 'primary.dark' }
+      {/* Load More Button - REMOVED */}
+
+      {/* Comments Modal */}
+      {selectedIssueForComments && (
+        <CommentsModal
+          open={commentsModalOpen}
+          onClose={() => {
+            setCommentsModalOpen(false);
+            setSelectedIssueForComments(null);
           }}
-          disabled={loading}
-        >
-          {loading ? <CircularProgress size={20} color="inherit" /> : '+'}
-        </Fab>
+          issueId={selectedIssueForComments._id}
+          issueTitle={selectedIssueForComments.title}
+          totalComments={selectedIssueForComments.commentsCount || 0}
+        />
       )}
     </Box>
   );

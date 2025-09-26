@@ -30,6 +30,7 @@ import {
   Visibility,
   ThumbUp,
   Comment,
+  PlayCircle,
 } from "@mui/icons-material";
 import { useDispatch, useSelector } from "react-redux";
 import { useNavigate, Navigate } from "react-router-dom";
@@ -136,11 +137,11 @@ const IssueCard: React.FC<IssueCardProps> = ({ issue, onViewDetails }) => {
           </Typography>
 
           <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
-            {issue.upvotes > 0 && (
+            {issue.upvotesCount > 0 && (
               <Box sx={{ display: "flex", alignItems: "center", gap: 0.5 }}>
                 <ThumbUp fontSize="small" color="action" />
                 <Typography variant="caption" color="text.secondary">
-                  {issue.upvotes}
+                  {issue.upvotesCount}
                 </Typography>
               </Box>
             )}
@@ -227,6 +228,10 @@ const UserDashboard: React.FC = () => {
 
   const handleViewAllIssues = () => {
     navigate("/my-issues");
+  };
+
+  const handleExploreReels = () => {
+    navigate("/reels");
   };
 
   const handleRefresh = () => {
@@ -404,6 +409,7 @@ const UserDashboard: React.FC = () => {
         </Grid>
       </Grid>
 
+
       {/* Quick Actions */}
       <Grid container spacing={3} sx={{ mb: 3 }}>
         <Grid item xs={12} md={6}>
@@ -413,6 +419,21 @@ const UserDashboard: React.FC = () => {
                 Quick Actions
               </Typography>
               <Box sx={{ display: "flex", flexDirection: "column", gap: 2 }}>
+                <Button
+                  variant="contained"
+                  startIcon={<PlayCircle />}
+                  onClick={handleExploreReels}
+                  size="large"
+                  fullWidth
+                  sx={{
+                    bgcolor: 'primary.main',
+                    '&:hover': { bgcolor: 'primary.dark' },
+                    fontWeight: 'bold',
+                    py: 1.5
+                  }}
+                >
+                  🎬 Explore Issue Reels
+                </Button>
                 <Button
                   variant="contained"
                   startIcon={<Add />}

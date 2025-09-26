@@ -182,25 +182,11 @@ router.get('/nearby', optionalAuth, nearbyIssuesValidation, IssueController.getN
 router.get('/map', optionalAuth, IssueController.getMapIssues);
 
 /**
- * @route   GET /api/issues/:issueId
- * @desc    Get issue by ID
- * @access  Public (but respects privacy settings)
- */
-router.get('/:issueId', optionalAuth, issueIdValidation, IssueController.getIssueById);
-
-/**
  * @route   PUT /api/issues/:issueId/status
  * @desc    Update issue status
  * @access  Private (Issue reporter or authorized users)
  */
 router.put('/:issueId/status', authenticateToken, updateStatusValidation, IssueController.updateIssueStatus);
-
-/**
- * @route   DELETE /api/issues/:issueId
- * @desc    Delete issue (only pending issues by reporter)
- * @access  Private (Issue reporter only)
- */
-router.delete('/:issueId', authenticateToken, issueIdValidation, IssueController.deleteIssue);
 
 /**
  * @route   POST /api/issues/:issueId/vote
@@ -217,6 +203,13 @@ router.post('/:issueId/vote', authenticateToken, voteValidation, IssueController
 router.delete('/:issueId/vote', authenticateToken, issueIdValidation, IssueController.removeVote);
 
 /**
+ * @route   GET /api/issues/:issueId/comments
+ * @desc    Get all comments for an issue
+ * @access  Public (but respects privacy settings)
+ */
+router.get('/:issueId/comments', optionalAuth, [...issueIdValidation], IssueController.getIssueComments);
+
+/**
  * @route   POST /api/issues/:issueId/comments
  * @desc    Add a comment to an issue
  * @access  Private (Authenticated users)
@@ -229,6 +222,20 @@ router.post('/:issueId/comments', authenticateToken, addCommentValidation, Issue
  * @access  Private (Comment author or authorized users)
  */
 router.delete('/:issueId/comments/:commentId', authenticateToken, [...issueIdValidation, ...commentIdValidation], IssueController.deleteComment);
+
+/**
+ * @route   GET /api/issues/:issueId
+ * @desc    Get issue by ID
+ * @access  Public (but respects privacy settings)
+ */
+router.get('/:issueId', optionalAuth, issueIdValidation, IssueController.getIssueById);
+
+/**
+ * @route   DELETE /api/issues/:issueId
+ * @desc    Delete issue (only pending issues by reporter)
+ * @access  Private (Issue reporter only)
+ */
+router.delete('/:issueId', authenticateToken, issueIdValidation, IssueController.deleteIssue);
 
 /**
  * @route   POST /api/issues/test-cloudinary

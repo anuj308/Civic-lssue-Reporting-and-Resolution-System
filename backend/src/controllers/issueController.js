@@ -1,6 +1,7 @@
 const { validationResult } = require('express-validator');
 const { Issue } = require('../models/Issue');
 const { Department } = require('../models/Department');
+const { User } = require('../models/User');
 const { processIssueImages, processIssueVideos } = require('../utils/cloudinaryService');
 
 class IssueController {
@@ -235,6 +236,12 @@ class IssueController {
         const requestedFields = fields.split(',').map(f => f.trim());
         // Always include essential fields for functionality
         const essentialFields = ['_id', 'title', 'description', 'category', 'status', 'location', 'timeline', 'votes', 'isPublic'];
+        
+        // If commentsCount is requested, also include comments field
+        if (requestedFields.includes('commentsCount')) {
+          essentialFields.push('comments');
+        }
+        
         const allFields = [...new Set([...essentialFields, ...requestedFields])];
         fieldSelection = allFields.reduce((acc, field) => {
           acc[field] = 1;
@@ -284,10 +291,10 @@ class IssueController {
           reportedBy: issue.reportedBy,
           assignedTo: issue.assignedTo,
           assignedDepartment: issue.assignedDepartment,
-          voteScore: (issue.votes?.upvotes?.length || 0) - (issue.votes?.downvotes?.length || 0),
-          upvotesCount: issue.votes?.upvotes?.length || 0,
-          downvotesCount: issue.votes?.downvotes?.length || 0,
-          commentsCount: issue.comments?.length || 0,
+          voteScore: (issue.votes?.upvotesCount || 0) - (issue.votes?.downvotesCount || 0),
+          upvotesCount: issue.votes?.upvotesCount || 0,
+          downvotesCount: issue.votes?.downvotesCount || 0,
+          commentsCount: issue.commentsCount || 0,
           userVote: userVote,
           daysSinceReported: Math.floor((Date.now() - new Date(issue.timeline?.reported || issue.createdAt).getTime()) / (1000 * 60 * 60 * 24)),
           tags: issue.tags,
@@ -365,6 +372,12 @@ class IssueController {
         const requestedFields = fields.split(',').map(f => f.trim());
         // Always include essential fields for functionality
         const essentialFields = ['_id', 'title', 'description', 'category', 'status', 'location', 'timeline', 'votes', 'isPublic'];
+        
+        // If commentsCount is requested, also include comments field
+        if (requestedFields.includes('commentsCount')) {
+          essentialFields.push('comments');
+        }
+        
         const allFields = [...new Set([...essentialFields, ...requestedFields])];
         fieldSelection = allFields.reduce((acc, field) => {
           acc[field] = 1;
@@ -417,10 +430,10 @@ class IssueController {
           timeline: issue.timeline,
           reportedBy: issue.reportedBy ? { name: issue.reportedBy.name } : null,
           assignedDepartment: issue.assignedDepartment,
-          voteScore: (issue.votes?.upvotes?.length || 0) - (issue.votes?.downvotes?.length || 0),
-          upvotesCount: issue.votes?.upvotes?.length || 0,
-          downvotesCount: issue.votes?.downvotes?.length || 0,
-          commentsCount: issue.comments?.length || 0,
+          voteScore: (issue.votes?.upvotesCount || 0) - (issue.votes?.downvotesCount || 0),
+          upvotesCount: issue.votes?.upvotesCount || 0,
+          downvotesCount: issue.votes?.downvotesCount || 0,
+          commentsCount: issue.commentsCount || 0,
           userVote: userVote,
           daysSinceReported: Math.floor((Date.now() - new Date(issue.timeline?.reported || issue.createdAt).getTime()) / (1000 * 60 * 60 * 24)),
           tags: issue.tags,
@@ -484,6 +497,12 @@ class IssueController {
         const requestedFields = fields.split(',').map(f => f.trim());
         // Always include essential fields for functionality
         const essentialFields = ['_id', 'title', 'description', 'category', 'status', 'location', 'timeline', 'votes', 'isPublic'];
+        
+        // If commentsCount is requested, also include comments field
+        if (requestedFields.includes('commentsCount')) {
+          essentialFields.push('comments');
+        }
+        
         const allFields = [...new Set([...essentialFields, ...requestedFields])];
         fieldSelection = allFields.reduce((acc, field) => {
           acc[field] = 1;
@@ -536,10 +555,10 @@ class IssueController {
           timeline: issue.timeline,
           reportedBy: issue.reportedBy ? { name: issue.reportedBy.name } : null,
           assignedDepartment: issue.assignedDepartment,
-          voteScore: (issue.votes?.upvotes?.length || 0) - (issue.votes?.downvotes?.length || 0),
-          upvotesCount: issue.votes?.upvotes?.length || 0,
-          downvotesCount: issue.votes?.downvotes?.length || 0,
-          commentsCount: issue.comments?.length || 0,
+          voteScore: (issue.votes?.upvotesCount || 0) - (issue.votes?.downvotesCount || 0),
+          upvotesCount: issue.votes?.upvotesCount || 0,
+          downvotesCount: issue.votes?.downvotesCount || 0,
+          commentsCount: issue.commentsCount || 0,
           userVote: userVote,
           daysSinceReported: Math.floor((Date.now() - new Date(issue.timeline?.reported || issue.createdAt).getTime()) / (1000 * 60 * 60 * 24)),
           tags: issue.tags,
@@ -647,7 +666,7 @@ class IssueController {
             assignedTo: issue.assignedTo,
             assignedDepartment: issue.assignedDepartment,
             votes: issue.votes,
-            voteScore: (issue.votes?.upvotes?.length || 0) - (issue.votes?.downvotes?.length || 0),
+            voteScore: (issue.votes?.upvotesCount || 0) - (issue.votes?.downvotesCount || 0),
             userVote: userVote, // Whether current user has voted and how
             comments: issue.comments,
             daysSinceReported: Math.floor((Date.now() - new Date(issue.timeline?.reported || issue.createdAt).getTime()) / (1000 * 60 * 60 * 24)),
@@ -906,7 +925,7 @@ class IssueController {
           },
           createdAt: issue.createdAt,
           reportedBy: issue.reportedBy ? { name: issue.reportedBy.name } : null,
-          voteScore: (issue.votes?.upvotes?.length || 0) - (issue.votes?.downvotes?.length || 0),
+          voteScore: (issue.votes?.upvotesCount || 0) - (issue.votes?.downvotesCount || 0),
           userVote: userVote,
           daysSinceReported: Math.floor((Date.now() - new Date(issue.timeline?.reported || issue.createdAt).getTime()) / (1000 * 60 * 60 * 24))
         };
@@ -964,21 +983,25 @@ class IssueController {
       // Remove existing votes first
       if (hasUpvoted) {
         issue.votes.upvotes = issue.votes.upvotes.filter(id => id.toString() !== userId.toString());
+        issue.votes.upvotesCount = Math.max(0, issue.votes.upvotesCount - 1);
       }
       if (hasDownvoted) {
         issue.votes.downvotes = issue.votes.downvotes.filter(id => id.toString() !== userId.toString());
+        issue.votes.downvotesCount = Math.max(0, issue.votes.downvotesCount - 1);
       }
 
       // Add new vote
       if (type === 'upvote') {
         issue.votes.upvotes.push(userId);
+        issue.votes.upvotesCount += 1;
       } else if (type === 'downvote') {
         issue.votes.downvotes.push(userId);
+        issue.votes.downvotesCount += 1;
       }
 
       await issue.save();
 
-      const voteScore = issue.votes.upvotes.length - issue.votes.downvotes.length;
+      const voteScore = issue.votes.upvotesCount - issue.votes.downvotesCount;
 
       console.log(`✅ User ${userId} ${type}d issue ${issueId}. New score: ${voteScore}`);
 
@@ -1026,12 +1049,18 @@ class IssueController {
       issue.votes.upvotes = issue.votes.upvotes.filter(id => id.toString() !== userId.toString());
       issue.votes.downvotes = issue.votes.downvotes.filter(id => id.toString() !== userId.toString());
 
+      // Update counter fields
+      const upvotesRemoved = originalUpvoteCount - issue.votes.upvotes.length;
+      const downvotesRemoved = originalDownvoteCount - issue.votes.downvotes.length;
+      issue.votes.upvotesCount = Math.max(0, issue.votes.upvotesCount - upvotesRemoved);
+      issue.votes.downvotesCount = Math.max(0, issue.votes.downvotesCount - downvotesRemoved);
+
       // Only save if vote was actually removed
-      if (issue.votes.upvotes.length !== originalUpvoteCount || issue.votes.downvotes.length !== originalDownvoteCount) {
+      if (upvotesRemoved > 0 || downvotesRemoved > 0) {
         await issue.save();
       }
 
-      const voteScore = issue.votes.upvotes.length - issue.votes.downvotes.length;
+      const voteScore = issue.votes.upvotesCount - issue.votes.downvotesCount;
 
       console.log(`✅ User ${userId} removed vote from issue ${issueId}. New score: ${voteScore}`);
 
@@ -1050,6 +1079,73 @@ class IssueController {
       res.status(500).json({
         success: false,
         message: 'Internal server error while removing vote'
+      });
+    }
+  }
+
+  /**
+   * Get all comments for an issue
+   * @param {Object} req - Express request object
+   * @param {Object} res - Express response object
+   */
+  static async getIssueComments(req, res) {
+    try {
+      const { issueId } = req.params;
+      const { page = 1, limit = 10 } = req.query;
+
+      const issue = await Issue.findById(issueId)
+        .populate('comments.user', 'name')
+        .select('comments isPublic reportedBy');
+
+      if (!issue) {
+        return res.status(404).json({
+          success: false,
+          message: 'Issue not found'
+        });
+      }
+
+      // Check if user has permission to view comments
+      if (!issue.isPublic && (!req.user || req.user._id.toString() !== issue.reportedBy.toString())) {
+        return res.status(403).json({
+          success: false,
+          message: 'Access denied. You do not have permission to view comments on this issue.'
+        });
+      }
+
+      // Sort comments by timestamp (newest first) and paginate
+      const sortedComments = issue.comments
+        .sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp))
+        .slice((parseInt(page) - 1) * parseInt(limit), parseInt(page) * parseInt(limit));
+
+      const totalComments = issue.comments.length;
+      const totalPages = Math.ceil(totalComments / parseInt(limit));
+
+      res.status(200).json({
+        success: true,
+        message: 'Comments retrieved successfully',
+        data: {
+          comments: sortedComments.map(comment => ({
+            id: comment._id,
+            user: comment.user,
+            message: comment.message,
+            timestamp: comment.timestamp,
+            isOfficial: comment.isOfficial
+          })),
+          pagination: {
+            currentPage: parseInt(page),
+            totalPages,
+            totalComments,
+            hasNextPage: parseInt(page) < totalPages,
+            hasPrevPage: parseInt(page) > 1
+          }
+        }
+      });
+
+    } catch (error) {
+      console.error('❌ Error fetching issue comments:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Internal server error while fetching comments'
       });
     }
   }
@@ -1099,6 +1195,7 @@ class IssueController {
       };
 
       issue.comments.push(newComment);
+      issue.commentsCount += 1;
       await issue.save();
 
       // Populate the user info for the response
@@ -1175,6 +1272,7 @@ class IssueController {
 
       // Remove the comment
       issue.comments.splice(commentIndex, 1);
+      issue.commentsCount = Math.max(0, issue.commentsCount - 1);
       await issue.save();
 
       console.log(`✅ Comment ${commentId} deleted from issue ${issueId} by user ${userId}`);
