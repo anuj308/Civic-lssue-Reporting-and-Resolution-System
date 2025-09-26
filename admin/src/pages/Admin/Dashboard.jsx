@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
-import { adminAPI } from '../../services/api';
-import { useAdminAuth } from '../../store/auth.jsx';
 import { Link } from 'react-router-dom';
+import { useAdminAuth } from '../../store/auth.jsx';
+import { mockDepartments, mockIssues, mockStats } from '../../services/mockData';
 
 const AdminDashboard = () => {
   const { profile, logout } = useAdminAuth() || {};
@@ -10,29 +10,11 @@ const AdminDashboard = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
+  // Modified useEffect to use mock data
   useEffect(() => {
-    const loadData = async () => {
-      try {
-        setLoading(true);
-        const [deptData, issueData] = await Promise.allSettled([
-          adminAPI.listDepartments({ page: 1, limit: 10 }),
-          adminAPI.listIssues ? adminAPI.listIssues({ page: 1, limit: 10 }) : Promise.resolve([])
-        ]);
-        
-        if (deptData.status === 'fulfilled') {
-          setDepartments(Array.isArray(deptData.value) ? deptData.value : deptData.value?.items || []);
-        }
-        if (issueData.status === 'fulfilled') {
-          setIssues(Array.isArray(issueData.value) ? issueData.value : issueData.value?.items || []);
-        }
-      } catch (err) {
-        setError(err?.message || 'Failed to load dashboard data');
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    loadData();
+    setDepartments(mockDepartments);
+    setIssues(mockIssues);
+    setLoading(false);
   }, []);
 
   if (loading) {
@@ -74,107 +56,143 @@ const AdminDashboard = () => {
       </div>
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {error && (
-          <div className="mb-6 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
-            {error}
-          </div>
-        )}
+        {/* Quick Stats Cards */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+          {{
+            label: 'Total Issues',
+            value: mockStats.totalIssues,
+            color: 'indigo'
+          },
+          {
+            label: 'Resolved',
+            value: mockStats.resolvedIssues,
+            color: 'green'
+          },
+          {
+            label: 'In Progress',
+            value: mockStats.inProgressIssues,
+            color: 'yellow'
+          },
+          {
+            label: 'Pending',
+            value: mockStats.pendingIssues,
+            color: 'red'
+          }
+          }.map(stat => (
+            <div key={stat.label} className="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
+              <div className="text-center">
+                <div className={`text-3xl font-bold text-${stat.color}-600`}>{stat.value}</div>
+                <div className="text-slate-600 mt-1">{stat.label}</div>
+              </div>
+            </div>
+          ))}
+        </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-          {/* Departments Section */}
+        {/* Category Distribution */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">
           <div className="bg-white rounded-xl shadow-sm border border-slate-200">
             <div className="p-6 border-b border-slate-200">
-              <h2 className="text-lg font-semibold text-slate-900">Departments</h2>
-              <p className="text-slate-600 text-sm mt-1">Manage government departments</p>
+              <h2 className="text-lg font-semibold text-slate-900">Issues by Category</h2>
             </div>
             <div className="p-6">
-              {departments.length > 0 ? (
-                <div className="space-y-3">
-                  {departments.slice(0, 5).map((dept) => (
-                    <div key={dept._id} className="flex items-center justify-between py-3 border-b border-slate-100 last:border-b-0">
-                      <div>
-                        <h3 className="font-medium text-slate-900">{dept.name}</h3>
-                        <p className="text-sm text-slate-600">{dept.code}</p>
+              <div className="space-y-4">
+                {Object.entries(mockStats.issuesByCategory).map(([category, count]) => (
+                  <div key={category} className="flex items-center">
+                    <div className="w-32 text-sm text-slate-600 capitalize">{category}</div>
+                    <div className="flex-1">
+                      <div className="h-2 bg-slate-100 rounded-full overflow-hidden">
+                        <div 
+                          className="h-full bg-indigo-600 rounded-full"
+                          style={{ width: `${(count / mockStats.totalIssues) * 100}%` }}
+                        />
                       </div>
-                      <span className={`px-2 py-1 text-xs rounded-full ${
-                        dept.isActive 
-                          ? 'bg-green-100 text-green-800' 
-                          : 'bg-slate-100 text-slate-600'
-                      }`}>
-                        {dept.isActive ? 'Active' : 'Inactive'}
-                      </span>
                     </div>
-                  ))}
-                  {departments.length > 5 && (
-                    <p className="text-sm text-slate-500 text-center pt-3">
-                      +{departments.length - 5} more departments
-                    </p>
-                  )}
-                </div>
-              ) : (
-                <p className="text-slate-500 text-center py-8">No departments found</p>
-              )}
+                    <div className="w-12 text-right text-sm text-slate-600">{count}</div>
+                  </div>
+                ))}
+              </div>
             </div>
           </div>
 
-          {/* Recent Issues Section */}
+          {/* Recent Activity */}
           <div className="bg-white rounded-xl shadow-sm border border-slate-200">
             <div className="p-6 border-b border-slate-200">
-              <h2 className="text-lg font-semibold text-slate-900">Recent Issues</h2>
-              <p className="text-slate-600 text-sm mt-1">Latest citizen reports</p>
+              <h2 className="text-lg font-semibold text-slate-900">Recent Activity</h2>
             </div>
             <div className="p-6">
-              {issues.length > 0 ? (
-                <div className="space-y-3">
-                  {issues.slice(0, 5).map((issue) => (
-                    <div key={issue._id} className="flex items-start justify-between py-3 border-b border-slate-100 last:border-b-0">
-                      <div className="flex-1 min-w-0">
-                        <h3 className="font-medium text-slate-900 truncate">{issue.title}</h3>
-                        <p className="text-sm text-slate-600 mt-1">{issue.category}</p>
-                      </div>
-                      <span className={`ml-3 px-2 py-1 text-xs rounded-full ${
-                        issue.status === 'resolved' 
-                          ? 'bg-green-100 text-green-800'
-                          : issue.status === 'in_progress'
-                          ? 'bg-yellow-100 text-yellow-800'
-                          : 'bg-slate-100 text-slate-600'
-                      }`}>
-                        {issue.status}
-                      </span>
+              <div className="space-y-4">
+                {mockStats.recentActivity.map((activity, index) => (
+                  <div key={index} className="flex items-start gap-4">
+                    <div className={`w-2 h-2 mt-2 rounded-full ${
+                      activity.newStatus === 'resolved' ? 'bg-green-500' :
+                      activity.newStatus === 'in_progress' ? 'bg-yellow-500' :
+                      'bg-slate-500'
+                    }`} />
+                    <div>
+                      <p className="text-sm text-slate-900">{activity.title}</p>
+                      <p className="text-xs text-slate-500 mt-1">
+                        Status changed from {activity.oldStatus} to {activity.newStatus}
+                      </p>
+                      <p className="text-xs text-slate-400 mt-1">
+                        {new Date(activity.timestamp).toLocaleString()}
+                      </p>
                     </div>
-                  ))}
-                  {issues.length > 5 && (
-                    <p className="text-sm text-slate-500 text-center pt-3">
-                      +{issues.length - 5} more issues
-                    </p>
-                  )}
-                </div>
-              ) : (
-                <p className="text-slate-500 text-center py-8">No issues found</p>
-              )}
+                  </div>
+                ))}
+              </div>
             </div>
           </div>
         </div>
 
-        {/* Quick Stats */}
-        <div className="mt-8 grid grid-cols-1 sm:grid-cols-3 gap-6">
-          <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
-            <div className="text-center">
-              <div className="text-2xl font-bold text-indigo-600">{departments.length}</div>
-              <div className="text-slate-600 text-sm mt-1">Total Departments</div>
-            </div>
+        {/* Latest Issues Table */}
+        <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+          <div className="p-6 border-b border-slate-200">
+            <h2 className="text-lg font-semibold text-slate-900">Latest Issues</h2>
           </div>
-          <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
-            <div className="text-center">
-              <div className="text-2xl font-bold text-green-600">{issues.filter(i => i.status === 'resolved').length}</div>
-              <div className="text-slate-600 text-sm mt-1">Resolved Issues</div>
-            </div>
-          </div>
-          <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
-            <div className="text-center">
-              <div className="text-2xl font-bold text-yellow-600">{issues.filter(i => i.status === 'pending').length}</div>
-              <div className="text-slate-600 text-sm mt-1">Pending Issues</div>
-            </div>
+          <div className="overflow-x-auto">
+            <table className="w-full">
+              <thead className="bg-slate-50">
+                <tr>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">Issue</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">Department</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">Status</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">Reported</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">Votes</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-200">
+                {issues.map(issue => (
+                  <tr key={issue._id} className="hover:bg-slate-50">
+                    <td className="px-6 py-4">
+                      <div className="text-sm font-medium text-slate-900">{issue.title}</div>
+                      <div className="text-sm text-slate-500">{issue.location.address}</div>
+                    </td>
+                    <td className="px-6 py-4">
+                      <div className="text-sm text-slate-900">{issue.department.name}</div>
+                      <div className="text-xs text-slate-500">{issue.department.code}</div>
+                    </td>
+                    <td className="px-6 py-4">
+                      <span className={`px-2 py-1 text-xs rounded-full ${
+                        issue.status === 'resolved' ? 'bg-green-100 text-green-800' :
+                        issue.status === 'in_progress' ? 'bg-yellow-100 text-yellow-800' :
+                        'bg-slate-100 text-slate-600'
+                      }`}>
+                        {issue.status}
+                      </span>
+                    </td>
+                    <td className="px-6 py-4 text-sm text-slate-500">
+                      {new Date(issue.createdAt).toLocaleDateString()}
+                    </td>
+                    <td className="px-6 py-4">
+                      <div className="flex items-center gap-2 text-sm">
+                        <span className="text-green-600">↑{issue.votes.up}</span>
+                        <span className="text-red-600">↓{issue.votes.down}</span>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           </div>
         </div>
       </div>
