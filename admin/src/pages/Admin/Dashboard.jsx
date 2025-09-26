@@ -1,11 +1,11 @@
 import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { useAdminAuth } from '../../store/auth.jsx';
 import { adminAPI } from '../../services/api';
 import { mockDepartments, mockIssues, mockStats } from '../../services/mockData';
+import { Line, Bar } from 'react-chartjs-2';
+import { FiTrendingUp, FiTrendingDown, FiAlertTriangle, FiCheckCircle } from 'react-icons/fi';
 
 const AdminDashboard = () => {
-  const { profile, logout } = useAdminAuth() || {};
   const [departments, setDepartments] = useState([]);
   const [issues, setIssues] = useState([]);
   const [stats, setStats] = useState(null);
@@ -21,8 +21,8 @@ const AdminDashboard = () => {
 
         // Fetch all data in parallel
         const [issuesResponse, departmentsResponse, statsResponse] = await Promise.all([
-          adminAPI.listIssues({ limit: 10, sort: '-createdAt' }),
-          adminAPI.listDepartments({ isActive: true }),
+          // adminAPI.listIssues({ limit: 10, sort: '-createdAt' }),
+          // adminAPI.listDepartments({ isActive: true }),
           // adminAPI.getStats()
         ]);
 
@@ -48,6 +48,24 @@ const AdminDashboard = () => {
     fetchDashboardData();
   }, []);
 
+  const renderTrendCard = (title, value, change, icon) => (
+    <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6 hover:shadow-md transition-shadow">
+      <div className="flex items-start justify-between">
+        <div>
+          <p className="text-sm text-slate-600">{title}</p>
+          <p className="text-2xl font-bold mt-1">{value}</p>
+          <div className={`flex items-center gap-1 mt-2 text-sm ${
+            change >= 0 ? 'text-green-600' : 'text-red-600'
+          }`}>
+            {change >= 0 ? <FiTrendingUp /> : <FiTrendingDown />}
+            <span>{Math.abs(change)}% from last month</span>
+          </div>
+        </div>
+        <div className="p-3 bg-slate-50 rounded-lg">{icon}</div>
+      </div>
+    </div>
+  );
+
   if (loading) {
     return (
       <div className="min-h-screen bg-slate-50 flex items-center justify-center">
@@ -67,7 +85,7 @@ const AdminDashboard = () => {
             <div>
               <h1 className="text-2xl font-bold text-slate-900">Admin Dashboard</h1>
               <p className="text-slate-600 mt-1">
-                Welcome back{profile?.name ? `, ${profile.name}` : ''}!
+                Welcome back!
                 {usingMockData && (
                   <span className="ml-2 text-xs text-amber-600 bg-amber-50 px-2 py-1 rounded-full">
                     Demo Mode
@@ -86,7 +104,6 @@ const AdminDashboard = () => {
                 Switch to Department
               </Link>
               <button
-                onClick={logout}
                 className="bg-slate-100 hover:bg-slate-200 text-slate-700 px-4 py-2 rounded-lg text-sm font-medium"
               >
                 Logout
@@ -97,93 +114,110 @@ const AdminDashboard = () => {
       </div>
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {/* Quick Stats Cards */}
+        {/* Overview Section */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-          {[
-            {
-              label: 'Total Issues',
-              value: stats?.totalIssues || 0,
-              color: 'indigo'
-            },
-            {
-              label: 'Resolved',
-              value: stats?.resolvedIssues || 0,
-              color: 'green'
-            },
-            {
-              label: 'In Progress',
-              value: stats?.inProgressIssues || 0,
-              color: 'yellow'
-            },
-            {
-              label: 'Pending',
-              value: stats?.pendingIssues || 0,
-              color: 'red'
-            }
-          ].map(stat => (
-            <div key={stat.label} className="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
-              <div className="text-center">
-                <div className={`text-3xl font-bold text-${stat.color}-600`}>{stat.value}</div>
-                <div className="text-slate-600 mt-1">{stat.label}</div>
+          {renderTrendCard(
+            'Total Active Issues',
+            stats?.issueBreakdown.thisMonth.total || 0,
+            8,
+            <FiAlertTriangle className="w-6 h-6 text-amber-500" />
+          )}
+          {renderTrendCard(
+            'Resolved Issues',
+            stats?.resolvedIssues || 0,
+            stats?.resolvedIssuesChange || 0,
+            <FiCheckCircle className="w-6 h-6 text-green-500" />
+          )}
+          {renderTrendCard(
+            'Issues in Progress',
+            stats?.inProgressIssues || 0,
+            stats?.inProgressIssuesChange || 0,
+            <FiTrendingUp className="w-6 h-6 text-blue-500" />
+          )}
+          {renderTrendCard(
+            'Pending Issues',
+            stats?.pendingIssues || 0,
+            stats?.pendingIssuesChange || 0,
+            <FiTrendingDown className="w-6 h-6 text-red-500" />
+          )}
+        </div>
+
+        {/* Charts Section */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">
+          {/* Resolution Time Trends */}
+          <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
+            <h3 className="text-lg font-semibold mb-4">Resolution Time Trends</h3>
+            <Line
+              data={{
+                labels: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri'],
+                datasets: [{
+                  label: 'Avg. Resolution Time (days)',
+                  data: stats?.issueBreakdown.trends.resolutionTimes || [],
+                  borderColor: '#6366f1',
+                  tension: 0.4
+                }]
+              }}
+              options={{ responsive: true }}
+            />
+          </div>
+
+          {/* Department Performance */}
+          <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
+            <h3 className="text-lg font-semibold mb-4">Department Performance</h3>
+            <Bar
+              data={{
+                labels: stats?.departmentInsights.map(d => d.name) || [],
+                datasets: [{
+                  label: 'Efficiency Score',
+                  data: stats?.departmentInsights.map(d => d.performance.efficiency) || [],
+                  backgroundColor: '#6366f1'
+                }]
+              }}
+              options={{ responsive: true }}
+            />
+          </div>
+        </div>
+
+        {/* Department Cards */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
+          {(stats?.departmentInsights || []).map(dept => (
+            <div key={dept.id} className="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="font-semibold">{dept.name}</h3>
+                <span className={`px-2 py-1 text-xs rounded-full ${
+                  dept?.stats?.trend === 'up' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
+                }`}>
+                  {dept?.stats?.trend === 'up' ? '↑' : '↓'} Performance
+                </span>
+              </div>
+              <div className="space-y-3">
+                <div className="flex justify-between text-sm">
+                  <span className="text-slate-600">Active Issues</span>
+                  <span className="font-medium">{dept?.stats?.activeIssues || 0}</span>
+                </div>
+                <div className="flex justify-between text-sm">
+                  <span className="text-slate-600">Avg Response</span>
+                  <span className="font-medium">{dept?.stats?.avgResponseTime || 'N/A'}</span>
+                </div>
+                <div className="flex justify-between text-sm">
+                  <span className="text-slate-600">Satisfaction</span>
+                  <span className="font-medium">{dept?.stats?.satisfaction || 0}%</span>
+                </div>
+                <div className="pt-3">
+                  <div className="flex justify-between text-xs text-slate-600 mb-1">
+                    <span>Efficiency Score</span>
+                    <span>{dept?.performance?.efficiency || 0}%</span>
+                  </div>
+                  <div className="h-1.5 bg-slate-100 rounded-full overflow-hidden">
+                    <div 
+                      className="h-full bg-indigo-600 rounded-full"
+                      style={{ width: `${dept?.performance?.efficiency || 0}%` }}
+                    />
+                  </div>
+                </div>
               </div>
             </div>
           ))}
-        </div>
-
-        {/* Category Distribution */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">
-          <div className="bg-white rounded-xl shadow-sm border border-slate-200">
-            <div className="p-6 border-b border-slate-200">
-              <h2 className="text-lg font-semibold text-slate-900">Issues by Category</h2>
-            </div>
-            <div className="p-6">
-              <div className="space-y-4">
-                {Object.entries(stats?.issuesByCategory || {}).map(([category, count]) => (
-                  <div key={category} className="flex items-center">
-                    <div className="w-32 text-sm text-slate-600 capitalize">{category}</div>
-                    <div className="flex-1">
-                      <div className="h-2 bg-slate-100 rounded-full overflow-hidden">
-                        <div 
-                          className="h-full bg-indigo-600 rounded-full"
-                          style={{ width: `${(count / (stats?.totalIssues || 1)) * 100}%` }}
-                        />
-                      </div>
-                    </div>
-                    <div className="w-12 text-right text-sm text-slate-600">{count}</div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </div>
-
-          {/* Recent Activity */}
-          <div className="bg-white rounded-xl shadow-sm border border-slate-200">
-            <div className="p-6 border-b border-slate-200">
-              <h2 className="text-lg font-semibold text-slate-900">Recent Activity</h2>
-            </div>
-            <div className="p-6">
-              <div className="space-y-4">
-                {(stats?.recentActivity || []).map((activity, index) => (
-                  <div key={index} className="flex items-start gap-4">
-                    <div className={`w-2 h-2 mt-2 rounded-full ${
-                      activity.newStatus === 'resolved' ? 'bg-green-500' :
-                      activity.newStatus === 'in_progress' ? 'bg-yellow-500' :
-                      'bg-slate-500'
-                    }`} />
-                    <div>
-                      <p className="text-sm text-slate-900">{activity.title}</p>
-                      <p className="text-xs text-slate-500 mt-1">
-                        Status changed from {activity.oldStatus} to {activity.newStatus}
-                      </p>
-                      <p className="text-xs text-slate-400 mt-1">
-                        {new Date(activity.timestamp).toLocaleString()}
-                      </p>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </div>
         </div>
 
         {/* Latest Issues Table */}

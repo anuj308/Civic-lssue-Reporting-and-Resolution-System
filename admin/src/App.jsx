@@ -25,13 +25,13 @@ const App = () => {
           <div className="flex justify-between h-16">
             <div className="flex gap-8">
               <Link 
-                to="/admin/login" 
+                to="/admin/" 
                 className="inline-flex items-center px-1 pt-1 text-sm font-medium text-slate-700 hover:text-slate-900"
               >
                 Admin Portal
               </Link>
               <Link 
-                to="/department/login" 
+                to="/department/" 
                 className="inline-flex items-center px-1 pt-1 text-sm font-medium text-slate-700 hover:text-slate-900"
               >
                 Department Portal
