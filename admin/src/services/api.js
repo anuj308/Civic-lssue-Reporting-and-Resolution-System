@@ -61,6 +61,8 @@ export const adminAPI = {
   login: (payload) => request('/admin/login', { method: 'POST', body: payload }),
   me: () => request('/admin/me', { token: getAdminToken() }),
   refresh: (payload) => request('/admin/refresh', { method: 'POST', body: payload }),
+  signup: (payload) => request('/admin/signup', { method: 'POST', body: payload }),
+  
   // Department management (admin side)
   listDepartments: (params = {}) => {
     const q = new URLSearchParams(params).toString();
@@ -69,7 +71,12 @@ export const adminAPI = {
   createDepartment: (payload) => request('/departments', { method: 'POST', body: payload, token: getAdminToken() }),
   updateDepartment: (id, payload) => request(`/departments/${id}`, { method: 'PUT', body: payload, token: getAdminToken() }),
   deleteDepartment: (id) => request(`/departments/${id}`, { method: 'DELETE', token: getAdminToken() }),
-  signup: (payload) => request('/admin/signup', { method: 'POST', body: payload }),
+  
+  // Issues management (admin side)
+  listIssues: (params = {}) => {
+    const q = new URLSearchParams(params).toString();
+    return request(`/issues${q ? `?${q}` : ''}`, { token: getAdminToken() });
+  },
 };
 
 // DEPARTMENT AUTH (use department token)
