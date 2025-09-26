@@ -40,6 +40,7 @@ const IssueDetail = React.lazy(() => import("./pages/User/IssueDetail"));
 const Map = React.lazy(() => import("./pages/User/Map"));
 const Profile = React.lazy(() => import("./pages/User/Profile"));
 const DepartmentLeaderboard = React.lazy(() => import("./pages/Departments/DepartmentLeaderboard"));
+const CommunityEvents = React.lazy(() => import("./pages/Community/CommunityEvents"));
 
 // Create a client for React Query
 const queryClient = new QueryClient({
@@ -81,6 +82,7 @@ const AppRoutes: React.FC = () => {
         <Route path="issues" element={<IssueManagement />} />
         <Route path="reels" element={<IssueReels />} />
         <Route path="departments" element={<DepartmentLeaderboard />} />
+        <Route path="community-events" element={<CommunityEvents />} />
 
         {/* Default redirect */}
         <Route index element={<Navigate to="dashboard" replace />} />

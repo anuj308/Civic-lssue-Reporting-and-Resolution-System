@@ -36,6 +36,7 @@ import {
   Add,
   AccountCircle,
   VideoLibrary,
+  Event,
 } from '@mui/icons-material';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useSelector } from 'react-redux';
@@ -203,6 +204,12 @@ const Sidebar: React.FC<SidebarProps> = ({
           label: 'Department Leaderboard',
           icon: <TrendingUp />,
           path: '/departments',
+        },
+        {
+          id: 'community-events',
+          label: 'Community Events',
+          icon: <Event />,
+          path: '/community-events',
         },
         {
           id: 'reels',
