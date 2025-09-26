@@ -1,6 +1,6 @@
 import React from 'react';
 import { Navigate } from 'react-router-dom';
-import { useDeptAuth } from '../store/auth';
+import { useDeptAuth } from '../store/auth.jsx';
 import Spinner from './Spinner';
 
 const DepartmentProtectedRoute = ({ children }) => {
