@@ -1,13 +1,8 @@
 import React, { Suspense } from 'react';
 import { Routes, Route, Navigate, Link } from 'react-router-dom';
-import AdminProtectedRoute from './components/AdminProtectedRoute';
-import DepartmentProtectedRoute from './components/DepartmentProtectedRoute';
 import Spinner from './components/Spinner';
-import { useAdminAuth, useDeptAuth } from './store/auth.jsx';
 
-import AdminLogin from './pages/Admin/Login';
 import AdminDashboard from './pages/Admin/Dashboard';
-import DepartmentAuth from './pages/Department/deptAuth.jsx';
 import DepartmentDashboard from './pages/Department/Dashboard';
 
 const LoginGuards = ({ children, role }) => {
