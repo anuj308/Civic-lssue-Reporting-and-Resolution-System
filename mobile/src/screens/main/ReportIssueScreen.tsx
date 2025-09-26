@@ -76,6 +76,7 @@ const ReportIssueScreen: React.FC = () => {
   const { isSubmitting, error } = useSelector((state: RootState) => state.issues);
   
   const [images, setImages] = useState<string[]>([]);
+  const [videos, setVideos] = useState<ImagePicker.ImagePickerAsset[]>([]);
   const [location, setLocation] = useState<{ latitude: number; longitude: number } | null>(null);
   const [categoryModalVisible, setCategoryModalVisible] = useState(false);
   const [priorityModalVisible, setPriorityModalVisible] = useState(false);
@@ -233,6 +234,70 @@ const ReportIssueScreen: React.FC = () => {
     setImages(prev => prev.filter((_, i) => i !== index));
   };
 
+  const pickVideo = async () => {
+    try {
+      const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (status !== 'granted') {
+        Alert.alert('Permission Required', 'Camera roll permission is required to add videos.');
+        return;
+      }
+
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ImagePicker.MediaTypeOptions.Videos,
+        allowsEditing: true,
+        quality: 0.8,
+        videoMaxDuration: 60, // Limit to 60 seconds
+      });
+
+      if (!result.canceled && result.assets) {
+        const asset = result.assets[0];
+        console.log('🎥 Video asset:', {
+          uri: asset.uri,
+          type: asset.type,
+          duration: asset.duration
+        });
+        setVideos(prev => [...prev, asset].slice(0, 2)); // Max 2 videos
+      }
+    } catch (error) {
+      console.error('Error picking video:', error);
+      Alert.alert('Error', 'Unable to pick video. Please try again.');
+    }
+  };
+
+  const recordVideo = async () => {
+    try {
+      const { status } = await ImagePicker.requestCameraPermissionsAsync();
+      if (status !== 'granted') {
+        Alert.alert('Permission Required', 'Camera permission is required to record videos.');
+        return;
+      }
+
+      const result = await ImagePicker.launchCameraAsync({
+        mediaTypes: ImagePicker.MediaTypeOptions.Videos,
+        allowsEditing: true,
+        quality: 0.8,
+        videoMaxDuration: 60, // Limit to 60 seconds
+      });
+
+      if (!result.canceled && result.assets) {
+        const asset = result.assets[0];
+        console.log('🎥 Recorded video asset:', {
+          uri: asset.uri,
+          type: asset.type,
+          duration: asset.duration
+        });
+        setVideos(prev => [...prev, asset].slice(0, 2)); // Max 2 videos
+      }
+    } catch (error) {
+      console.error('Error recording video:', error);
+      Alert.alert('Error', 'Unable to record video. Please try again.');
+    }
+  };
+
+  const removeVideo = (index: number) => {
+    setVideos(prev => prev.filter((_, i) => i !== index));
+  };
+
   const onSubmit = async (data: IssueFormData) => {
     if (!location) {
       Alert.alert('Location Required', 'Please enable location services or enter your location manually.');
@@ -285,7 +350,7 @@ const ReportIssueScreen: React.FC = () => {
         },
         media: {
           images: validImages, // Send base64 data URIs to backend
-          videos: [],
+          videos: videos, // Send video assets to backend
           audio: null
         },
         tags: [],
@@ -303,6 +368,7 @@ const ReportIssueScreen: React.FC = () => {
       console.log('  - Images count:', issueData.media.images.length);
       console.log('  - Images are base64:', issueData.media.images.every(img => img.startsWith('data:')));
       console.log('  - Sample image data:', issueData.media.images[0]?.substring(0, 100) + '...');
+      console.log('  - Videos count:', issueData.media.videos.length);
       
       await dispatch(createIssue(issueData)).unwrap();
       
@@ -315,6 +381,7 @@ const ReportIssueScreen: React.FC = () => {
             onPress: () => {
               reset();
               setImages([]);
+              setVideos([]);
               setLocation(null);
             },
           },
@@ -613,6 +680,73 @@ const ReportIssueScreen: React.FC = () => {
             </Card.Content>
           </Card>
 
+          {/* Videos */}
+          <Card style={styles.card}>
+            <Card.Content>
+              <Text variant="titleMedium" style={styles.cardTitle}>
+                Videos
+              </Text>
+              <Text variant="bodySmall" style={styles.cardSubtitle}>
+                Add videos to show the issue in action (max 2 videos, 60 seconds each)
+              </Text>
+
+              <View style={styles.photoContainer}>
+                <Button
+                  mode="outlined"
+                  onPress={recordVideo}
+                  style={styles.photoButton}
+                  icon="video"
+                >
+                  Record Video
+                </Button>
+                <Button
+                  mode="outlined"
+                  onPress={pickVideo}
+                  style={styles.photoButton}
+                  icon="video-plus"
+                >
+                  Choose Video
+                </Button>
+              </View>
+
+              {videos.length > 0 && (
+                <View style={styles.imagesGrid}>
+                  {videos.map((video, index) => (
+                    <View key={index} style={styles.imageItem}>
+                      <Surface style={styles.imageContainer}>
+                        <Image 
+                          source={{ uri: video.uri }}
+                          style={styles.imagePreview}
+                          resizeMode="cover"
+                        />
+                        <View style={styles.videoOverlay}>
+                          <IconButton
+                            icon="play"
+                            size={24}
+                            iconColor="white"
+                            style={styles.playButton}
+                          />
+                        </View>
+                        <IconButton
+                          icon="close"
+                          size={20}
+                          onPress={() => removeVideo(index)}
+                          style={styles.removeImageButton}
+                        />
+                      </Surface>
+                    </View>
+                  ))}
+                </View>
+              )}
+
+              {videos.length === 0 && (
+                <Surface style={styles.noImagesContainer}>
+                  <Text style={styles.noImagesText}>No videos added yet</Text>
+                </Surface>
+              )}
+            </Card.Content>
+          </Card>
+
           {/* Submit Button */}
           <View style={styles.submitContainer}>
             <Button
@@ -838,6 +972,20 @@ const styles = StyleSheet.create({
   },
   noImagesText: {
     color: theme.colors.onSurfaceVariant,
+  },
+  videoOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: 'rgba(0,0,0,0.3)',
+  },
+  playButton: {
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    margin: 0,
   },
   submitContainer: {
     padding: 16,
