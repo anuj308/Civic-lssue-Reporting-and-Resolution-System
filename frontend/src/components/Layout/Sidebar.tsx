@@ -130,6 +130,12 @@ const Sidebar: React.FC<SidebarProps> = ({
               path: '/analytics',
             },
             {
+              id: 'departments',
+              label: 'Department Leaderboard',
+              icon: <SupervisorAccount />,
+              path: '/departments',
+            },
+            {
               id: 'analytics-performance',
               label: 'Performance',
               icon: <Analytics />,
@@ -191,6 +197,12 @@ const Sidebar: React.FC<SidebarProps> = ({
           label: 'Issue Map',
           icon: <Map />,
           path: '/map',
+        },
+        {
+          id: 'departments',
+          label: 'Department Leaderboard',
+          icon: <TrendingUp />,
+          path: '/departments',
         },
         {
           id: 'reels',
