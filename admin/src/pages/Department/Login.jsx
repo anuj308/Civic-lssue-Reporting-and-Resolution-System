@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
-import { useDeptAuth } from '../../store/auth';
+import { useDeptAuth } from '../../store/auth.jsx';
 
 const DepartmentLogin = () => {
   const navigate = useNavigate();

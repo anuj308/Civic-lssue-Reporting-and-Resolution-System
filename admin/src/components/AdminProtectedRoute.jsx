@@ -1,6 +1,6 @@
 import React from 'react';
 import { Navigate } from 'react-router-dom';
-import { useAdminAuth } from '../store/auth';
+import { useAdminAuth } from '../store/auth.jsx';
 import Spinner from './Spinner';
 
 const AdminProtectedRoute = ({ children }) => {
