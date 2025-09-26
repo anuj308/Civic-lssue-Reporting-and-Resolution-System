@@ -1,20 +1,51 @@
 import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useAdminAuth } from '../../store/auth.jsx';
+import { adminAPI } from '../../services/api';
 import { mockDepartments, mockIssues, mockStats } from '../../services/mockData';
 
 const AdminDashboard = () => {
   const { profile, logout } = useAdminAuth() || {};
   const [departments, setDepartments] = useState([]);
   const [issues, setIssues] = useState([]);
+  const [stats, setStats] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [usingMockData, setUsingMockData] = useState(false);
 
-  // Modified useEffect to use mock data
   useEffect(() => {
-    setDepartments(mockDepartments);
-    setIssues(mockIssues);
-    setLoading(false);
+    const fetchDashboardData = async () => {
+      try {
+        setLoading(true);
+        setError('');
+
+        // Fetch all data in parallel
+        const [issuesResponse, departmentsResponse, statsResponse] = await Promise.all([
+          adminAPI.listIssues({ limit: 10, sort: '-createdAt' }),
+          adminAPI.listDepartments({ isActive: true }),
+          // adminAPI.getStats()
+        ]);
+
+        setIssues(issuesResponse);
+        setDepartments(departmentsResponse);
+        setStats(statsResponse);
+        setUsingMockData(false);
+
+      } catch (err) {
+        console.warn('Failed to fetch data from backend, using mock data:', err);
+        setError('Using demo data - Backend not available');
+        
+        // Fallback to mock data
+        setIssues(mockIssues);
+        setDepartments(mockDepartments);
+        setStats(mockStats);
+        setUsingMockData(true);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchDashboardData();
   }, []);
 
   if (loading) {
@@ -35,7 +66,17 @@ const AdminDashboard = () => {
           <div className="flex justify-between items-center py-6">
             <div>
               <h1 className="text-2xl font-bold text-slate-900">Admin Dashboard</h1>
-              <p className="text-slate-600 mt-1">Welcome back{profile?.name ? `, ${profile.name}` : ''}!</p>
+              <p className="text-slate-600 mt-1">
+                Welcome back{profile?.name ? `, ${profile.name}` : ''}!
+                {usingMockData && (
+                  <span className="ml-2 text-xs text-amber-600 bg-amber-50 px-2 py-1 rounded-full">
+                    Demo Mode
+                  </span>
+                )}
+              </p>
+              {error && (
+                <p className="text-xs text-red-600 mt-1">{error}</p>
+              )}
             </div>
             <div className="flex items-center gap-4">
               <Link 
@@ -58,27 +99,28 @@ const AdminDashboard = () => {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* Quick Stats Cards */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-          {{
-            label: 'Total Issues',
-            value: mockStats.totalIssues,
-            color: 'indigo'
-          },
-          {
-            label: 'Resolved',
-            value: mockStats.resolvedIssues,
-            color: 'green'
-          },
-          {
-            label: 'In Progress',
-            value: mockStats.inProgressIssues,
-            color: 'yellow'
-          },
-          {
-            label: 'Pending',
-            value: mockStats.pendingIssues,
-            color: 'red'
-          }
-          }.map(stat => (
+          {[
+            {
+              label: 'Total Issues',
+              value: stats?.totalIssues || 0,
+              color: 'indigo'
+            },
+            {
+              label: 'Resolved',
+              value: stats?.resolvedIssues || 0,
+              color: 'green'
+            },
+            {
+              label: 'In Progress',
+              value: stats?.inProgressIssues || 0,
+              color: 'yellow'
+            },
+            {
+              label: 'Pending',
+              value: stats?.pendingIssues || 0,
+              color: 'red'
+            }
+          ].map(stat => (
             <div key={stat.label} className="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
               <div className="text-center">
                 <div className={`text-3xl font-bold text-${stat.color}-600`}>{stat.value}</div>
@@ -96,14 +138,14 @@ const AdminDashboard = () => {
             </div>
             <div className="p-6">
               <div className="space-y-4">
-                {Object.entries(mockStats.issuesByCategory).map(([category, count]) => (
+                {Object.entries(stats?.issuesByCategory || {}).map(([category, count]) => (
                   <div key={category} className="flex items-center">
                     <div className="w-32 text-sm text-slate-600 capitalize">{category}</div>
                     <div className="flex-1">
                       <div className="h-2 bg-slate-100 rounded-full overflow-hidden">
                         <div 
                           className="h-full bg-indigo-600 rounded-full"
-                          style={{ width: `${(count / mockStats.totalIssues) * 100}%` }}
+                          style={{ width: `${(count / (stats?.totalIssues || 1)) * 100}%` }}
                         />
                       </div>
                     </div>
@@ -121,7 +163,7 @@ const AdminDashboard = () => {
             </div>
             <div className="p-6">
               <div className="space-y-4">
-                {mockStats.recentActivity.map((activity, index) => (
+                {(stats?.recentActivity || []).map((activity, index) => (
                   <div key={index} className="flex items-start gap-4">
                     <div className={`w-2 h-2 mt-2 rounded-full ${
                       activity.newStatus === 'resolved' ? 'bg-green-500' :
