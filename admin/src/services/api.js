@@ -68,6 +68,7 @@ export const adminAPI = {
   createDepartment: (payload) => request('/departments', { method: 'POST', body: payload, token: getAdminToken() }),
   updateDepartment: (id, payload) => request(`/departments/${id}`, { method: 'PUT', body: payload, token: getAdminToken() }),
   deleteDepartment: (id) => request(`/departments/${id}`, { method: 'DELETE', token: getAdminToken() }),
+  signup: (payload) => request('/admin/signup', { method: 'POST', body: payload }),
 };
 
 // DEPARTMENT AUTH (use department token)
