@@ -240,3 +240,69 @@ export const mockStats = {
         }
     ]
 };
+
+export const mockDepartmentIssues = [
+  {
+    _id: '1',
+    title: 'Water pipeline leakage on MG Road',
+    description: 'Major water leakage causing road damage and water wastage',
+    category: 'water_supply',
+    priority: 'high',
+    status: 'pending',
+    location: {
+      address: '123 MG Road, Near City Mall',
+      coordinates: [73.856743, 18.520430]
+    },
+    reportedBy: {
+      _id: 'user1',
+      name: 'John Doe',
+      phone: '+91 9876543210'
+    },
+    createdAt: '2023-09-25T10:30:00Z',
+    updatedAt: '2023-09-26T15:45:00Z',
+    mediaUrls: ['https://example.com/photo1.jpg'],
+    votes: { up: 15, down: 2 }
+  },
+  {
+    _id: '2',
+    title: 'Broken water meter',
+    description: 'Water meter showing incorrect readings',
+    category: 'water_supply',
+    priority: 'medium',
+    status: 'in_progress',
+    location: {
+      address: '45 Park Street',
+      coordinates: [73.856743, 18.520430]
+    },
+    reportedBy: {
+      _id: 'user2',
+      name: 'Jane Smith',
+      phone: '+91 9876543211'
+    },
+    createdAt: '2023-09-24T08:30:00Z',
+    updatedAt: '2023-09-26T09:45:00Z',
+    mediaUrls: [],
+    votes: { up: 5, down: 1 }
+  },
+  {
+    _id: '3',
+    title: 'Low water pressure',
+    description: 'Very low water pressure in residential area',
+    category: 'water_supply',
+    priority: 'low',
+    status: 'resolved',
+    location: {
+      address: '78 Lake View Road',
+      coordinates: [73.856743, 18.520430]
+    },
+    reportedBy: {
+      _id: 'user3',
+      name: 'Mike Johnson',
+      phone: '+91 9876543212'
+    },
+    createdAt: '2023-09-23T14:30:00Z',
+    updatedAt: '2023-09-25T16:45:00Z',
+    mediaUrls: [],
+    votes: { up: 8, down: 0 }
+  }
+];

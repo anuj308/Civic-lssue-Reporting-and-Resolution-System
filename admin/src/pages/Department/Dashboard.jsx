@@ -2,21 +2,32 @@ import React, { useEffect, useState } from 'react';
 import { departmentAPI } from '../../services/api';
 import { useDeptAuth } from '../../store/auth.jsx';
 import { Link } from 'react-router-dom';
+import { mockDepartmentIssues } from '../../services/mockData';
 
 const DepartmentDashboard = () => {
   const { profile, logout } = useDeptAuth() || {};
   const [issues, setIssues] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [usingMockData, setUsingMockData] = useState(false);
 
   useEffect(() => {
     const loadIssues = async () => {
       try {
         setLoading(true);
+        setError('');
+        
+        // Try to fetch real data
         const data = await departmentAPI.myIssues({ status: 'pending', limit: 20 });
         setIssues(Array.isArray(data) ? data : data?.items || []);
+        setUsingMockData(false);
+
       } catch (err) {
-        setError(err?.message || 'Failed to load issues');
+        console.warn('Failed to fetch real data, using mock data:', err);
+        // Fallback to mock data
+        setIssues(mockDepartmentIssues);
+        setUsingMockData(true);
+        setError('Using demo data - Backend not available');
       } finally {
         setLoading(false);
       }
@@ -43,7 +54,17 @@ const DepartmentDashboard = () => {
           <div className="flex justify-between items-center py-6">
             <div>
               <h1 className="text-2xl font-bold text-slate-900">Department Dashboard</h1>
-              <p className="text-slate-600 mt-1">Welcome back{profile?.name ? `, ${profile.name}` : ''}!</p>
+              <p className="text-slate-600 mt-1">
+                Welcome back{profile?.name ? `, ${profile.name}` : ''}!
+                {usingMockData && (
+                  <span className="ml-2 text-xs text-amber-600 bg-amber-50 px-2 py-1 rounded-full">
+                    Demo Mode
+                  </span>
+                )}
+              </p>
+              {error && (
+                <p className="text-xs text-red-600 mt-1">{error}</p>
+              )}
             </div>
             <div className="flex items-center gap-4">
               <Link 
@@ -64,16 +85,49 @@ const DepartmentDashboard = () => {
       </div>
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {error && (
-          <div className="mb-6 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
-            {error}
-          </div>
-        )}
+        {/* Quick Stats - Updated to handle empty issues array */}
+        <div className="grid grid-cols-1 sm:grid-cols-4 gap-6 mb-8">
+          {/*
+            { 
+              label: 'Total Assigned', 
+              value: issues.length,
+              color: 'slate'
+            },
+            { 
+              label: 'Pending', 
+              value: issues.filter(i => i.status === 'pending').length,
+              color: 'yellow'
+            },
+            { 
+              label: 'In Progress', 
+              value: issues.filter(i => i.status === 'in_progress').length,
+              color: 'blue'
+            },
+            { 
+              label: 'Resolved', 
+              value: issues.filter(i => i.status === 'resolved').length,
+              color: 'green'
+            }
+          ].map(stat => (
+            <div key={stat.label} className="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
+              <div className="text-center">
+                <div className={`text-2xl font-bold text-${stat.color}-600`}>
+                  {stat.value}
+                </div>
+                <div className="text-slate-600 text-sm mt-1">{stat.label}</div>
+              </div>
+            </div>
+          ))}
+        </div> */}
 
+        {/* Issues List */}
         <div className="bg-white rounded-xl shadow-sm border border-slate-200">
           <div className="p-6 border-b border-slate-200">
             <h2 className="text-lg font-semibold text-slate-900">Assigned Issues</h2>
-            <p className="text-slate-600 text-sm mt-1">Issues assigned to your department</p>
+            <p className="text-slate-600 text-sm mt-1">
+              Issues assigned to your department
+              {usingMockData && ' (Demo Data)'}
+            </p>
           </div>
           <div className="p-6">
             {issues.length > 0 ? (
@@ -121,34 +175,6 @@ const DepartmentDashboard = () => {
                 <p className="text-slate-400 text-sm mt-1">New issues will appear here when assigned to your department</p>
               </div>
             )}
-          </div>
-        </div>
-
-        {/* Quick Stats */}
-        <div className="mt-8 grid grid-cols-1 sm:grid-cols-4 gap-6">
-          <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
-            <div className="text-center">
-              <div className="text-2xl font-bold text-slate-700">{issues.length}</div>
-              <div className="text-slate-600 text-sm mt-1">Total Assigned</div>
-            </div>
-          </div>
-          <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
-            <div className="text-center">
-              <div className="text-2xl font-bold text-yellow-600">{issues.filter(i => i.status === 'pending').length}</div>
-              <div className="text-slate-600 text-sm mt-1">Pending</div>
-            </div>
-          </div>
-          <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
-            <div className="text-center">
-              <div className="text-2xl font-bold text-blue-600">{issues.filter(i => i.status === 'in_progress').length}</div>
-              <div className="text-slate-600 text-sm mt-1">In Progress</div>
-            </div>
-          </div>
-          <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
-            <div className="text-center">
-              <div className="text-2xl font-bold text-green-600">{issues.filter(i => i.status === 'resolved').length}</div>
-              <div className="text-slate-600 text-sm mt-1">Resolved</div>
-            </div>
           </div>
         </div>
       </div>
