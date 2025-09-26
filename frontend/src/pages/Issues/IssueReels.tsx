@@ -395,7 +395,7 @@ const IssueReels: React.FC = () => {
     const shareData = {
       title: issue.title,
       text: `Check out this civic issue: ${issue.title}`,
-      url: `${window.location.origin}/issues/${issue.id}`
+      url: `${window.location.origin}/issue/${issue.id}`
     };
 
     if (navigator.share) {
