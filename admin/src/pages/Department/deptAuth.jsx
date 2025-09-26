@@ -6,20 +6,26 @@ const DepartmentAuth = () => {
   const navigate = useNavigate();
   const { token, login, register } = useDepartmentAuth() || {};
 
+  // Form state management
   const [isLogin, setIsLogin] = useState(true);
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState('');
+  const [errors, setErrors] = useState({});
   
-  // Shared fields
-  const [identifier, setIdentifier] = useState('');
-  const [password, setPassword] = useState('');
-  
-  // Registration specific fields
-  const [name, setName] = useState('');
-  const [email, setEmail] = useState('');
-  const [code, setCode] = useState('');
-  const [contactPhone, setContactPhone] = useState('');
-  const [description, setDescription] = useState('');
+  // Login form state
+  const [loginForm, setLoginForm] = useState({
+    identifier: '',
+    password: '',
+  });
+
+  // Register form state
+  const [registerForm, setRegisterForm] = useState({
+    name: '',
+    code: '',
+    email: '',
+    password: '',
+    contactPhone: '',
+    description: '',
+  });
   
   const [showPassword, setShowPassword] = useState(false);
 
@@ -28,35 +34,58 @@ const DepartmentAuth = () => {
   }, [token, navigate]);
 
   const validateLoginForm = () => {
-    if (!identifier.trim()) {
-      setError('Department code or email is required');
-      return false;
+    const newErrors = {};
+
+    if (!loginForm.identifier.trim()) {
+      newErrors.identifier = 'Department code or email is required';
     }
-    if (!password || password.length < 6) {
-      setError('Password must be at least 6 characters');
-      return false;
+    if (!loginForm.password || loginForm.password.length < 6) {
+      newErrors.password = 'Password must be at least 6 characters';
     }
-    return true;
+
+    setErrors(newErrors);
+    return Object.keys(newErrors).length === 0;
   };
 
   const validateRegisterForm = () => {
-    if (!name.trim()) {
-      setError('Department name is required');
-      return false;
+    const newErrors = {};
+
+    if (!registerForm.name.trim()) {
+      newErrors.name = 'Department name is required';
     }
-    if (!code.trim()) {
-      setError('Department code is required');
-      return false;
+    if (!registerForm.code.trim()) {
+      newErrors.code = 'Department code is required';
+    } else if (!/^[A-Z0-9]{3,10}$/.test(registerForm.code.trim())) {
+      newErrors.code = 'Code must be 3-10 uppercase letters/numbers';
     }
-    if (!email.trim() || !email.includes('@')) {
-      setError('Valid email is required');
-      return false;
+    if (!registerForm.email.trim() || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(registerForm.email)) {
+      newErrors.email = 'Valid email is required';
     }
-    if (!password || password.length < 6) {
-      setError('Password must be at least 6 characters');
-      return false;
+    if (!registerForm.password || registerForm.password.length < 6) {
+      newErrors.password = 'Password must be at least 6 characters';
     }
-    return true;
+    if (registerForm.contactPhone && !/^\+?[\d\s-]{10,}$/.test(registerForm.contactPhone)) {
+      newErrors.contactPhone = 'Enter valid phone number';
+    }
+
+    setErrors(newErrors);
+    return Object.keys(newErrors).length === 0;
+  };
+
+  const handleLoginChange = (e) => {
+    const { name, value } = e.target;
+    setLoginForm(prev => ({ ...prev, [name]: value }));
+    if (errors[name]) {
+      setErrors(prev => ({ ...prev, [name]: '' }));
+    }
+  };
+
+  const handleRegisterChange = (e) => {
+    const { name, value } = e.target;
+    setRegisterForm(prev => ({ ...prev, [name]: value }));
+    if (errors[name]) {
+      setErrors(prev => ({ ...prev, [name]: '' }));
+    }
   };
 
   const onLogin = async (e) => {
@@ -64,12 +93,12 @@ const DepartmentAuth = () => {
     if (!validateLoginForm()) return;
 
     setLoading(true);
-    setError('');
+    setErrors({});
 
     try {
       const response = await login({
-        identifier: identifier.trim().toLowerCase(),
-        password,
+        identifier: loginForm.identifier.trim().toLowerCase(),
+        password: loginForm.password,
       });
 
       if (!response?.success) {
@@ -78,7 +107,7 @@ const DepartmentAuth = () => {
 
       navigate('/department', { replace: true });
     } catch (err) {
-      setError(err?.message || 'Invalid credentials');
+      setErrors({ submit: err?.message || 'Invalid credentials' });
     } finally {
       setLoading(false);
     }
@@ -89,16 +118,16 @@ const DepartmentAuth = () => {
     if (!validateRegisterForm()) return;
 
     setLoading(true);
-    setError('');
+    setErrors({});
 
     try {
       const response = await register({
-        name: name.trim(),
-        code: code.trim().toUpperCase(),
-        email: email.trim().toLowerCase(),
-        password,
-        contactPhone: contactPhone.trim(),
-        description: description.trim(),
+        ...registerForm,
+        name: registerForm.name.trim(),
+        code: registerForm.code.trim().toUpperCase(),
+        email: registerForm.email.trim().toLowerCase(),
+        contactPhone: registerForm.contactPhone.trim(),
+        description: registerForm.description.trim(),
       });
 
       if (!response?.success) {
@@ -107,7 +136,7 @@ const DepartmentAuth = () => {
 
       navigate('/department', { replace: true });
     } catch (err) {
-      setError(err?.message || 'Registration failed');
+      setErrors({ submit: err?.message || 'Registration failed' });
     } finally {
       setLoading(false);
     }
@@ -144,9 +173,9 @@ const DepartmentAuth = () => {
           </div>
 
           <div className="p-6">
-            {error && (
+            {errors.submit && (
               <div className="mb-4 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
-                {error}
+                {errors.submit}
               </div>
             )}
 
@@ -157,12 +186,18 @@ const DepartmentAuth = () => {
                     Department Code or Email
                   </label>
                   <input
-                    className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-slate-900 placeholder-slate-400 focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                    name="identifier"
+                    value={loginForm.identifier}
+                    onChange={handleLoginChange}
+                    className={`mt-1 w-full rounded-lg border ${
+                      errors.identifier ? 'border-red-500' : 'border-slate-300'
+                    } bg-white px-3 py-2 text-slate-900 placeholder-slate-400 focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500`}
                     placeholder="DEPT001 or department@gov.in"
-                    value={identifier}
-                    onChange={(e) => setIdentifier(e.target.value)}
                     required
                   />
+                  {errors.identifier && (
+                    <p className="mt-1 text-xs text-red-500">{errors.identifier}</p>
+                  )}
                 </div>
 
                 <div>
@@ -180,13 +215,19 @@ const DepartmentAuth = () => {
                   </div>
                   <input
                     type={showPassword ? 'text' : 'password'}
-                    className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-slate-900 placeholder-slate-400 focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                    name="password"
+                    value={loginForm.password}
+                    onChange={handleLoginChange}
+                    className={`mt-1 w-full rounded-lg border ${
+                      errors.password ? 'border-red-500' : 'border-slate-300'
+                    } bg-white px-3 py-2 text-slate-900 placeholder-slate-400 focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500`}
                     placeholder="••••••••"
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
                     required
                     minLength={6}
                   />
+                  {errors.password && (
+                    <p className="mt-1 text-xs text-red-500">{errors.password}</p>
+                  )}
                 </div>
 
                 <button
@@ -204,12 +245,18 @@ const DepartmentAuth = () => {
                     Department Name
                   </label>
                   <input
-                    className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-slate-900 placeholder-slate-400 focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                    name="name"
+                    value={registerForm.name}
+                    onChange={handleRegisterChange}
+                    className={`mt-1 w-full rounded-lg border ${
+                      errors.name ? 'border-red-500' : 'border-slate-300'
+                    } bg-white px-3 py-2 text-slate-900 placeholder-slate-400 focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500`}
                     placeholder="Public Works Department"
-                    value={name}
-                    onChange={(e) => setName(e.target.value)}
                     required
                   />
+                  {errors.name && (
+                    <p className="mt-1 text-xs text-red-500">{errors.name}</p>
+                  )}
                 </div>
 
                 <div>
@@ -217,12 +264,18 @@ const DepartmentAuth = () => {
                     Department Code
                   </label>
                   <input
-                    className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-slate-900 placeholder-slate-400 focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                    name="code"
+                    value={registerForm.code}
+                    onChange={handleRegisterChange}
+                    className={`mt-1 w-full rounded-lg border ${
+                      errors.code ? 'border-red-500' : 'border-slate-300'
+                    } bg-white px-3 py-2 text-slate-900 placeholder-slate-400 focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500`}
                     placeholder="PWD"
-                    value={code}
-                    onChange={(e) => setCode(e.target.value)}
                     required
                   />
+                  {errors.code && (
+                    <p className="mt-1 text-xs text-red-500">{errors.code}</p>
+                  )}
                 </div>
 
                 <div>
@@ -231,12 +284,18 @@ const DepartmentAuth = () => {
                   </label>
                   <input
                     type="email"
-                    className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-slate-900 placeholder-slate-400 focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                    name="email"
+                    value={registerForm.email}
+                    onChange={handleRegisterChange}
+                    className={`mt-1 w-full rounded-lg border ${
+                      errors.email ? 'border-red-500' : 'border-slate-300'
+                    } bg-white px-3 py-2 text-slate-900 placeholder-slate-400 focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500`}
                     placeholder="pwd@gov.in"
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
                     required
                   />
+                  {errors.email && (
+                    <p className="mt-1 text-xs text-red-500">{errors.email}</p>
+                  )}
                 </div>
 
                 <div>
@@ -245,11 +304,17 @@ const DepartmentAuth = () => {
                   </label>
                   <input
                     type="tel"
-                    className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-slate-900 placeholder-slate-400 focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                    name="contactPhone"
+                    value={registerForm.contactPhone}
+                    onChange={handleRegisterChange}
+                    className={`mt-1 w-full rounded-lg border ${
+                      errors.contactPhone ? 'border-red-500' : 'border-slate-300'
+                    } bg-white px-3 py-2 text-slate-900 placeholder-slate-400 focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500`}
                     placeholder="+91 XXXXXXXXXX"
-                    value={contactPhone}
-                    onChange={(e) => setContactPhone(e.target.value)}
                   />
+                  {errors.contactPhone && (
+                    <p className="mt-1 text-xs text-red-500">{errors.contactPhone}</p>
+                  )}
                 </div>
 
                 <div>
@@ -257,12 +322,18 @@ const DepartmentAuth = () => {
                     Description
                   </label>
                   <textarea
-                    className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-slate-900 placeholder-slate-400 focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                    name="description"
+                    value={registerForm.description}
+                    onChange={handleRegisterChange}
+                    className={`mt-1 w-full rounded-lg border ${
+                      errors.description ? 'border-red-500' : 'border-slate-300'
+                    } bg-white px-3 py-2 text-slate-900 placeholder-slate-400 focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500`}
                     placeholder="Brief description of department responsibilities..."
-                    value={description}
-                    onChange={(e) => setDescription(e.target.value)}
                     rows={3}
                   />
+                  {errors.description && (
+                    <p className="mt-1 text-xs text-red-500">{errors.description}</p>
+                  )}
                 </div>
 
                 <div>
@@ -280,13 +351,19 @@ const DepartmentAuth = () => {
                   </div>
                   <input
                     type={showPassword ? 'text' : 'password'}
-                    className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-slate-900 placeholder-slate-400 focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                    name="password"
+                    value={registerForm.password}
+                    onChange={handleRegisterChange}
+                    className={`mt-1 w-full rounded-lg border ${
+                      errors.password ? 'border-red-500' : 'border-slate-300'
+                    } bg-white px-3 py-2 text-slate-900 placeholder-slate-400 focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500`}
                     placeholder="••••••••"
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
                     required
                     minLength={6}
                   />
+                  {errors.password && (
+                    <p className="mt-1 text-xs text-red-500">{errors.password}</p>
+                  )}
                 </div>
 
                 <button
@@ -315,4 +392,4 @@ const DepartmentAuth = () => {
   );
 };
 
-export default DepartmentLogin;
+export default DepartmentAuth;

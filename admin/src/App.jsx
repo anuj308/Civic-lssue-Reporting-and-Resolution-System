@@ -7,7 +7,7 @@ import { useAdminAuth, useDeptAuth } from './store/auth.jsx';
 
 import AdminLogin from './pages/Admin/Login';
 import AdminDashboard from './pages/Admin/Dashboard';
-import DepartmentLogin from './pages/Department/Login';
+import DepartmentAuth from './pages/Department/deptAuth.jsx';
 import DepartmentDashboard from './pages/Department/Dashboard';
 
 const LoginGuards = ({ children, role }) => {
@@ -64,7 +64,7 @@ const App = () => {
             path="/department/login"
             element={
               <LoginGuards role="dept">
-                <DepartmentLogin />
+                <DepartmentAuth />
               </LoginGuards>
             }
           />
