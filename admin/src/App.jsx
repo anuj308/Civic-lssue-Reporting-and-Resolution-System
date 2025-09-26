@@ -3,12 +3,12 @@ import { Routes, Route, Navigate, Link } from 'react-router-dom';
 import AdminProtectedRoute from './components/AdminProtectedRoute';
 import DepartmentProtectedRoute from './components/DepartmentProtectedRoute';
 import Spinner from './components/Spinner';
+import { useAdminAuth, useDeptAuth } from './store/auth.jsx';
 
 import AdminLogin from './pages/Admin/Login';
 import AdminDashboard from './pages/Admin/Dashboard';
 import DepartmentLogin from './pages/Department/Login';
 import DepartmentDashboard from './pages/Department/Dashboard';
-import { useAdminAuth, useDeptAuth } from './store/auth';
 
 const LoginGuards = ({ children, role }) => {
   const { token: admin } = useAdminAuth() || {};

@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
-import { useAdminAuth } from '../../store/auth';
+import { useAdminAuth } from '../../store/auth.jsx';
 
 const AdminLogin = () => {
   const navigate = useNavigate();
