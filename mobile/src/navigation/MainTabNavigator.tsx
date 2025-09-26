@@ -10,6 +10,7 @@ import ProfileScreen from '../screens/main/ProfileScreen';
 import IssueDetailScreen from '../screens/main/IssueDetailScreen';
 import ReportIssueScreen from '../screens/main/ReportIssueScreen';
 import IssuesScreen from '../screens/main/IssuesScreen';
+import ReelsScreen from '../screens/main/ReelsScreen';
 import SecurityScreen from '../screens/main/SecurityScreen';
 import DeviceManagementScreen from '../screens/main/DeviceManagementScreen';
 import SecurityAlertsScreen from '../screens/main/SecurityAlertsScreen';
@@ -17,6 +18,7 @@ import SecuritySettingsScreen from '../screens/main/SecuritySettingsScreen';
 
 export type MainTabParamList = {
   Issues: undefined;
+  Reels: undefined;
   Report: undefined;
   Map: undefined;
   Profile: undefined;
@@ -47,6 +49,8 @@ const MainTabs = () => {
 
           if (route.name === 'Issues') {
             iconName = focused ? 'format-list-bulleted' : 'format-list-bulleted';
+          } else if (route.name === 'Reels') {
+            iconName = focused ? 'play-box-multiple' : 'play-box-multiple-outline';
           } else if (route.name === 'Report') {
             iconName = focused ? 'plus-circle' : 'plus-circle-outline';
           } else if (route.name === 'Map') {
@@ -79,6 +83,11 @@ const MainTabs = () => {
         name="Issues" 
         component={IssuesScreen}
         options={{ tabBarLabel: 'My Issues' }}
+      />
+      <Tab.Screen 
+        name="Reels" 
+        component={ReelsScreen}
+        options={{ tabBarLabel: 'Reels' }}
       />
       <Tab.Screen 
         name="Map" 

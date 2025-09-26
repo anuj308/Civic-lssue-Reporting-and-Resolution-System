@@ -66,6 +66,38 @@ const PRIORITY_COLORS = {
   critical: '#F44336',
 };
 
+const STATUS_COLORS_RGBA = {
+  pending: 'rgba(255, 152, 0, 0.2)',
+  acknowledged: 'rgba(33, 150, 243, 0.2)',
+  in_progress: 'rgba(156, 39, 176, 0.2)',
+  resolved: 'rgba(76, 175, 80, 0.2)',
+  closed: 'rgba(117, 117, 117, 0.2)',
+  rejected: 'rgba(244, 67, 54, 0.2)',
+};
+
+const PRIORITY_COLORS_RGBA = {
+  low: 'rgba(76, 175, 80, 0.2)',
+  medium: 'rgba(255, 152, 0, 0.2)',
+  high: 'rgba(255, 87, 34, 0.2)',
+  critical: 'rgba(244, 67, 54, 0.2)',
+};
+
+const STATUS_COLORS_RGBA_30 = {
+  pending: 'rgba(255, 152, 0, 0.3)',
+  acknowledged: 'rgba(33, 150, 243, 0.3)',
+  in_progress: 'rgba(156, 39, 176, 0.3)',
+  resolved: 'rgba(76, 175, 80, 0.3)',
+  closed: 'rgba(117, 117, 117, 0.3)',
+  rejected: 'rgba(244, 67, 54, 0.3)',
+};
+
+const PRIORITY_COLORS_RGBA_30 = {
+  low: 'rgba(76, 175, 80, 0.3)',
+  medium: 'rgba(255, 152, 0, 0.3)',
+  high: 'rgba(255, 87, 34, 0.3)',
+  critical: 'rgba(244, 67, 54, 0.3)',
+};
+
 const CATEGORY_LABELS = {
   pothole: 'Pothole',
   streetlight: 'Street Light',
@@ -103,12 +135,12 @@ const IssuesScreen: React.FC = () => {
 
   const filteredIssues = myIssues.filter((issue: Issue) => {
     const matchesSearch = 
-      issue.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      issue.description.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      issue.location.address.toLowerCase().includes(searchQuery.toLowerCase());
+      (issue.title || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
+      (issue.description || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
+      (issue.location?.address || '').toLowerCase().includes(searchQuery.toLowerCase());
     
-    const matchesStatus = selectedStatus.length === 0 || selectedStatus.includes(issue.status);
-    const matchesPriority = selectedPriority.length === 0 || selectedPriority.includes(issue.priority);
+    const matchesStatus = selectedStatus.length === 0 || selectedStatus.includes(issue.status || '');
+    const matchesPriority = selectedPriority.length === 0 || selectedPriority.includes(issue.priority || '');
     
     return matchesSearch && matchesStatus && matchesPriority;
   });
@@ -199,12 +231,12 @@ const IssuesScreen: React.FC = () => {
         <View style={styles.issueHeader}>
           <View style={styles.issueHeaderLeft}>
             <Text variant="titleMedium" style={styles.issueTitle} numberOfLines={2}>
-              {issue.title}
+              {issue.title || 'Untitled Issue'}
             </Text>
             <Text variant="bodySmall" style={styles.issueDate}>
               {issue.daysSinceReported === 0 
                 ? 'Today' 
-                : `${issue.daysSinceReported} days ago`
+                : `${issue.daysSinceReported || 0} days ago`
               }
             </Text>
           </View>
@@ -213,19 +245,19 @@ const IssuesScreen: React.FC = () => {
               icon={getStatusIcon(issue.status)}
               style={[
                 styles.statusChip,
-                { backgroundColor: STATUS_COLORS[issue.status] + '20' }
+                { backgroundColor: STATUS_COLORS_RGBA[issue.status] || 'rgba(102, 102, 102, 0.2)' }
               ]}
-              textStyle={{ color: STATUS_COLORS[issue.status], fontSize: 12 }}
+              textStyle={{ color: STATUS_COLORS[issue.status] || '#666666', fontSize: 12 }}
               compact
             >
-              {issue.statusDisplay}
+              {issue.statusDisplay || issue.status || 'Unknown'}
             </Chip>
           </View>
         </View>
 
         {/* Description */}
         <Text variant="bodyMedium" style={styles.issueDescription} numberOfLines={3}>
-          {issue.description}
+          {issue.description || 'No description available'}
         </Text>
 
         {/* Tags */}
@@ -235,22 +267,22 @@ const IssuesScreen: React.FC = () => {
             textStyle={styles.categoryChipText}
             compact
           >
-            {CATEGORY_LABELS[issue.category as keyof typeof CATEGORY_LABELS] || issue.category}
+            {CATEGORY_LABELS[issue.category as keyof typeof CATEGORY_LABELS] || issue.category || 'Other'}
           </Chip>
           
           <Chip
             icon={getPriorityIcon(issue.priority)}
             style={[
               styles.priorityChip,
-              { backgroundColor: PRIORITY_COLORS[issue.priority] + '20' }
+              { backgroundColor: PRIORITY_COLORS_RGBA[issue.priority] || 'rgba(102, 102, 102, 0.2)' }
             ]}
-            textStyle={{ color: PRIORITY_COLORS[issue.priority], fontSize: 11 }}
+            textStyle={{ color: PRIORITY_COLORS[issue.priority] || '#666666', fontSize: 11 }}
             compact
           >
-            {issue.priority.toUpperCase()}
+            {(issue.priority || 'unknown').toUpperCase()}
           </Chip>
 
-          {issue.media.images.length > 0 && (
+          {issue.media?.images?.length > 0 && (
             <Chip
               icon="image"
               style={styles.mediaChip}
@@ -264,7 +296,7 @@ const IssuesScreen: React.FC = () => {
 
         {/* Location */}
         <Text variant="bodySmall" style={styles.issueLocation} numberOfLines={1}>
-          📍 {issue.location.address}
+          📍 {issue.location?.address || 'Location not available'}
         </Text>
       </Card.Content>
     </Card>
@@ -305,11 +337,11 @@ const IssuesScreen: React.FC = () => {
             onPress={() => handleStatusFilterToggle(status)}
             style={[
               styles.filterChip,
-              selectedStatus.includes(status) && { backgroundColor: color + '30' }
+              selectedStatus.includes(status) && { backgroundColor: STATUS_COLORS_RGBA_30[status] || 'rgba(102, 102, 102, 0.3)' }
             ]}
-            textStyle={selectedStatus.includes(status) ? { color } : undefined}
+            textStyle={selectedStatus.includes(status) ? { color: STATUS_COLORS[status] || '#666666' } : undefined}
           >
-            {status.replace('_', ' ').toUpperCase()}
+            {(status || '').replace('_', ' ').toUpperCase()}
           </Chip>
         ))}
       </View>
@@ -324,11 +356,11 @@ const IssuesScreen: React.FC = () => {
             onPress={() => handlePriorityFilterToggle(priority)}
             style={[
               styles.filterChip,
-              selectedPriority.includes(priority) && { backgroundColor: color + '30' }
+              selectedPriority.includes(priority) && { backgroundColor: PRIORITY_COLORS_RGBA_30[priority] || 'rgba(102, 102, 102, 0.3)' }
             ]}
-            textStyle={selectedPriority.includes(priority) ? { color } : undefined}
+            textStyle={selectedPriority.includes(priority) ? { color: PRIORITY_COLORS[priority] || '#666666' } : undefined}
           >
-            {priority.toUpperCase()}
+            {(priority || '').toUpperCase()}
           </Chip>
         ))}
       </View>

@@ -279,6 +279,9 @@ export const issueApi = {
   getNearbyIssues: (params: { latitude: number; longitude: number; radius?: number }) =>
     apiService.get('/issues/nearby', { params }),
   
+  getPublicIssues: (params?: { page?: number; limit?: number; fields?: string }) =>
+    apiService.get('/issues/public', { params }),
+  
   getMapIssues: (params: { status?: string; category?: string; priority?: string } = {}) =>
     apiService.get('/issues/map', { params }),
   
