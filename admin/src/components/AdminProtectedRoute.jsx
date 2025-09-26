@@ -1,9 +1,11 @@
 import React from 'react';
 import { Navigate } from 'react-router-dom';
-import { getAdminToken } from '../services/api';
+import { useAdminAuth } from '../store/auth';
+import Spinner from './Spinner';
 
 const AdminProtectedRoute = ({ children }) => {
-  const token = getAdminToken?.() || null;
+  const { token, loading } = useAdminAuth() || {};
+  if (loading) return <Spinner className="h-screen" />;
   if (!token) return <Navigate to="/admin/login" replace />;
   return children;
 };
