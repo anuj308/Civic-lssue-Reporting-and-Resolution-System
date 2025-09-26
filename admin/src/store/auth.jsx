@@ -107,11 +107,19 @@ export const DepartmentAuthProvider = ({ children }) => {
     [fetchMe]
   );
 
-  const register = useCallback(async ({ name, email, password }) => {
-    if (!departmentAuthAPI.register) throw new Error('Department registration is not enabled');
-    await departmentAuthAPI.register({ name, email, password });
-    return true;
-  }, []);
+  const register = useCallback(
+    async ({ name, email, password }) => {
+      if (!departmentAuthAPI.register) throw new Error('Department registration is not enabled');
+      const response = await departmentAuthAPI.register({ name, email, password });
+      if (response.data.success) {
+        setDeptToken(response.data.data.accessToken);
+        setToken(response.data.data.accessToken);
+        setProfile(response.data.data.department);
+      }
+      return response.data;
+    },
+    []
+  );
 
   const logout = useCallback(() => {
     clearDeptToken();
