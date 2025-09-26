@@ -26,6 +26,12 @@ import OTPVerification from "./pages/Auth/OTPVerification";
 import ResetPassword from "./pages/Auth/ResetPassword";
 import ProtectedRoute from "./components/Auth/ProtectedRoute";
 
+// Admin Components
+import AdminLogin from "./pages/Admin/AdminLogin";
+import AdminDashboard from "./pages/Admin/AdminDashboard";
+import DepartmentList from "./pages/Departments/DepartmentList";
+import AdminProtectedRoute from "./components/Auth/AdminProtectedRoute";
+
 // Layout Components
 import Layout from "./components/Layout/Layout";
 
@@ -85,6 +91,25 @@ const AppRoutes: React.FC = () => {
         {/* Default redirect */}
         <Route index element={<Navigate to="dashboard" replace />} />
       </Route>
+
+      {/* Admin Routes */}
+      <Route path="/admin/login" element={<AdminLogin />} />
+      <Route
+        path="/admin"
+        element={
+          <AdminProtectedRoute>
+            <AdminDashboard />
+          </AdminProtectedRoute>
+        }
+      />
+      <Route
+        path="/admin/departments"
+        element={
+          <AdminProtectedRoute>
+            <DepartmentList />
+          </AdminProtectedRoute>
+        }
+      />
 
       {/* Catch all - redirect to dashboard */}
       <Route path="*" element={<Navigate to="/dashboard" replace />} />

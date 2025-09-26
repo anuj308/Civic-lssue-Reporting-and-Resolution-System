@@ -11,6 +11,7 @@ import departmentReducer from './slices/departmentSlice';
 import analyticsReducer from './slices/analyticsSlice';
 import notificationReducer from './slices/notificationSlice';
 import uiReducer from './slices/uiSlice';
+import adminReducer from './slices/adminSlice';
 
 // Persist configuration
 const persistConfig = {
@@ -28,6 +29,7 @@ const rootReducer = combineReducers({
   analytics: analyticsReducer,
   notifications: notificationReducer,
   ui: uiReducer,
+  admin: adminReducer,
 });
 
 // Persisted reducer
@@ -35,7 +37,16 @@ const persistedReducer = persistReducer(persistConfig, rootReducer);
 
 // Configure store
 export const store = configureStore({
-  reducer: persistedReducer,
+  reducer: {
+    auth: authReducer,
+    users: userReducer,
+    issues: issueReducer,
+    departments: departmentReducer,
+    analytics: analyticsReducer,
+    notifications: notificationReducer,
+    ui: uiReducer,
+    admin: adminReducer,
+  },
   middleware: (getDefaultMiddleware) =>
     getDefaultMiddleware({
       serializableCheck: {
