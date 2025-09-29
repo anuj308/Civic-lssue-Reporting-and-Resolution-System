@@ -385,13 +385,6 @@ const UserDashboard: React.FC = () => {
   const navigate = useNavigate();
   const currentUser = useSelector(selectCurrentUser);
 
-  // Check if user is admin/staff - redirect to admin dashboard
-  const isAdmin =
-    currentUser?.role &&
-    ["admin", "department_head", "department_staff"].includes(currentUser.role);
-  if (isAdmin) {
-    return <Navigate to="/dashboard" replace />;
-  }
   const issues = useSelector(selectIssues);
   const loading = useSelector(selectIssuesLoading);
   const error = useSelector(selectIssuesError);

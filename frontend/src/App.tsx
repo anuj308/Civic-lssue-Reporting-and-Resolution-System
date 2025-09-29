@@ -30,7 +30,6 @@ import ProtectedRoute from "./components/Auth/ProtectedRoute";
 import Layout from "./components/Layout/Layout";
 
 // Lazy load page components for code splitting
-const UserManagement = React.lazy(() => import("./pages/Users/UserManagement"));
 const IssueManagement = React.lazy(() => import("./pages/Issues/IssueManagement"));
 const IssueReels = React.lazy(() => import("./pages/Issues/IssueReels"));
 const UserDashboard = React.lazy(() => import("./pages/User/UserDashboard"));
@@ -78,7 +77,6 @@ const AppRoutes: React.FC = () => {
         <Route path="report-issue" element={<ReportIssue />} />
         <Route path="map" element={<Map />} />
         <Route path="profile" element={<Profile />} />
-        <Route path="users" element={<UserManagement />} />
         <Route path="issues" element={<IssueManagement />} />
         <Route path="reels" element={<IssueReels />} />
         <Route path="departments" element={<DepartmentLeaderboard />} />

@@ -389,9 +389,6 @@ export const usersAPI = {
 
   deleteUser: (userId: string) =>
     apiService.delete(`/users/${userId}`),
-
-  bulkOperations: (data: { operation: string; userIds: string[]; data?: any }) =>
-    apiService.post('/admin/users/bulk', data),
 };
 
 // Issues API
@@ -535,22 +532,5 @@ export const userApi = {
     apiService.post('/auth/change-password', data),
 };
 
-// Admin API
-export const adminAPI = {
-  getSystemOverview: () =>
-    apiService.get('/admin/overview'),
-
-  getSystemLogs: (params?: any) =>
-    apiService.get('/admin/logs', params),
-
-  updateSystemConfig: (config: any) =>
-    apiService.put('/admin/config', config),
-
-  generateReport: (params: { reportType: string; startDate?: string; endDate?: string; format?: string }) =>
-    apiService.get('/admin/reports', params),
-
-  performMaintenance: (operation: string) =>
-    apiService.post('/admin/maintenance', { operation }),
-};
 
 export default api;
