@@ -476,6 +476,7 @@ const ReportIssueScreen: React.FC = () => {
                     error={!!errors.title}
                     style={styles.input}
                     placeholder="Brief description of the issue"
+                    right={<TextInput.Icon icon="microphone" />}
                   />
                 )}
               />
@@ -502,6 +503,7 @@ const ReportIssueScreen: React.FC = () => {
                     multiline
                     numberOfLines={4}
                     placeholder="Provide detailed information about the issue..."
+                    right={<TextInput.Icon icon="microphone" />}
                   />
                 )}
               />
@@ -653,7 +655,73 @@ const ReportIssueScreen: React.FC = () => {
               )}
             </Card.Content>
           </Card>
+            
+              {/* Videos */}
+          <Card style={styles.card}>
+            <Card.Content>
+              <Text variant="titleMedium" style={styles.cardTitle}>
+                Videos
+              </Text>
+              <Text variant="bodySmall" style={styles.cardSubtitle}>
+                Add a short video (reel) to showcase the issue. This will be featured in the Reels section (max 2 videos, 60s each).
+              </Text>
 
+              <View style={styles.photoContainer}>
+                <Button
+                  mode="outlined"
+                  onPress={recordVideo}
+                  style={styles.photoButton}
+                  icon="video"
+                >
+                  Record Video
+                </Button>
+                <Button
+                  mode="outlined"
+                  onPress={pickVideo}
+                  style={styles.photoButton}
+                  icon="video-plus"
+                >
+                  Choose Video
+                </Button>
+              </View>
+
+              {videos.length > 0 && (
+                <View style={styles.imagesGrid}>
+                  {videos.map((video, index) => (
+                    <View key={index} style={styles.imageItem}>
+                      <Surface style={styles.imageContainer}>
+                        <Image 
+                          source={{ uri: video.uri }}
+                          style={styles.imagePreview}
+                          resizeMode="cover"
+                        />
+                        <View style={styles.videoOverlay}>
+                          <IconButton
+                            icon="play"
+                            size={24}
+                            iconColor="white"
+                            style={styles.playButton}
+                          />
+                        </View>
+                        <IconButton
+                          icon="close"
+                          size={20}
+                          onPress={() => removeVideo(index)}
+                          style={styles.removeImageButton}
+                        />
+                      </Surface>
+                    </View>
+                  ))}
+                </View>
+              )}
+
+              {videos.length === 0 && (
+                <Surface style={styles.noImagesContainer}>
+                  <Text style={styles.noImagesText}>No videos added yet</Text>
+                </Surface>
+              )}
+            </Card.Content>
+          </Card>
           {/* Photos */}
           <Card style={styles.card}>
             <Card.Content>
@@ -713,72 +781,7 @@ const ReportIssueScreen: React.FC = () => {
             </Card.Content>
           </Card>
 
-          {/* Videos */}
-          <Card style={styles.card}>
-            <Card.Content>
-              <Text variant="titleMedium" style={styles.cardTitle}>
-                Videos
-              </Text>
-              <Text variant="bodySmall" style={styles.cardSubtitle}>
-                Add videos to show the issue in action (max 2 videos, 60 seconds each)
-              </Text>
-
-              <View style={styles.photoContainer}>
-                <Button
-                  mode="outlined"
-                  onPress={recordVideo}
-                  style={styles.photoButton}
-                  icon="video"
-                >
-                  Record Video
-                </Button>
-                <Button
-                  mode="outlined"
-                  onPress={pickVideo}
-                  style={styles.photoButton}
-                  icon="video-plus"
-                >
-                  Choose Video
-                </Button>
-              </View>
-
-              {videos.length > 0 && (
-                <View style={styles.imagesGrid}>
-                  {videos.map((video, index) => (
-                    <View key={index} style={styles.imageItem}>
-                      <Surface style={styles.imageContainer}>
-                        <Image 
-                          source={{ uri: video.uri }}
-                          style={styles.imagePreview}
-                          resizeMode="cover"
-                        />
-                        <View style={styles.videoOverlay}>
-                          <IconButton
-                            icon="play"
-                            size={24}
-                            iconColor="white"
-                            style={styles.playButton}
-                          />
-                        </View>
-                        <IconButton
-                          icon="close"
-                          size={20}
-                          onPress={() => removeVideo(index)}
-                          style={styles.removeImageButton}
-                        />
-                      </Surface>
-                    </View>
-                  ))}
-                </View>
-              )}
-
-              {videos.length === 0 && (
-                <Surface style={styles.noImagesContainer}>
-                  <Text style={styles.noImagesText}>No videos added yet</Text>
-                </Surface>
-              )}
-            </Card.Content>
-          </Card>
+        
 
           {/* Submit Button */}
           <View style={styles.submitContainer}>
