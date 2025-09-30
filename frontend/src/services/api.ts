@@ -389,9 +389,6 @@ export const usersAPI = {
 
   deleteUser: (userId: string) =>
     apiService.delete(`/users/${userId}`),
-
-  bulkOperations: (data: { operation: string; userIds: string[]; data?: any }) =>
-    apiService.post('/admin/users/bulk', data),
 };
 
 // Issues API
@@ -538,18 +535,5 @@ export const userApi = {
     apiService.post('/auth/change-password', data),
 };
 
-// Admin API
-export const adminAPI = {
-  signup: (data: { name: string; email: string; username?: string; password: string }) =>
-    apiService.post('/admin/signup', data),
-
-  login: (data: { identifier: string; password: string }) =>
-    apiService.post('/admin/login', data),
-
-  me: () => apiService.get('/admin/me'),
-
-  refresh: (data?: { refreshToken?: string }) =>
-    apiService.post('/admin/refresh', data),
-};
 
 export default api;
